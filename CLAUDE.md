@@ -61,6 +61,13 @@ Ask the user to run `/ship`.
 - Implementation and documentation must remain aligned at all times.
 - The final report must be short enough to scan in under a minute.
 
+**Game rules changes require explicit user approval.**
+`docs/game-rules/` is the single source of truth for all game design. Every mechanic in the codebase is derived from it. Careless or unilateral edits to the rules can silently break gameplay logic, create inconsistencies between systems, and cause flow errors that are hard to trace back to their origin.
+- Never edit files under `docs/game-rules/` without the user explicitly approving the change first.
+- When a rules change is needed, present what would change and why, then wait for confirmation.
+- Rules edits should be minimal and targeted — do not rewrite sections when a single clarification suffices.
+- If a rule is ambiguous, ask the user to resolve the ambiguity rather than making a design decision unilaterally.
+
 ## Project structure
 
 ```
@@ -74,9 +81,9 @@ resources/
   data/enemy_grunt.tres     # Tier 1 enemy config
 
 scenes/battle/
-  BattleScene.tscn/.gd      # Root scene; wires CombatManager signals to HUDs
+  BattleScene.tscn/.gd      # Root scene; wires CombatManager signals to HUDs; owns DefeatPanel overlay with restart button (disconnects all signals before reload_current_scene)
   CombatantHUD.tscn/.gd     # Per-combatant UI: name, wound slots, guard value
-  RoundHUD.tscn/.gd         # Phase label, Strike button, scrollable combat log
+  RoundHUD.tscn/.gd         # Phase label, Strike button, scrollable combat log; emits strike_pressed signal
   Combatant.tscn/.gd        # Placeholder visual (colored rect + name)
 
 docs/game-rules/            # Design source of truth — rules drive implementation
@@ -84,6 +91,12 @@ docs/game-rules/            # Design source of truth — rules drive implementat
   reference/cheat-sheet.md  # Quick rules reference
 docs/game-style/
   style-concept.md          # Visual and tone direction
+docs/
+  project-status.md         # Implemented features and ordered roadmap
+
+.claude/
+  agents/docs-alignment-auditor.md  # Agent: cross-checks all docs against codebase
+  commands/audit-docs.md            # Skill: deploy the alignment auditor (/audit-docs)
 ```
 
 ## Architecture
@@ -92,7 +105,9 @@ docs/game-style/
 
 `CombatantData` (`.tres` resource) → `CombatManager` → signals → `BattleScene` → HUD nodes.
 
-`CombatantData` is **immutable config** only. All runtime state (wounds, guard, defeated flag) lives inside `CombatManager.CombatantState`, an inner class instantiated per combat. Scene nodes hold no game state.
+`CombatantData` is **immutable config** only. All runtime state lives inside `CombatManager.CombatantState`, an inner class instantiated per combat. Scene nodes hold no game state.
+
+`CombatantState` fields: `data` (CombatantData), `current_wounds`, `current_guard`, `stance_rolled` (bool — true once Stance has been rolled this round; reset at round start), `is_defeated`.
 
 ### Autoload singletons
 
@@ -103,15 +118,16 @@ docs/game-style/
 
 ```
 _begin_round()
+  → resets both guards to 0
   → emits player_action_required
-  → (player presses Strike)
+  → (player presses Strike → RoundHUD emits strike_pressed → BattleScene calls player_chose_strike)
   → player_chose_strike() calls _resolve_round()
   → rolls both attacks, VT check, _resolve_attack() × 2
   → await 0.8s timer
   → _begin_round()  ← loops until defeat
 ```
 
-`_resolve_round` uses `await` (it is a coroutine). Calling it without `await` from `player_chose_strike` is intentional — it runs asynchronously.
+`_resolve_round` is a GDScript coroutine (uses `await`). Calling it without `await` from `player_chose_strike` is intentional — it runs cooperatively on the main thread, yielding at the timer.
 
 ### GDScript typing rules
 
@@ -144,9 +160,9 @@ The rules live in `docs/game-rules/`. The implementation must match them exactly
 | Die size | from stat field (`dominion_size`, `negation_size`) — face value int (4/6/8/10) |
 | Keep | grade 0 → keep 1, grade 1 → keep 2, grade 2 → keep 3 |
 | VT (Fast/Slow) | VT is a **static enemy property**. Only the **player's** action roll is compared to the enemy's VT. Player >= VT → Fast (acts first); Player < VT → Slow (enemy acts first). Enemy timing is implicit in VT — no roll. |
-| Guard | rolled fresh by defender each attack phase; resets to 0 at round start |
+| Guard | rolled **once per round** when first pressured; subsequent same-round pressure reuses existing Guard without re-rolling; resets to 0 at round start |
 | Breach | `attack_total >= guard` (reaching exactly 0 is a breach) |
-| Wounds | 1 on breach; 2 if Massive: `(attack - guard) > defensive_size` |
+| Wounds | 1 on breach; 2 if Massive: `(attack - guard) > defensive_size` (currently `negation_size`; will vary per pool when Resolve/Stamina are added) |
 | Defeat | `wounds >= max_wounds` |
 
 Stats not yet implemented (defer until design requires): Ingenuity/Resolve/Stamina pools, Advantage/Disadvantage, Flat modifiers, equipment, Fervor/magic, progression/Constellation.

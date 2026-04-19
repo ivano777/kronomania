@@ -8,26 +8,28 @@ Tracks what is implemented and what remains. Updated after each feature ships.
 
 ### Core engine
 - **RollEngine** (`autoloads/RollEngine.gd`) — stateless dice resolver.
-  Build Pool → Roll → Keep → Flat → Outcome. Returns `Dictionary` with `dice`, `kept`, `total`, `flat`.
+  Build Pool → Roll → Keep → Flat → Outcome. Returns `Dictionary` with `dice`, `kept`, `total`, `pool_size`, `die_size`, `keep_count`, `flat`.
   Includes `flat` post-Keep numeric bonus parameter (already wired, currently passed as 0 everywhere).
   Helpers: `is_fast(total, vt)`, `is_massive(attack, guard, defensive_size)`.
 - **CombatantData** (`resources/CombatantData.gd`) — immutable combatant config as a `.tres` Resource.
   Fields: `combatant_name`, `tier`, `dominion_size`, `negation_size`, `keep_grade`, `velocity_threshold`, `max_wounds`.
   Both player and enemy `max_wounds` are configurable; player default = 3, enemy values vary per `.tres` file.
 - **CombatManager** (`autoloads/CombatManager.gd`) — 1v1 combat state machine.
-  Owns all runtime state (wounds, guard, defeated flag) via inner class `CombatantState`.
+  Owns all runtime state via inner class `CombatantState` (fields: `data`, `current_wounds`, `current_guard`, `stance_rolled`, `is_defeated`).
   Round loop: `_begin_round → player_chose_strike → _resolve_round → _resolve_attack × 2 → loop`.
+  Defeat is checked after each `_resolve_attack()`; if triggered, second attack and timer are skipped.
 
 ### Combat mechanics
 - **Roll / Keep** — Tier-based pool, grade-based keep (0→1, 1→2, 2→3).
 - **VT / initiative** — only the player's roll is compared to the enemy's static VT; Fast → player first, Slow → enemy first. Enemy timing is implicit in VT — no roll.
-- **Active Guard** — defender rolls Stance (Negation die, Tier pool) each attack phase. Guard resets to 0 at the start of each round (not after each attack).
+- **Active Guard** — Stance is rolled once per round when first pressured (`stance_rolled` flag on `CombatantState`). Subsequent same-round pressure reuses the existing Guard value without re-rolling. Guard resets to 0 and `stance_rolled` resets to `false` at round start.
+  *Future: replace the boolean flag with a per-pool data structure tracking `{ guard: int, rolled: bool }` for each of Stance / Resolve / Stamina.*
 - **Breach** — `attack_total >= guard`.
 - **Massive damage** — `(attack - guard) > defensive_size` → 2 Wounds instead of 1.
 - **Wound tracking + Defeat** — `wounds >= max_wounds`.
 
 ### Data
-- `resources/data/player_default.tres` — Tier 1, d6 off/def, keep grade 0, max wounds 3.
+- `resources/data/player_default.tres` — Tier 1, d6 off/def, keep grade 0, max wounds 3. (`velocity_threshold` field is present due to shared schema but unused for the player.)
 - `resources/data/enemy_grunt.tres` — Tier 1, d6 off / d4 def, keep grade 0, VT 10, max wounds 2.
 
 ### UI (prototype-quality)
@@ -39,6 +41,8 @@ Tracks what is implemented and what remains. Updated after each feature ships.
 
 ### Tooling
 - `/ship` — Conventional Commit, pull --rebase, and push in one command.
+- `/audit-docs` — deploy the `docs-alignment-auditor` agent to cross-check all docs against the codebase.
+- `docs-alignment-auditor` agent (`.claude/agents/docs-alignment-auditor.md`) — reads all docs and code, reports misalignments with severity and proposed fixes.
 - Headless validation: `"$GODOT" --headless --path "<project>" --quit-after 5`.
 - `CLAUDE.md` — engine setup, Autonomous Feature Loop workflow, architecture, rules summary.
 

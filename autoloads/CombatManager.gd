@@ -39,14 +39,16 @@ signal player_action_required()
 
 class CombatantState:
 	var data: CombatantData
-	var current_wounds: int = 0
-	var current_guard: int  = 0
-	var is_defeated: bool   = false
+	var current_wounds: int  = 0
+	var current_guard: int   = 0
+	var stance_rolled: bool  = false  # true once Stance has been rolled this round
+	var is_defeated: bool    = false
 
 	func init(d: CombatantData) -> void:
 		data = d
 		current_wounds = 0
 		current_guard  = 0
+		stance_rolled  = false
 		is_defeated    = false
 
 
@@ -93,9 +95,11 @@ func player_chose_strike() -> void:
 func _begin_round() -> void:
 	_round += 1
 
-	# Guard resets at the start of each new turn (rules: defense-and-guard.md).
+	# Guard and roll-flag reset at the start of each new round (rules: defense-and-guard.md).
 	_player.current_guard = 0
+	_player.stance_rolled = false
 	_enemy.current_guard  = 0
+	_enemy.stance_rolled  = false
 	guard_changed.emit(true,  0)
 	guard_changed.emit(false, 0)
 
@@ -178,14 +182,22 @@ func _resolve_attack(attacker_is_player: bool, attack_result: Dictionary) -> voi
 		]
 	)
 
-	# Defender rolls Stance (Negation die, Tier pool, keep grade).
-	var def_result := RollEngine.resolve(
-		defender.data.tier, defender.data.negation_size, defender.data.keep_grade
-	)
-	defender.current_guard = def_result.total as int
-	guard_changed.emit(defender_is_player, defender.current_guard)
-
-	log_message.emit(_fmt_defense(defender.data.combatant_name, def_result))
+	# Stance may only be rolled once per round (rules: defense-and-guard.md).
+	# If already rolled this round, reuse the existing Guard value.
+	if not defender.stance_rolled:
+		var def_result := RollEngine.resolve(
+			defender.data.tier, defender.data.negation_size, defender.data.keep_grade
+		)
+		defender.current_guard = def_result.total as int
+		defender.stance_rolled = true
+		guard_changed.emit(defender_is_player, defender.current_guard)
+		log_message.emit(_fmt_defense(defender.data.combatant_name, def_result))
+	else:
+		log_message.emit(
+			"  %s Stance already active — Guard [b]%d[/b] absorbs pressure." % [
+				defender.data.combatant_name, defender.current_guard
+			]
+		)
 
 	# Compare: guard breached when attack_total >= guard (guard reaches 0 or below).
 	if (attack_result.total as int) >= defender.current_guard:
