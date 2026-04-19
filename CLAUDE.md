@@ -127,6 +127,9 @@ _begin_round()
 - **Game style** — vision, setting, tone, art direction, and high-level gameplay loop:
   [docs/game-style/style-concept.md](docs/game-style/style-concept.md)
   @./docs/game-style/style-concept.md
+- **Project status** — what is implemented, what is next, ordered roadmap:
+  [docs/project-status.md](docs/project-status.md)
+  @./docs/project-status.md
 
 Before implementing any mechanic, verify the rules in `docs/game-rules/` — the code must match the docs exactly.
 
