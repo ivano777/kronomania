@@ -125,29 +125,21 @@ func _resolve_round() -> void:
 	log_message.emit(_fmt_attack(_enemy.data.combatant_name, e_atk))
 
 	# ── VT check ──────────────────────────────────────────────────────────
-	# VT is a static enemy property. Both sides compare their action roll
-	# against the enemy's authored VT (rules: initiative-and-speed.md).
+	# VT is a static enemy property. Only the player's roll is compared to it.
+	# The enemy's speed is encoded in the VT value itself — no roll needed.
+	# Player Fast → player acts first; Player Slow → enemy acts first.
 	var encounter_vt: int = _enemy.data.velocity_threshold
 	var p_fast := RollEngine.is_fast(p_atk.total as int, encounter_vt)
-	var e_fast := RollEngine.is_fast(e_atk.total as int, encounter_vt)
 
 	log_message.emit(_fmt_speed(_player.data.combatant_name, p_atk.total as int, encounter_vt, p_fast))
-	log_message.emit(_fmt_speed(_enemy.data.combatant_name,  e_atk.total as int, encounter_vt, e_fast))
 
 	# ── Determine resolution order ─────────────────────────────────────────
-	# Fast before Slow. Ties: player goes first.
-	var player_first: bool
-	if p_fast and not e_fast:
-		player_first = true
+	var player_first: bool = p_fast
+	if p_fast:
 		phase_changed.emit("Fast Phase — Player acts first")
-	elif e_fast and not p_fast:
-		player_first = false
-		phase_changed.emit("Fast Phase — Enemy acts first")
 	else:
-		player_first = true
-		var label := "FAST" if p_fast else "Slow"
-		log_message.emit("Both %s — %s acts first (tie-break)." % [label, _player.data.combatant_name])
-		phase_changed.emit(("%s Phase — Player acts first (tie)" % label))
+		log_message.emit("%s is Slow — %s acts first." % [_player.data.combatant_name, _enemy.data.combatant_name])
+		phase_changed.emit("Slow Phase — Enemy acts first")
 
 	# ── First attacker ─────────────────────────────────────────────────────
 	_resolve_attack(player_first, p_atk if player_first else e_atk)
@@ -158,8 +150,7 @@ func _resolve_round() -> void:
 
 	# ── Second attacker ────────────────────────────────────────────────────
 	var second_is_player := not player_first
-	var second_phase := "Slow Phase" if (p_fast != e_fast) else ("Slow Phase" if not p_fast else "Fast Phase (2nd)")
-	phase_changed.emit(second_phase)
+	phase_changed.emit("Slow Phase" if p_fast else "Fast Phase (2nd)")
 	_resolve_attack(second_is_player, p_atk if second_is_player else e_atk)
 
 	if _player.is_defeated or _enemy.is_defeated:

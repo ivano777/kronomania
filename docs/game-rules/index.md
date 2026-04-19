@@ -121,4 +121,4 @@ It is a structured gameplay guideline that can be translated into code, tools, c
 - Two categories of Fervor-tagged dice: real Fervor dice (additive, post-keep) and substitution dice (normal pool, Fervor-tagged).
 - Cantrips do not use Fervor and remain available during Burnout.
 - Player character **Max Wounds = 3** by default; Defeat when Wounds >= Max Wounds.
-- **VT is a static enemy property.** The player has no authored VT. Both the player's and the enemy's action totals are compared against the enemy's VT to determine Fast / Slow.
+- **VT is a static enemy property.** Only the player's action roll is compared to the enemy's VT. Player Fast (>= VT) → acts first; Player Slow (< VT) → enemy acts first. The enemy does not roll for timing.

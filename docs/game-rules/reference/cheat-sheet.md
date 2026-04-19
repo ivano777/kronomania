@@ -59,10 +59,9 @@ Guard resets at start of each new turn.
 
 ## VT (Velocity Threshold)
 - VT is a **static value authored on the enemy / target**.
-- The actor rolls their action; the total is compared to the target's VT.
-- **>= VT → Fast** | **< VT → Slow**
-- The player has no authored VT. Only the enemy's VT is used.
-- Both the player's and the enemy's action rolls are compared to the same encounter VT.
+- Only the **player's** action roll is compared to the enemy's VT.
+- **>= VT → Fast** (player acts first) | **< VT → Slow** (enemy acts first)
+- The enemy does not roll for timing — its speed is encoded in the VT value itself.
 
 ## Spell Resolution Order
 1. Normal pool from Tier

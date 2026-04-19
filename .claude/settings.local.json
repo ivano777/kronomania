@@ -4,7 +4,9 @@
   },
   "permissions": {
     "allow": [
-      "Bash($GODOT *)"
+      "Bash($GODOT *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }

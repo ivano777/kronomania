@@ -20,9 +20,12 @@ Player timing is determined entirely by the action roll vs the enemy's static VT
 
 VT belongs to the enemy, not to the acting character.
 
-In a given encounter, the same VT value is used to evaluate all action rolls — whether the actor is the player or the enemy.
-A higher enemy VT makes Fast timing harder to achieve for both sides.
-A lower enemy VT makes Fast timing easier for both sides.
+The enemy's speed is encoded in the VT value itself — a high VT means a fast enemy, a low VT means a slow one.
+Only the player's action roll is compared to the enemy's VT.
+The enemy does not roll to determine its own timing; its phase position is implicit in the VT.
+
+- **Player Fast** (roll >= VT) → player acts before the enemy.
+- **Player Slow** (roll < VT) → enemy acts before the player.
 
 Typical VT ranges by enemy type:
 

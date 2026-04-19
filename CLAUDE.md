@@ -140,7 +140,7 @@ The rules live in `docs/game-rules/`. The implementation must match them exactly
 | Pool size | = Tier (T1=1 die, T2=2, T3=3, T4=4) |
 | Die size | from stat field (`dominion_size`, `negation_size`) — face value int (4/6/8/10) |
 | Keep | grade 0 → keep 1, grade 1 → keep 2, grade 2 → keep 3 |
-| VT (Fast/Slow) | VT is a **static enemy property**. Both the player's and the enemy's action totals are compared against the **enemy's** VT. >= VT → Fast; < VT → Slow. Fast resolves before Slow; ties → player first. |
+| VT (Fast/Slow) | VT is a **static enemy property**. Only the **player's** action roll is compared to the enemy's VT. Player >= VT → Fast (acts first); Player < VT → Slow (enemy acts first). Enemy timing is implicit in VT — no roll. |
 | Guard | rolled fresh by defender each attack phase; resets to 0 at round start |
 | Breach | `attack_total >= guard` (reaching exactly 0 is a breach) |
 | Wounds | 1 on breach; 2 if Massive: `(attack - guard) > defensive_size` |
