@@ -57,6 +57,13 @@ Guard resets at start of each new turn.
 - Player Max Wounds = 3 (default)
 - Defeat when Wounds >= Max Wounds
 
+## VT (Velocity Threshold)
+- VT is a **static value authored on the enemy / target**.
+- The actor rolls their action; the total is compared to the target's VT.
+- **>= VT → Fast** | **< VT → Slow**
+- The player has no authored VT. Only the enemy's VT is used.
+- Both the player's and the enemy's action rolls are compared to the same encounter VT.
+
 ## Spell Resolution Order
 1. Normal pool from Tier
 2. Advantage / Disadvantage / Desperation

@@ -19,7 +19,9 @@ extends Resource
 ## Training grade for Keep: 0 → keep 1, 1 → keep 2, 2 → keep 3.
 @export_range(0, 2) var keep_grade: int = 0
 
-## Velocity Threshold: rolls >= VT are Fast; rolls < VT are Slow.
+## Velocity Threshold: the encounter timing threshold authored on the ENEMY.
+## Both the player's and the enemy's action totals are compared to the enemy's VT.
+## This field is not used for player timing — only the enemy's value is read.
 @export_range(1, 25) var velocity_threshold: int = 12
 
 ## Maximum Wounds before Defeat.

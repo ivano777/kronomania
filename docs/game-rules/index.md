@@ -88,6 +88,8 @@ It is a structured gameplay guideline that can be translated into code, tools, c
 ### Reference
 - [Cheat Sheet](./reference/cheat-sheet.md)
 @./reference/cheat-sheet.md
+- [Effect Taxonomy](./reference/effect-taxonomy.md)
+@./reference/effect-taxonomy.md
 - [Status Effects](./reference/status-effects.md)
 @./reference/status-effects.md
 - [Examples](./reference/examples.md)
@@ -98,6 +100,8 @@ It is a structured gameplay guideline that can be translated into code, tools, c
 ### Appendices
 - [Enemy Guidelines](./appendices/enemy-guidelines.md)
 @./appendices/enemy-guidelines.md
+- [Future Expansions](./appendices/future-expansions.md)
+@./appendices/future-expansions.md
 - [Changelog](./appendices/changelog.md)
 @./appendices/changelog.md
 - [Rewrite Notes](./appendices/rewrite-notes.md)
@@ -117,3 +121,4 @@ It is a structured gameplay guideline that can be translated into code, tools, c
 - Two categories of Fervor-tagged dice: real Fervor dice (additive, post-keep) and substitution dice (normal pool, Fervor-tagged).
 - Cantrips do not use Fervor and remain available during Burnout.
 - Player character **Max Wounds = 3** by default; Defeat when Wounds >= Max Wounds.
+- **VT is a static enemy property.** The player has no authored VT. Both the player's and the enemy's action totals are compared against the enemy's VT to determine Fast / Slow.

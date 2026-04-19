@@ -71,11 +71,10 @@ func start_combat(player_data: CombatantData, enemy_data: CombatantData) -> void
 
 	log_message.emit("[b]Combat begins![/b]")
 	log_message.emit(
-		"%s (VT %d, d%d off / d%d def) vs %s (VT %d, d%d off / d%d def)" % [
-			player_data.combatant_name, player_data.velocity_threshold,
-			player_data.dominion_size, player_data.negation_size,
-			enemy_data.combatant_name, enemy_data.velocity_threshold,
-			enemy_data.dominion_size, enemy_data.negation_size,
+		"Encounter VT: %d | %s (d%d off / d%d def) vs %s (d%d off / d%d def)" % [
+			enemy_data.velocity_threshold,
+			player_data.combatant_name, player_data.dominion_size, player_data.negation_size,
+			enemy_data.combatant_name, enemy_data.dominion_size, enemy_data.negation_size,
 		]
 	)
 	_begin_round()
@@ -126,11 +125,14 @@ func _resolve_round() -> void:
 	log_message.emit(_fmt_attack(_enemy.data.combatant_name, e_atk))
 
 	# ── VT check ──────────────────────────────────────────────────────────
-	var p_fast := RollEngine.is_fast(p_atk.total as int, _player.data.velocity_threshold)
-	var e_fast := RollEngine.is_fast(e_atk.total as int, _enemy.data.velocity_threshold)
+	# VT is a static enemy property. Both sides compare their action roll
+	# against the enemy's authored VT (rules: initiative-and-speed.md).
+	var encounter_vt: int = _enemy.data.velocity_threshold
+	var p_fast := RollEngine.is_fast(p_atk.total as int, encounter_vt)
+	var e_fast := RollEngine.is_fast(e_atk.total as int, encounter_vt)
 
-	log_message.emit(_fmt_speed(_player.data.combatant_name, p_atk.total as int, _player.data.velocity_threshold, p_fast))
-	log_message.emit(_fmt_speed(_enemy.data.combatant_name,  e_atk.total as int, _enemy.data.velocity_threshold,  e_fast))
+	log_message.emit(_fmt_speed(_player.data.combatant_name, p_atk.total as int, encounter_vt, p_fast))
+	log_message.emit(_fmt_speed(_enemy.data.combatant_name,  e_atk.total as int, encounter_vt, e_fast))
 
 	# ── Determine resolution order ─────────────────────────────────────────
 	# Fast before Slow. Ties: player goes first.
