@@ -18,7 +18,7 @@ If the action result is:
 Slow does not automatically mean failure.
 
 ## Round Flow
-A typical round has three broad phases:
+A typical round has four broad phases:
 1. declared actions
 2. Fast resolution
 3. threat resolution

@@ -1,0 +1,48 @@
+[gd_scene load_steps=2 format=3 uid="uid://q7r8s9t0u1v2w"]
+
+[ext_resource type="Script" uid="uid://h7i8j9k0l1m2n" path="res://scenes/battle/CombatantHUD.gd" id="1_hudscr"]
+
+[node name="CombatantHUD" type="VBoxContainer"]
+custom_minimum_size = Vector2(180, 0)
+script = ExtResource("1_hudscr")
+
+[node name="NameLabel" type="Label" parent="."]
+layout_mode = 2
+text = "Combatant"
+horizontal_alignment = 1
+
+[node name="WoundsRow" type="HBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="WoundsPrefix" type="Label" parent="WoundsRow"]
+layout_mode = 2
+text = "Wounds: "
+
+[node name="WoundSlots" type="HBoxContainer" parent="WoundsRow"]
+layout_mode = 2
+
+[node name="Slot0" type="ColorRect" parent="WoundsRow/WoundSlots"]
+layout_mode = 2
+custom_minimum_size = Vector2(22, 22)
+color = Color(0.25, 0.25, 0.25, 1)
+
+[node name="Slot1" type="ColorRect" parent="WoundsRow/WoundSlots"]
+layout_mode = 2
+custom_minimum_size = Vector2(22, 22)
+color = Color(0.25, 0.25, 0.25, 1)
+
+[node name="Slot2" type="ColorRect" parent="WoundsRow/WoundSlots"]
+layout_mode = 2
+custom_minimum_size = Vector2(22, 22)
+color = Color(0.25, 0.25, 0.25, 1)
+
+[node name="GuardRow" type="HBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="GuardPrefix" type="Label" parent="GuardRow"]
+layout_mode = 2
+text = "Guard: "
+
+[node name="GuardValue" type="Label" parent="GuardRow"]
+layout_mode = 2
+text = "0"

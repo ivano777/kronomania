@@ -1,0 +1,10 @@
+{
+  "env": {
+    "GODOT": "C:/Program Files/Godot/Godot_v4.6.2-stable_win64_console.exe"
+  },
+  "permissions": {
+    "allow": [
+      "Bash($GODOT *)"
+    ]
+  }
+}

@@ -11,8 +11,15 @@ config_version=5
 [application]
 
 config/name="kronomania"
+run/main_scene="uid://kfkv1xh1n4qh"
 config/features=PackedStringArray("4.6", "Forward Plus")
 config/icon="res://icon.svg"
+config/main_scene="res://scenes/battle/BattleScene.tscn"
+
+[autoload]
+
+RollEngine="*res://autoloads/RollEngine.gd"
+CombatManager="*res://autoloads/CombatManager.gd"
 
 [physics]
 

@@ -1,0 +1,19 @@
+[gd_scene load_steps=2 format=3 uid="uid://e9f0g1h2i3j4k"]
+
+[ext_resource type="Script" uid="uid://combatantscr01" path="res://scenes/battle/Combatant.gd" id="1_cscr"]
+
+[node name="Combatant" type="Control"]
+custom_minimum_size = Vector2(100, 180)
+script = ExtResource("1_cscr")
+
+[node name="Body" type="ColorRect" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.2, 0.35, 0.8, 1)
+
+[node name="NameLabel" type="Label" parent="."]
+anchor_right = 1.0
+layout_mode = 1
+anchors_preset = 5
+text = "Name"
+horizontal_alignment = 1
