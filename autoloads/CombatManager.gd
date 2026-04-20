@@ -50,6 +50,7 @@ class CombatantState:
 	var max_wounds: int     = 3
 	var is_defeated: bool   = false
 	var weapon_override: EquipmentData = null  # set by debug tools; null = use data.equipped_weapon
+	var unlocked_nodes: Array[NodeData] = []   # runtime copy of starting_nodes; debug tools may modify
 	# Per-pool guard state (Stance / Resolve / Stamina).
 	var stance_guard: int   = 0
 	var resolve_guard: int  = 0
@@ -63,6 +64,10 @@ class CombatantState:
 		current_wounds = 0
 		max_wounds = d.max_wounds + (d.equipped_weapon.max_wounds_bonus if d.equipped_weapon else 0)
 		is_defeated = false
+		unlocked_nodes.clear()
+		for n in d.starting_nodes:
+			if n is NodeData:
+				unlocked_nodes.append(n as NodeData)
 		reset_guard()
 
 	func reset_guard() -> void:
@@ -168,12 +173,12 @@ func _resolve_round(net_advantage: int = 0, target_pool: String = "stance") -> v
 
 	# ── Roll both attack pools ─────────────────────────────────────────────
 	var p_atk := RollEngine.resolve(
-		_effective_tier(_player), _player.data.dominion_size, _player.data.keep_grade,
+		_effective_tier(_player), _player.data.dominion_size, _training_keep_grade(_player),
 		_attack_flat(_player),
 		net_advantage + _pool_bonus(_player)
 	)
 	var e_atk := RollEngine.resolve(
-		_effective_tier(_enemy), _enemy.data.dominion_size, _enemy.data.keep_grade,
+		_effective_tier(_enemy), _enemy.data.dominion_size, _training_keep_grade(_enemy),
 		_attack_flat(_enemy)
 	)
 
@@ -241,7 +246,7 @@ func _resolve_attack(attacker_is_player: bool, attack_result: Dictionary, target
 	if not defender.is_pool_rolled(target_pool):
 		var def_result := RollEngine.resolve(
 				_effective_tier(defender), defensive_size,
-				defender.data.keep_grade, _guard_flat(defender)
+				_training_keep_grade(defender), _guard_flat(defender)
 			)
 		var guard_val: int = def_result.total as int
 		defender.set_guard_val(target_pool, guard_val)
@@ -352,10 +357,33 @@ func _pool_bonus(state: CombatantState) -> int:
 	return w.pool_bonus if w else 0
 
 
+## Returns the effective keep grade for a combatant: highest Training node value,
+## or data.keep_grade as fallback when no Training node is present.
+func _training_keep_grade(state: CombatantState) -> int:
+	var best: int = state.data.keep_grade
+	for node in state.unlocked_nodes:
+		if node.effect_type == "training_keep":
+			best = maxi(best, node.effect_value)
+	return best
+
+
 ## Debug only — swap the player's weapon at runtime without restarting combat.
 func debug_set_player_weapon(weapon: EquipmentData) -> void:
 	if _player:
 		_player.weapon_override = weapon
+
+
+## Debug only — replace the player's unlocked nodes at runtime.
+func debug_set_player_nodes(nodes: Array[NodeData]) -> void:
+	if _player:
+		_player.unlocked_nodes = nodes
+
+
+## Debug only — returns the player's current effective keep grade.
+func debug_get_player_keep_grade() -> int:
+	if _player:
+		return _training_keep_grade(_player)
+	return 0
 
 
 # ── Formatting helpers ────────────────────────────────────────────────────────

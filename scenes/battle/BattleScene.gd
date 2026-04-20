@@ -8,6 +8,7 @@ const ENEMY_DATA  := preload("res://resources/data/enemy_grunt.tres")
 
 # ── Debug scenes (remove path + add_child call to strip at release) ───────────
 const _DBG_WEAPON_SEL := "res://scenes/debug/DebugWeaponSelector.tscn"
+const _DBG_NODE_SEL   := "res://scenes/debug/DebugNodeSelector.tscn"
 
 # ── Node references ───────────────────────────────────────────────────────────
 @onready var _player_hud:    CombatantHUD = $GameLayout/PlayerSide/PlayerHUD
@@ -53,6 +54,8 @@ func _ready() -> void:
 	# Debug widgets — instantiated at runtime; safe to remove with the const above.
 	if ResourceLoader.exists(_DBG_WEAPON_SEL):
 		add_child((load(_DBG_WEAPON_SEL) as PackedScene).instantiate())
+	if ResourceLoader.exists(_DBG_NODE_SEL):
+		add_child((load(_DBG_NODE_SEL) as PackedScene).instantiate())
 
 	# Start combat.
 	CombatManager.start_combat(PLAYER_DATA, ENEMY_DATA)

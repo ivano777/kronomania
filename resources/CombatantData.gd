@@ -34,3 +34,7 @@ extends Resource
 ## Optional equipped weapon. Applies Potency cap, Forging/Warding flat bonuses,
 ## Fortitude max-wounds bonus, Surge/Drain pool modifier, and stores tags.
 @export var equipped_weapon: EquipmentData = null
+
+## Constellation nodes this combatant starts with.
+## keep_grade above is used as fallback when no Training node provides a value.
+@export var starting_nodes: Array[NodeData] = []

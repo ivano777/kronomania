@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="NodeData" format=3 uid="uid://ep4ig6u8h3yov"]
+
+[ext_resource type="Script" uid="uid://bmnx7e2qr4w9p" path="res://resources/NodeData.gd" id="1_ndscr"]
+
+[resource]
+script = ExtResource("1_ndscr")
+node_name = "Training Keep II"
+category = "Training"
+effect_type = "training_keep"
+effect_value = 2

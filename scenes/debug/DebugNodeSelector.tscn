@@ -1,0 +1,24 @@
+[gd_scene format=3 uid="uid://bvqny5y0xt4v0"]
+
+[ext_resource type="Script" path="res://scenes/debug/DebugNodeSelector.gd" id="1_nsel"]
+
+[node name="DebugNodeSelector" type="VBoxContainer"]
+anchor_left = 0.0
+anchor_top = 1.0
+anchor_right = 0.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = -300.0
+offset_bottom = -210.0
+script = ExtResource("1_nsel")
+
+[node name="ToggleButton" type="Button" parent="."]
+text = "Training ▸"
+
+[node name="Panel" type="VBoxContainer" parent="."]
+visible = false
+
+[node name="Buttons" type="HBoxContainer" parent="Panel"]
+
+[node name="StatusLabel" type="Label" parent="Panel"]
+text = "Keep grade: 0 (keep 1 dice)"

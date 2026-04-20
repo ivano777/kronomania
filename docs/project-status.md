@@ -12,8 +12,9 @@ Tracks what is implemented and what remains. Updated after each feature ships.
   Includes `flat` post-Keep numeric bonus parameter (wired; populated from equipment bonuses).
   Helpers: `is_fast(total, vt)`, `is_massive(attack, guard, defensive_size)`.
 - **CombatantData** (`resources/CombatantData.gd`) — immutable combatant config as a `.tres` Resource.
-  Fields: `combatant_name`, `tier`, `dominion_size`, `negation_size`, `ingenuity_size`, `keep_grade`, `velocity_threshold`, `max_wounds`, `equipped_weapon`.
+  Fields: `combatant_name`, `tier`, `dominion_size`, `negation_size`, `ingenuity_size`, `keep_grade`, `velocity_threshold`, `max_wounds`, `equipped_weapon`, `starting_nodes`.
   Both player and enemy `max_wounds` are configurable; player default = 3, enemy values vary per `.tres` file.
+  `keep_grade` is a fallback default; `starting_nodes` provides data-driven Training nodes that override it at runtime.
 - **EquipmentData** (`resources/EquipmentData.gd`) — immutable equipment config as a `.tres` Resource.
   Fields: `item_name`, `potency`, `flat_attack_bonus` (Forging), `flat_guard_bonus` (Warding), `max_wounds_bonus` (Fortitude), `pool_bonus` (Surge/Drain), `tags`.
   Referenced by `CombatantData.equipped_weapon`. All effects applied at combat init or roll time; `null` = no weapon (no penalty).
@@ -37,7 +38,9 @@ Tracks what is implemented and what remains. Updated after each feature ships.
 - **Equipment effects** — Potency (Tier cap), Forging (flat attack +), Warding (flat guard +), Fortitude (max wounds +), Surge/Drain (pool ±). Applied via helpers in `CombatManager`; logged in combat narrative when non-zero. Tags stored for future skill prerequisites.
 
 ### Data
-- `resources/data/player_default.tres` — Tier 1, d6 off/def, keep grade 0, max wounds 3; equipped with Iron Sword.
+- `resources/data/player_default.tres` — Tier 1, d6 off/def, keep grade 0 (fallback), max wounds 3; equipped with Iron Sword; starts with Training Keep I node (effective keep grade 1 → keep 2 dice).
+- `resources/data/nodes/training_keep_1.tres` — Training, effect_type "training_keep", grade 1.
+- `resources/data/nodes/training_keep_2.tres` — Training, effect_type "training_keep", grade 2.
 - `resources/data/enemy_grunt.tres` — Tier 1, d6 off / d4 def, keep grade 0, VT 10, max wounds 2; equipped with Crude Club.
 - `resources/data/weapons/iron_sword.tres` — Potency 1, Forging I (+1 flat attack), tags ["Sharp"].
 - `resources/data/weapons/crude_club.tres` — Potency 1, no bonuses, tags ["Blunt"].
@@ -75,10 +78,10 @@ Ordered by dependency. Items within a group can be parallelized.
   *Channeling (magical flat) deferred to Group 4. Potency/Diminishment (die-size steps) deferred.*
 
 ### Group 3 — Progression / Constellation
-- [ ] **Node resource** — data type for constellation nodes (category, effect, unlock condition).
-- [ ] **Constellation scene** — visual skill tree; spend points to unlock nodes.
-- [ ] **Tier advancement** — breadth check across Core / Training / Ability / Flavor categories.
-- [ ] **Keep grade from Training nodes** — replace hardcoded `keep_grade` in CombatantData.
+- [x] **Node resource** — `NodeData` (`resources/NodeData.gd`): `node_name`, `category`, `effect_type`, `effect_value`. Sample nodes: `training_keep_1.tres`, `training_keep_2.tres`.
+- [x] **Keep grade from Training nodes** — `CombatantData.starting_nodes: Array[NodeData]` loaded into `CombatantState.unlocked_nodes`. `CombatManager._training_keep_grade()` scans for `"training_keep"` nodes; `keep_grade` remains as fallback. Debug widget `DebugNodeSelector` lets you swap grades mid-combat.
+- [ ] **Constellation scene** — visual skill tree; spend points to unlock nodes. *(Deferred to Group 5 — requires Hub scene.)*
+- [ ] **Tier advancement** — breadth check across Core / Training / Ability / Flavor categories. *(Deferred — requires Constellation scene.)*
 
 ### Group 4 — Magic system
 - [ ] **Fervor subsystem** — real Fervor dice (additive post-keep, cannot be discarded), substitution dice (normal pool, Fervor-tagged), escalation per max roll, cap = current modified Ingenuity.
