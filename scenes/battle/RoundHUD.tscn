@@ -1,7 +1,8 @@
-[gd_scene load_steps=3 format=3 uid="uid://x3y4z5a6b7c8d"]
+[gd_scene load_steps=4 format=3 uid="uid://x3y4z5a6b7c8d"]
 
 [ext_resource type="Script" uid="uid://o3p4q5r6s7t8u" path="res://scenes/battle/RoundHUD.gd" id="1_rhudscr"]
 [ext_resource type="Script" path="res://scenes/debug/DebugAdvantageControl.gd" id="2_dbgscr"]
+[ext_resource type="Script" path="res://scenes/debug/DebugPoolSelector.gd" id="3_poolscr"]
 
 [node name="RoundHUD" type="VBoxContainer"]
 custom_minimum_size = Vector2(360, 0)
@@ -41,6 +42,26 @@ text = "0"
 [node name="PlusButton" type="Button" parent="DebugAdvantageControl"]
 layout_mode = 2
 text = "+"
+
+[node name="DebugPoolSelector" type="HBoxContainer" parent="."]
+layout_mode = 2
+script = ExtResource("3_poolscr")
+
+[node name="PoolLabel" type="Label" parent="DebugPoolSelector"]
+layout_mode = 2
+text = "Pool:"
+
+[node name="StanceButton" type="Button" parent="DebugPoolSelector"]
+layout_mode = 2
+text = "[Stance]"
+
+[node name="ResolveButton" type="Button" parent="DebugPoolSelector"]
+layout_mode = 2
+text = "Resolve"
+
+[node name="StaminaButton" type="Button" parent="DebugPoolSelector"]
+layout_mode = 2
+text = "Stamina"
 
 [node name="Separator" type="HSeparator" parent="."]
 layout_mode = 2

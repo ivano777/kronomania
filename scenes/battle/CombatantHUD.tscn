@@ -36,13 +36,35 @@ layout_mode = 2
 custom_minimum_size = Vector2(22, 22)
 color = Color(0.25, 0.25, 0.25, 1)
 
-[node name="GuardRow" type="HBoxContainer" parent="."]
+[node name="StanceRow" type="HBoxContainer" parent="."]
 layout_mode = 2
 
-[node name="GuardPrefix" type="Label" parent="GuardRow"]
+[node name="StancePrefix" type="Label" parent="StanceRow"]
 layout_mode = 2
-text = "Guard: "
+text = "Stance: "
 
-[node name="GuardValue" type="Label" parent="GuardRow"]
+[node name="StanceValue" type="Label" parent="StanceRow"]
+layout_mode = 2
+text = "0"
+
+[node name="ResolveRow" type="HBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="ResolvePrefix" type="Label" parent="ResolveRow"]
+layout_mode = 2
+text = "Resolve: "
+
+[node name="ResolveValue" type="Label" parent="ResolveRow"]
+layout_mode = 2
+text = "0"
+
+[node name="StaminaRow" type="HBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="StaminaPrefix" type="Label" parent="StaminaRow"]
+layout_mode = 2
+text = "Stamina: "
+
+[node name="StaminaValue" type="Label" parent="StaminaRow"]
 layout_mode = 2
 text = "0"

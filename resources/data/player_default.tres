@@ -8,6 +8,7 @@ combatant_name = "Player"
 tier = 1
 dominion_size = 6
 negation_size = 6
+ingenuity_size = 6
 keep_grade = 0
 velocity_threshold = 12
 max_wounds = 3

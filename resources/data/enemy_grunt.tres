@@ -8,6 +8,7 @@ combatant_name = "Grunt"
 tier = 1
 dominion_size = 6
 negation_size = 4
+ingenuity_size = 4
 keep_grade = 0
 velocity_threshold = 10
 max_wounds = 2

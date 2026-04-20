@@ -68,11 +68,11 @@ func _on_wounds_changed(is_player: bool, current: int, max_wounds: int) -> void:
 		_enemy_hud.set_wounds(current, max_wounds)
 
 
-func _on_guard_changed(is_player: bool, guard_value: int) -> void:
+func _on_guard_changed(is_player: bool, pool: String, guard_value: int) -> void:
 	if is_player:
-		_player_hud.set_guard(guard_value)
+		_player_hud.set_guard(pool, guard_value)
 	else:
-		_enemy_hud.set_guard(guard_value)
+		_enemy_hud.set_guard(pool, guard_value)
 
 
 func _on_combat_ended(winner_name: String) -> void:
@@ -86,7 +86,7 @@ func _on_player_action_required() -> void:
 
 
 func _on_strike_pressed() -> void:
-	CombatManager.player_chose_strike(_round_hud.get_net_advantage())
+	CombatManager.player_chose_strike(_round_hud.get_net_advantage(), _round_hud.get_target_pool())
 
 
 func _on_restart_pressed() -> void:

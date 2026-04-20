@@ -16,6 +16,9 @@ extends Resource
 ## Negation die face used for Stance defense rolls.
 @export_enum("4", "6", "8", "10") var negation_size: int = 6
 
+## Ingenuity die face used for Resolve defense rolls.
+@export_enum("4", "6", "8", "10") var ingenuity_size: int = 6
+
 ## Training grade for Keep: 0 → keep 1, 1 → keep 2, 2 → keep 3.
 @export_range(0, 2) var keep_grade: int = 0
 

@@ -8,8 +8,9 @@ signal strike_pressed
 @onready var _phase_label:  Label         = $PhaseLabel
 @onready var _strike_btn:   Button        = $StrikeButton
 @onready var _log_text:     RichTextLabel = $LogScroll/LogText
-# Debug control — null when node is absent (removed for release).
-@onready var _debug_adv = $DebugAdvantageControl if has_node("DebugAdvantageControl") else null
+# Debug controls — null when nodes are absent (removed for release).
+@onready var _debug_adv  = $DebugAdvantageControl if has_node("DebugAdvantageControl") else null
+@onready var _debug_pool = $DebugPoolSelector     if has_node("DebugPoolSelector")     else null
 
 
 func _ready() -> void:
@@ -48,6 +49,11 @@ func clear_log() -> void:
 ## Returns the current net advantage set by the debug control (0 if absent).
 func get_net_advantage() -> int:
 	return _debug_adv.get_net_advantage() if _debug_adv else 0
+
+
+## Returns the target defense pool set by the debug control ("stance" if absent).
+func get_target_pool() -> String:
+	return _debug_pool.get_target_pool() if _debug_pool else "stance"
 
 
 # ── Private ───────────────────────────────────────────────────────────────────

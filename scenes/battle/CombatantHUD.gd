@@ -6,9 +6,11 @@ const COLOR_WOUND_EMPTY  := Color(0.25, 0.25, 0.25, 1.0)
 const COLOR_WOUND_FILLED := Color(0.85, 0.10, 0.10, 1.0)
 const COLOR_WOUND_HIDDEN := Color(0.0, 0.0, 0.0, 0.0)
 
-@onready var _name_label:     Label        = $NameLabel
+@onready var _name_label:     Label         = $NameLabel
 @onready var _wound_slots:    HBoxContainer = $WoundsRow/WoundSlots
-@onready var _guard_label:    Label        = $GuardRow/GuardValue
+@onready var _stance_value:   Label         = $StanceRow/StanceValue
+@onready var _resolve_value:  Label         = $ResolveRow/ResolveValue
+@onready var _stamina_value:  Label         = $StaminaRow/StaminaValue
 
 var _slot_nodes: Array[ColorRect] = []
 var _max_wounds: int = 3
@@ -25,7 +27,9 @@ func setup(data: CombatantData) -> void:
 	_name_label.text = data.combatant_name
 	_max_wounds = data.max_wounds
 	_refresh_wounds(0)
-	_guard_label.text = "0"
+	set_guard("stance",  0)
+	set_guard("resolve", 0)
+	set_guard("stamina", 0)
 
 
 # Update wound slot display. current = wounds taken so far.
@@ -34,9 +38,12 @@ func set_wounds(current: int, max_wounds: int) -> void:
 	_refresh_wounds(current)
 
 
-# Update guard value label.
-func set_guard(value: int) -> void:
-	_guard_label.text = str(value)
+# Update the guard value label for a specific pool.
+func set_guard(pool: String, value: int) -> void:
+	match pool:
+		"stance":  _stance_value.text  = str(value)
+		"resolve": _resolve_value.text = str(value)
+		"stamina": _stamina_value.text = str(value)
 
 
 func _refresh_wounds(current: int) -> void:

@@ -25,6 +25,7 @@ Tracks what is implemented and what remains. Updated after each feature ships.
 - **Active Guard** — Stance is rolled once per round when first pressured (`stance_rolled` flag on `CombatantState`). Subsequent same-round pressure reuses the existing Guard value without re-rolling. Guard resets to 0 and `stance_rolled` resets to `false` at round start.
   *Future: replace the boolean flag with a per-pool data structure tracking `{ guard: int, rolled: bool }` for each of Stance / Resolve / Stamina.*
 - **Advantage / Disadvantage** — `net_advantage` parameter on `RollEngine.resolve()`. Positive = extra dice, negative = fewer dice. Net pool ≤ 0 triggers Desperation (roll 2d, keep worst). Applied to player attack only; enemy A/D deferred.
+- **Multiple defense pools** — Stance (Negation), Resolve (Ingenuity), Stamina (Dominion) tracked independently per combatant via per-pool guard/rolled state in `CombatantState`. `guard_changed` signal carries pool name. `CombatantHUD` shows all 3 pools. Debug pool selector in `scenes/debug/` lets you target any pool mid-combat.
 - **Breach** — `attack_total >= guard`.
 - **Massive damage** — `(attack - guard) > defensive_size` → 2 Wounds instead of 1.
 - **Wound tracking + Defeat** — `wounds >= max_wounds`.
@@ -56,9 +57,8 @@ Ordered by dependency. Items within a group can be parallelized.
 ### Group 1 — Mechanics completions (no new systems)
 - [x] **Advantage / Disadvantage** — pool modifier; cancels 1-for-1; net Disadvantage to 0 → Desperation (roll 2, keep worst). Debug UI in `scenes/debug/` (removable at release).
   *Integration point: tied to status effects and equipment traits; does not interact with Fervor dice.*
-- [ ] **Multiple defense pools** — Resolve (Ingenuity) and Stamina (Dominion) alongside the already-implemented Stance.
-  Cumulative Disadvantage on 2nd+ different pool per attack phase. Each pool resets to 0 at round start.
-  *Current implementation: only Stance is used. `negation_size` is the only defense stat in CombatantData.*
+- [x] **Multiple defense pools** — Resolve (Ingenuity) and Stamina (Dominion) alongside the already-implemented Stance.
+  *Deferred: cumulative Disadvantage on 2nd+ different pool per turn; mixed-threat enemy actions.*
 
 ### Group 2 — Equipment and effect system
 - [ ] **Equipment resource** — Potency cap, flat bonus, tags. Inefficiency rule when used without training.
