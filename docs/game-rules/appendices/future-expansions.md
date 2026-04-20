@@ -47,6 +47,22 @@ This pattern always resolves Slow, creating a clear tactical decision: commit to
 
 ---
 
+## Manual Keep Selection
+
+Currently Keep always takes the best dice automatically ("keep the best valid dice", per roll-keep.md).
+
+A possible future extension: the player may choose a **Keep Mode** per action before rolling.
+
+Rough idea:
+- **Keep Highest** (default) — auto-select the best `keep_count` dice; current behaviour.
+- **Keep Lowest** — auto-select the worst `keep_count` dice; useful for mechanics that reward low rolls (e.g. stealth, self-sacrifice effects).
+- **Manual Pick** — after rolling, the player selects exactly which dice to keep from the full pool; most expressive but slowest.
+
+Keep Mode could be a per-action option, a node-gated unlock, or a status effect.
+Needs design refinement before adoption — interactions with Desperation, Fervor-tagged dice, and forced-keep rules (real Fervor dice) must be resolved first.
+
+---
+
 ## Stacking Desperation
 
 Currently Desperation is a fixed state: when the pool reaches 0 or below, roll 2 dice and keep the worst.
