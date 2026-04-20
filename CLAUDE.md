@@ -30,6 +30,25 @@ Follow this workflow for every requested feature, without exception.
 - Never parallelize writes to files that share state or that must be
   applied in a specific order (e.g. autoloads before scenes that depend on them).
 
+### 2b. Debug & Testability
+Every feature that introduces a new mechanic or runtime value must ship with a way to
+exercise it interactively in the game view.
+
+- Debug controls live exclusively under `scenes/debug/` — never mixed into production
+  scene folders.
+- Production code references debug nodes via **null-safe delegates only**:
+  ```gdscript
+  @onready var _debug_x = $DebugWidget if has_node("DebugWidget") else null
+  func get_x() -> SomeType:
+      return _debug_x.get_x() if _debug_x else <safe_default>
+  ```
+- To remove at release: delete `scenes/debug/`, remove the child node from the parent
+  `.tscn`, remove the `@onready` ref and delegation method from the parent `.gd`.
+  Nothing else changes — production callers already use the safe default path.
+- If a mechanic has no runtime input (e.g. a pure calculation with no tunable
+  parameters), a log-only approach is acceptable. Document the decision in the feature
+  report.
+
 ### 3. Validate (deploy a sub-agent)
 Deploy a validation sub-agent that:
 - Runs the project headless: `"$GODOT" --headless --path "C:/Users/ivano/Documents/ivano/svago/godot/kronomania" --quit-after 5`
@@ -89,6 +108,8 @@ scenes/battle/
   CombatantHUD.tscn/.gd     # Per-combatant UI: name, wound slots, guard value
   RoundHUD.tscn/.gd         # Phase label, Strike button, scrollable combat log; emits strike_pressed signal
   Combatant.tscn/.gd        # Placeholder visual (colored rect + name)
+
+scenes/debug/               # Debug-only widgets (removable at release); never imported by production code directly
 
 docs/game-rules/            # Design source of truth — rules drive implementation
   index.md                  # Entry point with reading order
