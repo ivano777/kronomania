@@ -8,9 +8,9 @@ _adding an `@export` field, or adding a `.tres` file._
 
 | File | Signals | Public entry points |
 |------|---------|-------------------|
-| `autoloads/CombatManager.gd` | `log_message(text: String)`<br>`round_started(round_num: int)`<br>`phase_changed(phase_name: String)`<br>`wounds_changed(is_player: bool, current: int, max_wounds: int)`<br>`guard_changed(is_player: bool, pool: String, guard_value: int)`<br>`combat_ended(winner_name: String)`<br>`player_action_required()` | `start_combat(player_data: CombatantData, enemy_data: CombatantData) -> void:`<br>`player_chose_strike(net_advantage: int = 0, target_pool: String = "stance") -> void:`<br>`debug_set_player_weapon(weapon: EquipmentData) -> void:` |
+| `autoloads/CombatManager.gd` | `log_message(text: String)`<br>`round_started(round_num: int)`<br>`phase_changed(phase_name: String)`<br>`wounds_changed(is_player: bool, current: int, max_wounds: int)`<br>`guard_changed(is_player: bool, pool: String, guard_value: int)`<br>`combat_ended(winner_name: String)`<br>`player_action_required()`<br>`player_magic_available(can_cantrip: bool, can_cast_spell: bool)`<br>`fervor_changed(is_player: bool, fervor_size: int, fervor_cap: int, is_burned_out: bool)` | `start_combat(player_data: CombatantData, enemy_data: CombatantData) -> void:`<br>`player_chose_strike(net_advantage: int = 0, target_pool: String = "stance") -> void:`<br>`player_chose_cantrip(target_pool: String = "resolve") -> void:`<br>`player_chose_spell(net_advantage: int = 0, target_pool: String = "resolve") -> void:`<br>`debug_set_fervor(new_fervor_size: int, burned_out: bool) -> void:`<br>`debug_set_player_weapon(weapon: EquipmentData) -> void:` |
 | `autoloads/PlayerProgression.gd` | — | `can_unlock(node: NodeData) -> bool:`<br>`unlock(node: NodeData) -> void:`<br>`reset() -> void:`<br>`is_unlocked(node: NodeData) -> bool:`<br>`get_category_count(category: String) -> int:`<br>`get_tier() -> int:` |
-| `autoloads/RollEngine.gd` | — | `roll_dice(n: int, size: int) -> Array[int]:`<br>`keep_best(dice: Array[int], keep_count: int) -> Array[int]:`<br>`keep_worst(dice: Array[int], keep_count: int) -> Array[int]:`<br>`resolve(tier: int, die_size: int, keep_grade: int, flat: int = 0, net_advantage: int = 0) -> Dictionary:`<br>`is_fast(total: int, vt: int) -> bool:`<br>`is_massive(attack_total: int, guard: int, defensive_size: int) -> bool:` |
+| `autoloads/RollEngine.gd` | — | `roll_dice(n: int, size: int) -> Array[int]:`<br>`keep_best(dice: Array[int], keep_count: int) -> Array[int]:`<br>`keep_worst(dice: Array[int], keep_count: int) -> Array[int]:`<br>`resolve(tier: int, die_size: int, keep_grade: int, flat: int = 0, net_advantage: int = 0, fervor_size: int = 0) -> Dictionary:`<br>`is_fast(total: int, vt: int) -> bool:`<br>`is_massive(attack_total: int, guard: int, defensive_size: int) -> bool:` |
 
 ## Resource schemas
 
@@ -26,6 +26,7 @@ _adding an `@export` field, or adding a `.tres` file._
 |------|------|-----------|-----------|
 | `resources/data/enemy_grunt.tres` | `CombatantData` | combatant_name="Grunt", negation_size=4, ingenuity_size=4, velocity_threshold=10, max_wounds=2, equipped_weapon=crude_club.tres | `crude_club.tres` |
 | `resources/data/nodes/ability_minor_studies.tres` | `NodeData` | node_name="Minor Studies", category="Ability", effect_type="minor_studies", effect_value=0, description="You have learned basic cantrips. Ingenuity-based attack; no Fervor cost. Available even during Burnout.", unlock_cost=1 | — |
+| `resources/data/nodes/ability_spellcasting.tres` | `NodeData` | node_name="Spellcasting", category="Ability", effect_type="spellcasting", effect_value=0, description="You have mastered Fervor channeling. Cast true spells using Ingenuity + a real Fervor die. Each max-roll escalates Fervor instability.", unlock_cost=1 | `ability_minor_studies.tres` |
 | `resources/data/nodes/ability_sure_footed.tres` | `NodeData` | node_name="Sure-Footed", category="Ability", effect_type="", effect_value=0, description="Reflexes honed for the arena. Balance and positioning improved.", unlock_cost=1 | — |
 | `resources/data/nodes/core_dominion_1.tres` | `NodeData` | node_name="Dominion I", category="Core", effect_type="stat_size_dominion", effect_value=8, description="Offensive potential deepens. (Stat size effect in future update.)", unlock_cost=1 | — |
 | `resources/data/nodes/flavor_warrior_oath.tres` | `NodeData` | node_name="Warrior's Oath", category="Flavor", effect_type="", effect_value=0, description="Your name is known beyond these walls. You have sworn to prove your worth.", unlock_cost=1 | — |
@@ -51,5 +52,6 @@ _adding an `@export` field, or adding a `.tres` file._
 |------|---------|-------------------|
 | `scenes/debug/DebugAdvantageControl.gd` | — | `get_net_advantage() -> int:` |
 | `scenes/debug/DebugEquipmentDisplay.gd` | — | `setup(player_data: CombatantData, enemy_data: CombatantData) -> void:` |
+| `scenes/debug/DebugFervorDisplay.gd` | — | — |
 | `scenes/debug/DebugPoolSelector.gd` | — | `get_target_pool() -> String:` |
 | `scenes/debug/DebugWeaponSelector.gd` | — | — |

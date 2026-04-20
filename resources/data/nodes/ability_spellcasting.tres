@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="NodeData" format=3 uid="uid://bspellcast001"]
+
+[ext_resource type="Script" path="res://resources/NodeData.gd" id="1_ndscr"]
+[ext_resource type="Resource" uid="uid://csp4lx7saynb2" path="res://resources/data/nodes/ability_minor_studies.tres" id="2_prereq"]
+
+[resource]
+script = ExtResource("1_ndscr")
+node_name = "Spellcasting"
+category = "Ability"
+effect_type = "spellcasting"
+effect_value = 0
+description = "You have mastered Fervor channeling. Cast true spells using Ingenuity + a real Fervor die. Each max-roll escalates Fervor instability."
+unlock_cost = 1
+prerequisite = ExtResource("2_prereq")

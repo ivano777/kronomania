@@ -37,8 +37,10 @@ func keep_worst(dice: Array[int], keep_count: int) -> Array[int]:
 # flat          : int — additive bonus applied after Keep (0 if unused)
 # net_advantage : int — positive = extra dice, negative = fewer dice;
 #                       pool ≤ 0 triggers Desperation (roll 2, keep worst)
+# fervor_size   : int — if > 0, roll one additive Fervor die of this face value
+#                       after Keep; cannot be discarded; result included in total.
 # Returns a Dictionary with full audit trail for the log.
-func resolve(tier: int, die_size: int, keep_grade: int, flat: int = 0, net_advantage: int = 0) -> Dictionary:
+func resolve(tier: int, die_size: int, keep_grade: int, flat: int = 0, net_advantage: int = 0, fervor_size: int = 0) -> Dictionary:
 	var pool_size: int = tier + net_advantage
 	var desperation := pool_size <= 0
 
@@ -58,6 +60,14 @@ func resolve(tier: int, die_size: int, keep_grade: int, flat: int = 0, net_advan
 	for d in kept:
 		total += d
 
+	# Real Fervor die: additive post-Keep, cannot be discarded.
+	var fervor_roll := 0
+	var fervor_maxed := false
+	if fervor_size > 0:
+		fervor_roll = roll_dice(1, fervor_size)[0]
+		total += fervor_roll
+		fervor_maxed = (fervor_roll == fervor_size)
+
 	return {
 		"dice":          dice,
 		"kept":          kept,
@@ -68,6 +78,8 @@ func resolve(tier: int, die_size: int, keep_grade: int, flat: int = 0, net_advan
 		"flat":          flat,
 		"net_advantage": net_advantage,
 		"desperation":   desperation,
+		"fervor_roll":   fervor_roll,
+		"fervor_maxed":  fervor_maxed,
 	}
 
 

@@ -68,3 +68,15 @@ text = "Stamina: "
 [node name="StaminaValue" type="Label" parent="StaminaRow"]
 layout_mode = 2
 text = "0"
+
+[node name="FervorRow" type="HBoxContainer" parent="."]
+layout_mode = 2
+visible = false
+
+[node name="FervorPrefix" type="Label" parent="FervorRow"]
+layout_mode = 2
+text = "Fervor: "
+
+[node name="FervorValue" type="Label" parent="FervorRow"]
+layout_mode = 2
+text = "d4 / d6"

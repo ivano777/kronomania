@@ -7,7 +7,8 @@ const PLAYER_DATA := preload("res://resources/data/player_default.tres")
 const ENEMY_DATA  := preload("res://resources/data/enemy_grunt.tres")
 
 # ── Debug scenes (remove path + add_child call to strip at release) ───────────
-const _DBG_WEAPON_SEL := "res://scenes/debug/DebugWeaponSelector.tscn"
+const _DBG_WEAPON_SEL   := "res://scenes/debug/DebugWeaponSelector.tscn"
+const _DBG_FERVOR_DISP  := "res://scenes/debug/DebugFervorDisplay.tscn"
 
 # ── Node references ───────────────────────────────────────────────────────────
 @onready var _player_hud:    CombatantHUD = $GameLayout/PlayerSide/PlayerHUD
@@ -28,15 +29,17 @@ func _ready() -> void:
 	_player_visual.setup(PLAYER_DATA, true)
 	_enemy_visual.setup(ENEMY_DATA, false)
 
-	# Set up HUDs with initial data.
-	_player_hud.setup(PLAYER_DATA)
-	_enemy_hud.setup(ENEMY_DATA)
+	# Set up HUDs with initial data. Player HUD shows the Fervor row.
+	_player_hud.setup(PLAYER_DATA, true)
+	_enemy_hud.setup(ENEMY_DATA, false)
 
 	if _debug_equip:
 		_debug_equip.setup(PLAYER_DATA, ENEMY_DATA)
 
-	# Connect RoundHUD strike button.
+	# Connect RoundHUD action buttons.
 	_round_hud.strike_pressed.connect(_on_strike_pressed)
+	_round_hud.cantrip_pressed.connect(_on_cantrip_pressed)
+	_round_hud.spell_pressed.connect(_on_spell_pressed)
 
 	# Connect restart button.
 	_restart_btn.pressed.connect(_on_restart_pressed)
@@ -63,10 +66,15 @@ func _ready() -> void:
 	CombatManager.guard_changed.connect(_on_guard_changed)
 	CombatManager.combat_ended.connect(_on_combat_ended)
 	CombatManager.player_action_required.connect(_on_player_action_required)
+	CombatManager.player_magic_available.connect(_on_player_magic_available)
+	CombatManager.fervor_changed.connect(_on_fervor_changed)
 
-	# Debug widgets — instantiated at runtime; safe to remove with the const above.
+	# Debug widgets — instantiated at runtime; safe to remove with the consts above.
 	if ResourceLoader.exists(_DBG_WEAPON_SEL):
 		add_child((load(_DBG_WEAPON_SEL) as PackedScene).instantiate())
+	if ResourceLoader.exists(_DBG_FERVOR_DISP):
+		add_child((load(_DBG_FERVOR_DISP) as PackedScene).instantiate())
+
 	# Start combat.
 	CombatManager.start_combat(PLAYER_DATA, ENEMY_DATA)
 
@@ -101,6 +109,7 @@ func _on_guard_changed(is_player: bool, pool: String, guard_value: int) -> void:
 
 func _on_combat_ended(winner_name: String) -> void:
 	_round_hud.disable_strike()
+	_round_hud.disable_magic()
 	_result_label.text = "Winner: %s" % winner_name
 	_defeat_panel.show()
 
@@ -109,8 +118,25 @@ func _on_player_action_required() -> void:
 	_round_hud.enable_strike()
 
 
+func _on_player_magic_available(can_cantrip: bool, can_cast_spell: bool) -> void:
+	_round_hud.enable_magic(can_cantrip, can_cast_spell)
+
+
+func _on_fervor_changed(is_player: bool, fervor_size: int, fervor_cap: int, is_burned_out: bool) -> void:
+	if is_player:
+		_player_hud.set_fervor(fervor_size, fervor_cap, is_burned_out)
+
+
 func _on_strike_pressed() -> void:
 	CombatManager.player_chose_strike(_round_hud.get_net_advantage(), _round_hud.get_target_pool())
+
+
+func _on_cantrip_pressed() -> void:
+	CombatManager.player_chose_cantrip(_round_hud.get_target_pool())
+
+
+func _on_spell_pressed() -> void:
+	CombatManager.player_chose_spell(_round_hud.get_net_advantage(), _round_hud.get_target_pool())
 
 
 func _on_restart_pressed() -> void:
@@ -131,3 +157,5 @@ func _teardown_signals() -> void:
 	CombatManager.guard_changed.disconnect(_on_guard_changed)
 	CombatManager.combat_ended.disconnect(_on_combat_ended)
 	CombatManager.player_action_required.disconnect(_on_player_action_required)
+	CombatManager.player_magic_available.disconnect(_on_player_magic_available)
+	CombatManager.fervor_changed.disconnect(_on_fervor_changed)

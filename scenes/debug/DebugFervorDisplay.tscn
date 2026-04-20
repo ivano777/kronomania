@@ -1,0 +1,28 @@
+[gd_scene format=3 uid="uid://dbgfervord001"]
+
+[ext_resource type="Script" path="res://scenes/debug/DebugFervorDisplay.gd" id="1_fervscr"]
+
+[node name="DebugFervorDisplay" type="VBoxContainer"]
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -300.0
+offset_top = -200.0
+offset_bottom = -10.0
+script = ExtResource("1_fervscr")
+
+[node name="ToggleButton" type="Button" parent="."]
+text = "✦ Fervor ▸"
+
+[node name="Panel" type="VBoxContainer" parent="."]
+visible = false
+
+[node name="StatusLabel" type="Label" parent="Panel"]
+text = "Fervor: d4 / d6"
+
+[node name="EscalateButton" type="Button" parent="Panel"]
+text = "Escalate Fervor"
+
+[node name="BurnoutButton" type="Button" parent="Panel"]
+text = "Force Burnout"

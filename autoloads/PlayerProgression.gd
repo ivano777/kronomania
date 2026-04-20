@@ -7,6 +7,8 @@ const ALL_NODES: Array = [
 	preload("res://resources/data/nodes/core_dominion_1.tres"),
 	preload("res://resources/data/nodes/training_keep_1.tres"),
 	preload("res://resources/data/nodes/training_keep_2.tres"),
+	preload("res://resources/data/nodes/ability_minor_studies.tres"),
+	preload("res://resources/data/nodes/ability_spellcasting.tres"),
 	preload("res://resources/data/nodes/ability_sure_footed.tres"),
 	preload("res://resources/data/nodes/flavor_warrior_oath.tres"),
 ]

@@ -90,29 +90,53 @@ docs/               # project-status.md (roadmap), project-index.md (generated c
 
 `CombatantData` is **immutable config** only. All runtime state lives inside `CombatManager.CombatantState`, an inner class instantiated per combat. Scene nodes hold no game state.
 
-`CombatantState` fields: `data` (CombatantData), `current_wounds`, `max_wounds`, `is_defeated`, `unlocked_nodes`, `tier_override`, `weapon_override`, plus per-pool guard state (`stance_guard`, `resolve_guard`, `stamina_guard`, and matching `_rolled` booleans). Methods: `init()`, `reset_guard()`, `get_guard(pool)`, `set_guard_val(pool, value)`, `is_pool_rolled(pool)`, `set_pool_rolled(pool, value)`.
+`CombatantState` fields: `data` (CombatantData), `current_wounds`, `max_wounds`, `is_defeated`, `unlocked_nodes`, `tier_override`, `weapon_override`, plus per-pool guard state (`stance_guard`, `resolve_guard`, `stamina_guard`, and matching `_rolled` booleans), plus magic state (`fervor_size`, `is_burned_out`, `has_minor_studies`, `has_spellcasting`). Methods: `init()`, `reset_guard()`, `get_guard(pool)`, `set_guard_val(pool, value)`, `is_pool_rolled(pool)`, `set_pool_rolled(pool, value)`.
 
 ### Autoload singletons
 
 Signatures and signals are in `docs/project-index.md`. Architectural gotchas:
-- **`RollEngine`** — stateless. Returns `Dictionary`; always cast values with `as int` / `as Array` — the type inferencer cannot infer through `Dictionary`.
-- **`CombatManager`** — all output via signals; nothing returned. Disconnect all signals before `reload_current_scene()`.
-- **`PlayerProgression`** — constellation state; read by `CombatManager` at `start_combat()`.
+- **`RollEngine`** — stateless. Returns `Dictionary`; always cast values with `as int` / `as Array` — the type inferencer cannot infer through `Dictionary`. `resolve()` accepts optional `fervor_size` (additive post-keep Fervor die); `aspect_stat_size` / `aspect_count` for mixed-pool spell resolution are coming in the next feature (SpellData).
+- **`CombatManager`** — all output via signals; nothing returned. Disconnect all signals before `reload_current_scene()`. Signals: `fervor_changed(is_player, fervor_size, fervor_cap, is_burned_out)`, `player_magic_available(can_cantrip, can_cast_spell)`. Public methods: `player_chose_cantrip(target_pool)`, `player_chose_spell(net_advantage, target_pool)`, `debug_set_fervor(size, burned_out)`.
+- **`PlayerProgression`** — constellation state; read by `CombatManager` at `start_combat()`. `ALL_NODES` catalog includes Minor Studies and Spellcasting nodes.
 
 ### Round loop (CombatManager)
 
 ```
 _begin_round()
   → resets both guards to 0
+  → emits player_magic_available(can_cantrip, can_cast_spell)
   → emits player_action_required
-  → (player presses Strike → RoundHUD emits strike_pressed → BattleScene calls player_chose_strike)
-  → player_chose_strike() calls _resolve_round()
+  → (player presses Strike / Cantrip / Spell → BattleScene calls player_chose_strike / _cantrip / _spell)
+  → _resolve_round / _resolve_round_cantrip / _resolve_round_spell
   → rolls both attacks, VT check, _resolve_attack() × 2
+  → [spell only] _escalate_fervor() if Fervor die maxed
   → await 0.8s timer
   → _begin_round()  ← loops until defeat
 ```
 
-`_resolve_round` is a GDScript coroutine (uses `await`). Calling it without `await` from `player_chose_strike` is intentional — it runs cooperatively on the main thread, yielding at the timer.
+`_resolve_round*` are GDScript coroutines (use `await`). Calling them without `await` from the `player_chose_*` methods is intentional — they run cooperatively on the main thread, yielding at the timer.
+
+### Magic system
+
+Group 4 implements Fervor / Burnout / Cantrips / True Spells:
+
+- **Fervor** — player-only runtime state on `CombatantState`. Track: d4 → d6 → d8 → d10 (`FERVOR_TRACK` const). Cap = `data.ingenuity_size`. Resets to d4 each combat (Long Rest / Recovery persistence deferred to Group 5).
+- **Escalation** — after a true spell resolves, if the real Fervor die rolled its maximum, `_escalate_fervor(_player, 1)` steps Fervor up. If new size exceeds cap, Burnout triggers.
+- **Burnout** — blocks `player_chose_spell()`; cantrips remain available. Cleared at combat start (Group 5 will add cross-scene persistence).
+- **Cantrip** — Ingenuity die, no Fervor die, no escalation. Available during Burnout.
+- **True spell** — Ingenuity die + real Fervor die. Per-spell aspect dice coming in next feature (see below).
+
+### SpellData (in-progress design — not yet implemented)
+
+The next feature adds a `SpellData` resource. Agreed design:
+- `aspect_stat: String` (`"dominion"` | `"negation"` | `""`) — non-Ingenuity stat for anchor dice; `""` = pure Ingenuity spell.
+- `aspect_dice: int` — how many normal pool dice use `aspect_stat`; the rest are Ingenuity-based (Fervor-tagged for escalation). 0 = pure Ingenuity.
+- `target_pool: String` — defense pool the spell pressures.
+- `flat_bonus: int` — post-keep flat addition.
+- `is_cantrip: bool` — no Fervor die, available during Burnout.
+- Spells are unlocked via `NodeData` with `effect_type="spell"` and a `spell: SpellData` reference.
+- `RollEngine.resolve()` will gain `aspect_stat_size` and `aspect_count` params for mixed pools.
+- UI: spell selection via small popup (one button per known spell); cantrips in a separate popup.
 
 ### GDScript typing rules
 
@@ -141,11 +165,12 @@ _begin_round()
 
 | Area | What looks wrong | Why it's correct |
 |------|-----------------|-----------------|
-| `_resolve_round` in CombatManager | Called without `await` from `player_chose_strike` | Intentional coroutine pattern — runs cooperatively on main thread, yields at the timer |
+| `_resolve_round*` in CombatManager | Called without `await` from `player_chose_*` | Intentional coroutine pattern — runs cooperatively on main thread, yields at the timer |
 | `global_script_class_cache.cfg` | May be stale after adding a new `class_name` | Must be updated manually when Godot editor hasn't been opened — headless runner uses the cached index |
 | `EquipmentData` flat bonuses | Applied unconditionally regardless of training | Inefficiency rule (Potency → 1 without training) is deferred to Group 3 |
 | Per-pool guard state in `CombatantState` | Three separate guard/rolled pairs | Will become richer (cumulative Disadvantage) in Group 4; current structure is intentional |
 | `debug_set_player_weapon` on `CombatManager` | Public method with "debug" in name on a production autoload | Used by `DebugWeaponSelector`; safe because it's null-guarded at the call site |
+| `fervor_size` resets to d4 each `start_combat()` | Fervor doesn't persist across combats | Intentional — Long Rest / Recovery Scene cross-scene persistence is deferred to Group 5 |
 
 ## Game rules summary
 
@@ -155,12 +180,16 @@ The rules live in `docs/game-rules/`. The implementation must match them exactly
 |---|---|
 | Roll resolution | Build Pool → Roll → Keep → Flat → Outcome |
 | Pool size | = Tier (T1=1 die, T2=2, T3=3, T4=4) |
-| Die size | from stat field (`dominion_size`, `negation_size`) — face value int (4/6/8/10) |
+| Die size | from stat field (`dominion_size`, `negation_size`, `ingenuity_size`) — face value int (4/6/8/10) |
 | Keep | grade 0 → keep 1, grade 1 → keep 2, grade 2 → keep 3 |
 | VT (Fast/Slow) | VT is a **static enemy property**. Only the **player's** action roll is compared to the enemy's VT. Player >= VT → Fast (acts first); Player < VT → Slow (enemy acts first). Enemy timing is implicit in VT — no roll. |
 | Guard | rolled **once per round** when first pressured; subsequent same-round pressure reuses existing Guard without re-rolling; resets to 0 at round start |
 | Breach | `attack_total >= guard` (reaching exactly 0 is a breach) |
-| Wounds | 1 on breach; 2 if Massive: `(attack - guard) > defensive_size` (currently `negation_size`; will vary per pool when Resolve/Stamina are added) |
+| Wounds | 1 on breach; 2 if Massive: `(attack - guard) > defensive_size` |
 | Defeat | `wounds >= max_wounds` |
+| Cantrip | Ingenuity die, Tier pool, no Fervor die, no escalation, available during Burnout; requires Minor Studies node |
+| True spell | Ingenuity die + real Fervor die (d4 base); requires Spellcasting node; Fervor escalates on max-roll |
+| Fervor cap | = `ingenuity_size` die face; caster may act at cap; escalating **beyond** cap triggers Burnout |
+| Burnout | Blocks true spells; cantrips unaffected; clears at next combat start (Group 5 adds persistence) |
 
-Next unimplemented group: Fervor/magic system (Group 4). Everything in the table above is live.
+Next unimplemented feature: SpellData resource + per-spell resolution (aspect dice, mixed pool). Everything in the table above is live.
