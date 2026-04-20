@@ -1,6 +1,6 @@
 [gd_resource type="Resource" script_class="NodeData" format=3 uid="uid://dk3hf5t7g2xnq"]
 
-[ext_resource type="Script" uid="uid://bmnx7e2qr4w9p" path="res://resources/NodeData.gd" id="1_ndscr"]
+[ext_resource type="Script" path="res://resources/NodeData.gd" id="1_ndscr"]
 
 [resource]
 script = ExtResource("1_ndscr")
@@ -8,3 +8,5 @@ node_name = "Training Keep I"
 category = "Training"
 effect_type = "training_keep"
 effect_value = 1
+description = "Trained focus. Keep 2 dice on all rolls instead of 1."
+unlock_cost = 1

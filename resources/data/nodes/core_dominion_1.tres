@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="NodeData" format=3 uid="uid://dxf0fvyol0dhj"]
+
+[ext_resource type="Script" path="res://resources/NodeData.gd" id="1_ndscr"]
+
+[resource]
+script = ExtResource("1_ndscr")
+node_name = "Dominion I"
+category = "Core"
+effect_type = "stat_size_dominion"
+effect_value = 8
+description = "Offensive potential deepens. (Stat size effect in future update.)"
+unlock_cost = 1

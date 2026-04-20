@@ -1,11 +1,13 @@
 extends VBoxContainer
 
+# [name, potency, flat_atk, flat_def, pool_bonus]
 const PRESETS := [
-	["Iron Sword  (+1 atk)",        1, 0, 0],
-	["Sharp Blade (+2 atk)",        2, 0, 0],
-	["Guard Shield (+2 def)",       0, 2, 0],
-	["Surge Axe (+1 atk +1 pool)",  1, 0, 1],
-	["Crude Club  (none)",          0, 0, 0],
+	["Crude Club",    1, 0, 0,  0],
+	["Iron Sword",    2, 1, 0,  0],
+	["Steel Sword",   3, 2, 0,  0],
+	["Guard Shield",  2, 0, 2,  0],
+	["Surge Axe",     3, 1, 0,  1],
+	["Master Blade",  4, 3, 0,  0],
 ]
 
 @onready var _toggle: Button       = $ToggleButton
@@ -17,11 +19,14 @@ func _ready() -> void:
 	_panel.hide()
 	_toggle.pressed.connect(_on_toggle)
 	for preset in PRESETS:
+		var name: String  = preset[0]
+		var pot:  int     = preset[1]
+		var atk:  int     = preset[2]
+		var def:  int     = preset[3]
+		var pool: int     = preset[4]
 		var btn := Button.new()
-		btn.text = preset[0] as String
-		btn.pressed.connect(_apply.bind(
-			preset[0] as String, preset[1] as int,
-			preset[2] as int, preset[3] as int))
+		btn.text = _label(name, pot, atk, def, pool)
+		btn.pressed.connect(_apply.bind(name, pot, atk, def, pool))
 		$Panel/Buttons.add_child(btn)
 
 
@@ -30,12 +35,20 @@ func _on_toggle() -> void:
 	_toggle.text = "⚔ Weapon ▾" if _panel.visible else "⚔ Weapon ▸"
 
 
-func _apply(name: String, atk: int, def: int, pool: int) -> void:
+func _apply(name: String, pot: int, atk: int, def: int, pool: int) -> void:
 	var w := EquipmentData.new()
 	w.item_name = name
-	w.potency = 1
+	w.potency = pot
 	w.flat_attack_bonus = atk
 	w.flat_guard_bonus = def
 	w.pool_bonus = pool
 	CombatManager.debug_set_player_weapon(w)
-	_status.text = "Active: %s" % name
+	_status.text = "Active: %s" % _label(name, pot, atk, def, pool)
+
+
+func _label(name: String, pot: int, atk: int, def: int, pool: int) -> String:
+	var parts := ["P%d" % pot]
+	if atk  != 0: parts.append("+%d atk" % atk)
+	if def  != 0: parts.append("+%d def" % def)
+	if pool != 0: parts.append("%+d pool" % pool)
+	return "%s  [%s]" % [name, "  ".join(parts)]

@@ -5,6 +5,6 @@
 [resource]
 script = ExtResource("1_eqscr")
 item_name = "Iron Sword"
-potency = 1
+potency = 2
 flat_attack_bonus = 1
 tags = PackedStringArray("Sharp")

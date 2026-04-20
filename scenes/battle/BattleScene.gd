@@ -8,7 +8,6 @@ const ENEMY_DATA  := preload("res://resources/data/enemy_grunt.tres")
 
 # ── Debug scenes (remove path + add_child call to strip at release) ───────────
 const _DBG_WEAPON_SEL := "res://scenes/debug/DebugWeaponSelector.tscn"
-const _DBG_NODE_SEL   := "res://scenes/debug/DebugNodeSelector.tscn"
 
 # ── Node references ───────────────────────────────────────────────────────────
 @onready var _player_hud:    CombatantHUD = $GameLayout/PlayerSide/PlayerHUD
@@ -42,6 +41,20 @@ func _ready() -> void:
 	# Connect restart button.
 	_restart_btn.pressed.connect(_on_restart_pressed)
 
+	# Constellation navigation button (top-right corner, always accessible).
+	var c_btn := Button.new()
+	c_btn.text = "Constellation"
+	c_btn.anchor_left   = 1.0
+	c_btn.anchor_right  = 1.0
+	c_btn.anchor_top    = 0.0
+	c_btn.anchor_bottom = 0.0
+	c_btn.offset_left   = -150.0
+	c_btn.offset_top    = 10.0
+	c_btn.offset_right  = -10.0
+	c_btn.offset_bottom = 44.0
+	c_btn.pressed.connect(_on_constellation_pressed)
+	add_child(c_btn)
+
 	# Connect CombatManager signals.
 	CombatManager.log_message.connect(_on_log)
 	CombatManager.round_started.connect(_on_round_started)
@@ -54,9 +67,6 @@ func _ready() -> void:
 	# Debug widgets — instantiated at runtime; safe to remove with the const above.
 	if ResourceLoader.exists(_DBG_WEAPON_SEL):
 		add_child((load(_DBG_WEAPON_SEL) as PackedScene).instantiate())
-	if ResourceLoader.exists(_DBG_NODE_SEL):
-		add_child((load(_DBG_NODE_SEL) as PackedScene).instantiate())
-
 	# Start combat.
 	CombatManager.start_combat(PLAYER_DATA, ENEMY_DATA)
 
@@ -104,7 +114,16 @@ func _on_strike_pressed() -> void:
 
 
 func _on_restart_pressed() -> void:
-	# Disconnect signals before reload to avoid duplicate connections.
+	_teardown_signals()
+	get_tree().reload_current_scene()
+
+
+func _on_constellation_pressed() -> void:
+	_teardown_signals()
+	get_tree().change_scene_to_file("res://scenes/constellation/ConstellationScene.tscn")
+
+
+func _teardown_signals() -> void:
 	CombatManager.log_message.disconnect(_on_log)
 	CombatManager.round_started.disconnect(_on_round_started)
 	CombatManager.phase_changed.disconnect(_on_phase_changed)
@@ -112,5 +131,3 @@ func _on_restart_pressed() -> void:
 	CombatManager.guard_changed.disconnect(_on_guard_changed)
 	CombatManager.combat_ended.disconnect(_on_combat_ended)
 	CombatManager.player_action_required.disconnect(_on_player_action_required)
-
-	get_tree().reload_current_scene()

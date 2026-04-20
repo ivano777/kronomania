@@ -50,7 +50,8 @@ class CombatantState:
 	var max_wounds: int     = 3
 	var is_defeated: bool   = false
 	var weapon_override: EquipmentData = null  # set by debug tools; null = use data.equipped_weapon
-	var unlocked_nodes: Array[NodeData] = []   # runtime copy of starting_nodes; debug tools may modify
+	var unlocked_nodes: Array[NodeData] = []   # runtime copy; for player, overridden from PlayerProgression
+	var tier_override: int = 0                 # when > 0, overrides data.tier (used for player Tier from Constellation)
 	# Per-pool guard state (Stance / Resolve / Stamina).
 	var stance_guard: int   = 0
 	var resolve_guard: int  = 0
@@ -115,6 +116,8 @@ var _waiting_for_player: bool = false
 func start_combat(player_data: CombatantData, enemy_data: CombatantData) -> void:
 	_player = CombatantState.new()
 	_player.init(player_data)
+	_player.unlocked_nodes = PlayerProgression.unlocked_nodes.duplicate()
+	_player.tier_override = PlayerProgression.get_tier()
 	_enemy = CombatantState.new()
 	_enemy.init(enemy_data)
 	_round = 0
@@ -333,10 +336,12 @@ func _get_pool_size(state: CombatantState, pool: String) -> int:
 	return state.data.negation_size
 
 
-## Effective Tier capped by equipment Potency (if any).
+## Effective Tier: tier_override if set (player Tier from Constellation), else data.tier,
+## then capped by equipment Potency.
 func _effective_tier(state: CombatantState) -> int:
+	var base := state.tier_override if state.tier_override > 0 else state.data.tier
 	var w: EquipmentData = state.weapon_override if state.weapon_override else state.data.equipped_weapon
-	return mini(state.data.tier, w.potency) if w else state.data.tier
+	return mini(base, w.potency) if w else base
 
 
 ## Flat bonus applied to attack rolls from equipped weapon (Forging).
@@ -372,18 +377,6 @@ func debug_set_player_weapon(weapon: EquipmentData) -> void:
 	if _player:
 		_player.weapon_override = weapon
 
-
-## Debug only — replace the player's unlocked nodes at runtime.
-func debug_set_player_nodes(nodes: Array[NodeData]) -> void:
-	if _player:
-		_player.unlocked_nodes = nodes
-
-
-## Debug only — returns the player's current effective keep grade.
-func debug_get_player_keep_grade() -> int:
-	if _player:
-		return _training_keep_grade(_player)
-	return 0
 
 
 # ── Formatting helpers ────────────────────────────────────────────────────────

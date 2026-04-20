@@ -1,6 +1,7 @@
 [gd_resource type="Resource" script_class="NodeData" format=3 uid="uid://ep4ig6u8h3yov"]
 
-[ext_resource type="Script" uid="uid://bmnx7e2qr4w9p" path="res://resources/NodeData.gd" id="1_ndscr"]
+[ext_resource type="Script" path="res://resources/NodeData.gd" id="1_ndscr"]
+[ext_resource type="Resource" uid="uid://dk3hf5t7g2xnq" path="res://resources/data/nodes/training_keep_1.tres" id="2_prereq"]
 
 [resource]
 script = ExtResource("1_ndscr")
@@ -8,3 +9,6 @@ node_name = "Training Keep II"
 category = "Training"
 effect_type = "training_keep"
 effect_value = 2
+description = "Mastered form. Keep 3 dice on all rolls."
+unlock_cost = 1
+prerequisite = ExtResource("2_prereq")

@@ -15,3 +15,12 @@ extends Resource
 
 ## Numeric value for the effect (e.g. keep grade: 1 or 2).
 @export_range(0, 4) var effect_value: int = 0
+
+## Human-readable description shown in the Constellation UI.
+@export_multiline var description: String = ""
+
+## Point cost to unlock this node.
+@export_range(1, 5) var unlock_cost: int = 1
+
+## Optional prerequisite node that must be unlocked before this one can be purchased.
+@export var prerequisite: NodeData = null

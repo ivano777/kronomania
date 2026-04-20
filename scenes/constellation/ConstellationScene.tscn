@@ -1,0 +1,90 @@
+[gd_scene format=3 uid="uid://ktux3ayz7890e"]
+
+[ext_resource type="Script" path="res://scenes/constellation/ConstellationScene.gd" id="1_cscr"]
+
+[node name="ConstellationScene" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_cscr")
+
+[node name="Background" type="ColorRect" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.06, 0.06, 0.1, 1)
+
+[node name="Main" type="VBoxContainer" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = -20.0
+offset_bottom = -20.0
+add_theme_constant_override("separation") = 10
+
+[node name="Header" type="HBoxContainer" parent="Main"]
+add_theme_constant_override("separation") = 16
+
+[node name="TitleLabel" type="Label" parent="Main/Header"]
+text = "Constellation"
+theme_override_font_sizes/font_size = 22
+
+[node name="Spacer" type="Control" parent="Main/Header"]
+size_flags_horizontal = 3
+
+[node name="PointsLabel" type="Label" parent="Main/Header"]
+text = "Points: ?"
+
+[node name="TierLabel" type="Label" parent="Main/Header"]
+text = "Tier ?"
+
+[node name="ProgressLabel" type="Label" parent="Main"]
+text = ""
+
+[node name="Separator" type="HSeparator" parent="Main"]
+
+[node name="Columns" type="HBoxContainer" parent="Main"]
+size_flags_vertical = 3
+add_theme_constant_override("separation") = 12
+
+[node name="CoreColumn" type="VBoxContainer" parent="Main/Columns"]
+size_flags_horizontal = 3
+add_theme_constant_override("separation") = 6
+
+[node name="CoreHeader" type="Label" parent="Main/Columns/CoreColumn"]
+text = "Core"
+theme_override_font_sizes/font_size = 15
+
+[node name="TrainingColumn" type="VBoxContainer" parent="Main/Columns"]
+size_flags_horizontal = 3
+add_theme_constant_override("separation") = 6
+
+[node name="TrainingHeader" type="Label" parent="Main/Columns/TrainingColumn"]
+text = "Training"
+theme_override_font_sizes/font_size = 15
+
+[node name="AbilityColumn" type="VBoxContainer" parent="Main/Columns"]
+size_flags_horizontal = 3
+add_theme_constant_override("separation") = 6
+
+[node name="AbilityHeader" type="Label" parent="Main/Columns/AbilityColumn"]
+text = "Ability"
+theme_override_font_sizes/font_size = 15
+
+[node name="FlavorColumn" type="VBoxContainer" parent="Main/Columns"]
+size_flags_horizontal = 3
+add_theme_constant_override("separation") = 6
+
+[node name="FlavorHeader" type="Label" parent="Main/Columns/FlavorColumn"]
+text = "Flavor"
+theme_override_font_sizes/font_size = 15
+
+[node name="Separator2" type="HSeparator" parent="Main"]
+
+[node name="Footer" type="HBoxContainer" parent="Main"]
+
+[node name="BackButton" type="Button" parent="Main/Footer"]
+text = "Back to Battle"
+size_flags_horizontal = 3
+
+[node name="ResetButton" type="Button" parent="Main/Footer"]
+text = "Reset (Debug)"
