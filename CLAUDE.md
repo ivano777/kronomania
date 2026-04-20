@@ -31,29 +31,12 @@ Follow this workflow for every requested feature, without exception.
   applied in a specific order (e.g. autoloads before scenes that depend on them).
 
 ### 2b. Debug & Testability
-Every feature that introduces a new mechanic or runtime value must ship with a way to
-exercise it interactively in the game view.
+Every feature that introduces a new mechanic or runtime value must ship with a way to exercise it interactively.
 
-- Debug controls live exclusively under `scenes/debug/` — never mixed into production
-  scene folders.
-- Production code references debug nodes via **null-safe delegates only**:
-  ```gdscript
-  @onready var _debug_x = $DebugWidget if has_node("DebugWidget") else null
-  func get_x() -> SomeType:
-	  return _debug_x.get_x() if _debug_x else <safe_default>
-  ```
-- To remove at release: delete `scenes/debug/`, remove the child node from the parent
-  `.tscn`, remove the `@onready` ref and delegation method from the parent `.gd`.
-  Nothing else changes — production callers already use the safe default path.
-- If a mechanic has no runtime input (e.g. a pure calculation with no tunable
-  parameters), a log-only approach is acceptable. Document the decision in the feature
-  report.
+Debug widgets live exclusively in `scenes/debug/`. Reference via null-safe `@onready` delegate: `@onready var _dbg = $Widget if has_node("Widget") else null`. Remove at release: delete `scenes/debug/`, remove the child from the parent `.tscn`, remove the `@onready` and its delegation method — nothing else changes. If a mechanic has no tunable parameters, a log-only approach is acceptable; document the decision in the feature report.
 
 ### 3. Validate (deploy a sub-agent)
-Deploy a validation sub-agent that:
-- Runs the project headless: `"$GODOT" --headless --path "C:/Users/ivano/Documents/ivano/svago/godot/kronomania" --quit-after 5`
-- Checks for SCRIPT ERRORs and ERRORs in output (WARNINGs from invalid UIDs are expected and safe to ignore).
-- Verifies: feature logic, scene/script integration, `@onready` node paths, signal connections, `class_name` registrations in `.godot/global_script_class_cache.cfg`.
+Deploy a sub-agent: run headless (see Engine section), check for SCRIPT ERRORs and ERRORs (UID WARNINGs are safe), verify `@onready` paths, signal connections, and `class_name` registrations in `.godot/global_script_class_cache.cfg`.
 
 ### 4. Fix Loop
 If validation fails:
@@ -65,6 +48,9 @@ If validation fails:
 Only after a clean validation pass:
 - Update relevant files under `docs/game-rules/` if mechanics changed.
 - Update `CLAUDE.md` if architecture or rules changed.
+- If the feature added or renamed a `.gd` file, added a signal, added an `@export` field,
+  or added a `.tres` file — run `/refresh-index` as the final action in this step, before
+  asking the user to run `/ship`. Content-only changes (bug fixes, logic edits) skip this.
 
 ### 6. Report
 Return a concise summary covering:
@@ -78,50 +64,22 @@ Ask the user to run `/ship`.
 ---
 
 **Rules**
-- Small iterative steps — never implement more than the approved slice.
-- No unnecessary rewrites — edit what needs to change, leave the rest alone.
-- Docs are updated only after successful validation, never before.
-- Implementation and documentation must remain aligned at all times.
+- Docs updated only after successful validation, never before.
 - The final report must be short enough to scan in under a minute.
-
-**Game rules changes require explicit user approval.**
-`docs/game-rules/` is the single source of truth for all game design. Every mechanic in the codebase is derived from it. Careless or unilateral edits to the rules can silently break gameplay logic, create inconsistencies between systems, and cause flow errors that are hard to trace back to their origin.
-- Never edit files under `docs/game-rules/` without the user explicitly approving the change first.
-- When a rules change is needed, present what would change and why, then wait for confirmation.
-- Rules edits should be minimal and targeted — do not rewrite sections when a single clarification suffices.
-- If a rule is ambiguous, ask the user to resolve the ambiguity rather than making a design decision unilaterally.
+- Never edit files under `docs/game-rules/` without explicit user approval — it is the single source of truth for all game design. If a rule is ambiguous, ask; never decide unilaterally.
 
 ## Project structure
 
 ```
-autoloads/          # Singletons registered in project.godot
-  RollEngine.gd     # Stateless dice engine (pure functions, no state)
-  CombatManager.gd  # Combat state machine — owns all runtime combat state
-
-resources/
-  CombatantData.gd          # class_name CombatantData extends Resource
-  data/player_default.tres  # Tier 1 player config
-  data/enemy_grunt.tres     # Tier 1 enemy config
-
-scenes/battle/
-  BattleScene.tscn/.gd      # Root scene; wires CombatManager signals to HUDs; owns DefeatPanel overlay with restart button (disconnects all signals before reload_current_scene)
-  CombatantHUD.tscn/.gd     # Per-combatant UI: name, wound slots, guard value
-  RoundHUD.tscn/.gd         # Phase label, Strike button, scrollable combat log; emits strike_pressed signal
-  Combatant.tscn/.gd        # Placeholder visual (colored rect + name)
-
-scenes/debug/               # Debug-only widgets (removable at release); never imported by production code directly
-
-docs/game-rules/            # Design source of truth — rules drive implementation
-  index.md                  # Entry point with reading order
-  reference/cheat-sheet.md  # Quick rules reference
-docs/game-style/
-  style-concept.md          # Visual and tone direction
-docs/
-  project-status.md         # Implemented features and ordered roadmap
-
-.claude/
-  agents/docs-alignment-auditor.md  # Agent: cross-checks all docs against codebase
-  commands/audit-docs.md            # Skill: deploy the alignment auditor (/audit-docs)
+autoloads/          # RollEngine (dice), CombatManager (combat SM), PlayerProgression (constellation)
+resources/          # Resource class definitions (.gd) + data/ (.tres files) — see project-index.md
+scenes/battle/      # BattleScene (root), CombatantHUD, RoundHUD, Combatant
+scenes/constellation/  # ConstellationScene (skill tree)
+scenes/debug/       # Debug widgets — removable at release; never imported by production code directly
+scripts/            # gen_project_index.py — regenerates docs/project-index.md
+docs/game-rules/    # Design source of truth — navigation TOC at index.md; load files on demand
+docs/               # project-status.md (roadmap), project-index.md (generated code map)
+.claude/            # agents/docs-alignment-auditor.md, commands/audit-docs.md + refresh-index.md
 ```
 
 ## Architecture
@@ -132,12 +90,14 @@ docs/
 
 `CombatantData` is **immutable config** only. All runtime state lives inside `CombatManager.CombatantState`, an inner class instantiated per combat. Scene nodes hold no game state.
 
-`CombatantState` fields: `data` (CombatantData), `current_wounds`, `current_guard`, `stance_rolled` (bool — true once Stance has been rolled this round; reset at round start), `is_defeated`.
+`CombatantState` fields: `data` (CombatantData), `current_wounds`, `max_wounds`, `is_defeated`, `unlocked_nodes`, `tier_override`, `weapon_override`, plus per-pool guard state (`stance_guard`, `resolve_guard`, `stamina_guard`, and matching `_rolled` booleans). Methods: `init()`, `reset_guard()`, `get_guard(pool)`, `set_guard_val(pool, value)`, `is_pool_rolled(pool)`, `set_pool_rolled(pool, value)`.
 
 ### Autoload singletons
 
-- **`RollEngine`** — call for any dice resolution. Stateless; safe to call from anywhere. Returns a `Dictionary` with keys `dice`, `kept`, `total`, `pool_size`, `die_size`, `keep_count`, `flat`. Always cast Dictionary values with `as int` / `as Array` before use — the GDScript type inferencer cannot infer through `Dictionary` values.
-- **`CombatManager`** — owns the round loop. The only entry points are `start_combat(player, enemy)` and `player_chose_strike()`. All output is via signals; nothing is returned. Disconnect all signals before `reload_current_scene()` to avoid duplicate connections.
+Signatures and signals are in `docs/project-index.md`. Architectural gotchas:
+- **`RollEngine`** — stateless. Returns `Dictionary`; always cast values with `as int` / `as Array` — the type inferencer cannot infer through `Dictionary`.
+- **`CombatManager`** — all output via signals; nothing returned. Disconnect all signals before `reload_current_scene()`.
+- **`PlayerProgression`** — constellation state; read by `CombatManager` at `start_combat()`.
 
 ### Round loop (CombatManager)
 
@@ -164,17 +124,28 @@ _begin_round()
 
 - **Game rules** — entry point with reading order, section list, and current canonical design decisions:
   [docs/game-rules/index.md](docs/game-rules/index.md)
-  @./docs/game-rules/index.md
-- **Game style** — vision, setting, tone, art direction, and high-level gameplay loop:
-  [docs/game-style/style-concept.md](docs/game-style/style-concept.md)
-  @./docs/game-style/style-concept.md
+  _(Load specific rule files on demand; the rules summary table below covers 90% of coding needs.)_
+- **Game style** — 2D turn-based dark fantasy duel RPG. Hand-drawn or dark-fantasy pixel art.
+  UI should feel like a tangible RPG document. Tone: tense, strategic, rewarding.
+  Full vision: [docs/game-style/style-concept.md](docs/game-style/style-concept.md)
 - **Project status** — what is implemented, what is next, ordered roadmap:
   consult this before proposing any new implementation to ensure suggestions
   align with the current development phase and do not skip planned dependencies.
   [docs/project-status.md](docs/project-status.md)
   @./docs/project-status.md
+- **Project index** — auto-generated code map: all GDScript files, resource schemas, data files,
+  scenes, and their dependencies. Read this before scanning source files.
+  @./docs/project-index.md
 
-Before implementing any mechanic, verify the rules in `docs/game-rules/` — the code must match the docs exactly.
+## Fragile areas — do not accidentally "fix" these
+
+| Area | What looks wrong | Why it's correct |
+|------|-----------------|-----------------|
+| `_resolve_round` in CombatManager | Called without `await` from `player_chose_strike` | Intentional coroutine pattern — runs cooperatively on main thread, yields at the timer |
+| `global_script_class_cache.cfg` | May be stale after adding a new `class_name` | Must be updated manually when Godot editor hasn't been opened — headless runner uses the cached index |
+| `EquipmentData` flat bonuses | Applied unconditionally regardless of training | Inefficiency rule (Potency → 1 without training) is deferred to Group 3 |
+| Per-pool guard state in `CombatantState` | Three separate guard/rolled pairs | Will become richer (cumulative Disadvantage) in Group 4; current structure is intentional |
+| `debug_set_player_weapon` on `CombatManager` | Public method with "debug" in name on a production autoload | Used by `DebugWeaponSelector`; safe because it's null-guarded at the call site |
 
 ## Game rules summary
 
@@ -192,4 +163,4 @@ The rules live in `docs/game-rules/`. The implementation must match them exactly
 | Wounds | 1 on breach; 2 if Massive: `(attack - guard) > defensive_size` (currently `negation_size`; will vary per pool when Resolve/Stamina are added) |
 | Defeat | `wounds >= max_wounds` |
 
-Stats not yet implemented (defer until design requires): Ingenuity/Resolve/Stamina pools, Advantage/Disadvantage, Flat modifiers, equipment, Fervor/magic, progression/Constellation.
+Next unimplemented group: Fervor/magic system (Group 4). Everything in the table above is live.
