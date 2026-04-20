@@ -23,3 +23,21 @@ Default inefficiency:
 - special abilities are ignored
 
 Equipment does not normally rewrite stable stat Size.
+
+## Tags
+
+Tags are descriptive labels attached to weapons and tools.
+They are the basis for skill prerequisites and Synergy conditions.
+
+Tags are **open-ended** — new tags are defined as items are authored.
+Multiple tags may appear on a single item.
+
+Examples: `[Sharp]`, `[Pointed]`, `[Flame]`, `[Heavy]`, `[Blunt]`
+
+## Skill Prerequisites
+
+A skill may require a specific tag to be present on an **equipped** item before the skill is available.
+If the prerequisite is not met, the skill is unavailable regardless of training or nodes.
+Prerequisites are stated in the skill description.
+
+See [Skills](./skills.md) for the skill entry format and full prerequisite rules.

@@ -1,72 +1,78 @@
-[gd_scene load_steps=6 format=3 uid="uid://l5m6n7o8p9q0r"]
+[gd_scene format=3 uid="uid://kfkv1xh1n4qh"]
 
-[ext_resource type="Script"      uid="uid://v9w0x1y2z3a4b" path="res://scenes/battle/BattleScene.gd"   id="1_bscr"]
-[ext_resource type="PackedScene" uid="uid://q7r8s9t0u1v2w" path="res://scenes/battle/CombatantHUD.tscn" id="2_chud"]
-[ext_resource type="PackedScene" uid="uid://x3y4z5a6b7c8d" path="res://scenes/battle/RoundHUD.tscn"    id="3_rhud"]
-[ext_resource type="PackedScene" uid="uid://e9f0g1h2i3j4k" path="res://scenes/battle/Combatant.tscn"   id="4_comb"]
+[ext_resource type="Script" uid="uid://15o84clu565i" path="res://scenes/battle/BattleScene.gd" id="1_bscr"]
+[ext_resource type="PackedScene" uid="uid://bq5rg150l8e1u" path="res://scenes/battle/CombatantHUD.tscn" id="2_chud"]
+[ext_resource type="PackedScene" uid="uid://wjwhsrnwy3or" path="res://scenes/battle/RoundHUD.tscn" id="3_rhud"]
+[ext_resource type="PackedScene" uid="uid://be04uyksxvods" path="res://scenes/battle/Combatant.tscn" id="4_comb"]
 
-[node name="BattleScene" type="Control"]
+[node name="BattleScene" type="Control" unique_id=1751107599]
+layout_mode = 3
+anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 script = ExtResource("1_bscr")
 
-[node name="Background" type="ColorRect" parent="."]
+[node name="Background" type="ColorRect" parent="." unique_id=2058934650]
+layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 color = Color(0.08, 0.08, 0.12, 1)
 
-[node name="GameLayout" type="HBoxContainer" parent="."]
+[node name="GameLayout" type="HBoxContainer" parent="." unique_id=1736236432]
+layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 
-[node name="PlayerSide" type="VBoxContainer" parent="GameLayout"]
-layout_mode = 2
+[node name="PlayerSide" type="VBoxContainer" parent="GameLayout" unique_id=338356683]
 custom_minimum_size = Vector2(200, 0)
-
-[node name="PlayerHUD" parent="GameLayout/PlayerSide" instance=ExtResource("2_chud")]
 layout_mode = 2
 
-[node name="PlayerVisual" parent="GameLayout/PlayerSide" instance=ExtResource("4_comb")]
+[node name="PlayerHUD" parent="GameLayout/PlayerSide" unique_id=1820282212 instance=ExtResource("2_chud")]
+layout_mode = 2
+
+[node name="PlayerVisual" parent="GameLayout/PlayerSide" unique_id=961022335 instance=ExtResource("4_comb")]
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="CenterPanel" type="VBoxContainer" parent="GameLayout"]
+[node name="CenterPanel" type="VBoxContainer" parent="GameLayout" unique_id=656109814]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="RoundHUD" parent="GameLayout/CenterPanel" instance=ExtResource("3_rhud")]
+[node name="RoundHUD" parent="GameLayout/CenterPanel" unique_id=1943023332 instance=ExtResource("3_rhud")]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="EnemySide" type="VBoxContainer" parent="GameLayout"]
-layout_mode = 2
+[node name="EnemySide" type="VBoxContainer" parent="GameLayout" unique_id=1438999933]
 custom_minimum_size = Vector2(200, 0)
-
-[node name="EnemyHUD" parent="GameLayout/EnemySide" instance=ExtResource("2_chud")]
 layout_mode = 2
 
-[node name="EnemyVisual" parent="GameLayout/EnemySide" instance=ExtResource("4_comb")]
+[node name="EnemyHUD" parent="GameLayout/EnemySide" unique_id=787879007 instance=ExtResource("2_chud")]
+layout_mode = 2
+
+[node name="EnemyVisual" parent="GameLayout/EnemySide" unique_id=1524144416 instance=ExtResource("4_comb")]
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="DefeatPanel" type="Panel" parent="."]
+[node name="DefeatPanel" type="Panel" parent="." unique_id=595927372]
 visible = false
+layout_mode = 1
+anchors_preset = -1
 anchor_left = 0.25
 anchor_top = 0.3
 anchor_right = 0.75
 anchor_bottom = 0.7
-layout_mode = 1
 
-[node name="PanelContent" type="VBoxContainer" parent="DefeatPanel"]
+[node name="PanelContent" type="VBoxContainer" parent="DefeatPanel" unique_id=899831953]
+layout_mode = 1
+anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-layout_mode = 1
 
-[node name="ResultLabel" type="Label" parent="DefeatPanel/PanelContent"]
+[node name="ResultLabel" type="Label" parent="DefeatPanel/PanelContent" unique_id=2020393111]
 layout_mode = 2
 text = "Combat Over"
 horizontal_alignment = 1
 
-[node name="RestartButton" type="Button" parent="DefeatPanel/PanelContent"]
+[node name="RestartButton" type="Button" parent="DefeatPanel/PanelContent" unique_id=9048855]
 layout_mode = 2
 text = "Play Again"

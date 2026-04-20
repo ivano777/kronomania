@@ -86,7 +86,7 @@ func _on_player_action_required() -> void:
 
 
 func _on_strike_pressed() -> void:
-	CombatManager.player_chose_strike()
+	CombatManager.player_chose_strike(_round_hud.get_net_advantage())
 
 
 func _on_restart_pressed() -> void:

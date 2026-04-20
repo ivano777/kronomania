@@ -40,6 +40,8 @@ It is a structured gameplay guideline that can be translated into code, tools, c
 @./core/modifiers.md
 - [Equipment](./core/equipment.md)
 @./core/equipment.md
+- [Skills](./core/skills.md)
+@./core/skills.md
 - [Combat](./core/combat.md)
 @./core/combat.md
 - [Defense and Guard](./core/defense-and-guard.md)

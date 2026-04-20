@@ -77,6 +77,21 @@ Adds or removes dice from the roll pool before Keep (Situation modifier layer).
 | Drain I | −1 die |
 | Drain II | −2 dice |
 
+### Synergy — Conditional Skill Bonus
+A bonus granted when a skill's synergy condition is met.
+Conditions are either an equipped item with a specific tag, or an unlocked node.
+The bonus type and value are **defined per skill**.
+
+Current implementation: flat bonus only.
+
+| Name | Flat Bonus |
+|---|---|
+| Synergy I | +1 |
+| Synergy II | +3 |
+
+Synergy bonus type (flat vs extra die) is stated in the skill description.
+See [Skills](../core/skills.md) for the full synergy rule and skill entry format.
+
 ---
 
 ## VT Modifiers — Timing

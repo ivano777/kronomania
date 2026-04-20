@@ -47,6 +47,42 @@ This pattern always resolves Slow, creating a clear tactical decision: commit to
 
 ---
 
+## Stacking Desperation
+
+Currently Desperation is a fixed state: when the pool reaches 0 or below, roll 2 dice and keep the worst.
+
+A possible future extension: Desperation scales with the degree of net Disadvantage beyond 0.
+
+Rough idea:
+- Pool = 0 → roll 2, keep worst (current rule)
+- Pool = −1 → roll 3, keep worst
+- Pool = −2 → roll 4, keep worst
+- and so on
+
+This would make severe Disadvantage increasingly punishing rather than hitting a flat floor.
+Needs further design refinement before adoption — the current flat Desperation rule is intentionally simple.
+
+---
+
+## Synergy Expansions
+
+These extend the baseline Synergy mechanic defined in [Skills](../core/skills.md) and [Effect Taxonomy](../reference/effect-taxonomy.md).
+
+### Synergy as Extra Die
+Synergy I or II may grant an extra pool die instead of a flat bonus.
+When implemented, the skill description will state the bonus type explicitly (flat or extra die).
+
+### Multi-Source Stacking
+A skill's Synergy condition may be met by up to **2 different qualifying sources** (e.g., two separate items each carrying the required tag).
+Each matching source contributes its Synergy bonus independently.
+The stacking cap and per-source bonus are stated in the skill description.
+
+### Inventory / Container Synergy
+A skill may grant Synergy based on items in the player's bag, chest, or carried items — not only equipped slots.
+This extends the prerequisite scope beyond the active equipped loadout.
+
+---
+
 ## Additional Expansion Areas
 
 Future categories that may draw from VT modifier design:

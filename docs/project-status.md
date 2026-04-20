@@ -24,6 +24,7 @@ Tracks what is implemented and what remains. Updated after each feature ships.
 - **VT / initiative** — only the player's roll is compared to the enemy's static VT; Fast → player first, Slow → enemy first. Enemy timing is implicit in VT — no roll.
 - **Active Guard** — Stance is rolled once per round when first pressured (`stance_rolled` flag on `CombatantState`). Subsequent same-round pressure reuses the existing Guard value without re-rolling. Guard resets to 0 and `stance_rolled` resets to `false` at round start.
   *Future: replace the boolean flag with a per-pool data structure tracking `{ guard: int, rolled: bool }` for each of Stance / Resolve / Stamina.*
+- **Advantage / Disadvantage** — `net_advantage` parameter on `RollEngine.resolve()`. Positive = extra dice, negative = fewer dice. Net pool ≤ 0 triggers Desperation (roll 2d, keep worst). Applied to player attack only; enemy A/D deferred.
 - **Breach** — `attack_total >= guard`.
 - **Massive damage** — `(attack - guard) > defensive_size` → 2 Wounds instead of 1.
 - **Wound tracking + Defeat** — `wounds >= max_wounds`.
@@ -53,7 +54,7 @@ Tracks what is implemented and what remains. Updated after each feature ships.
 Ordered by dependency. Items within a group can be parallelized.
 
 ### Group 1 — Mechanics completions (no new systems)
-- [ ] **Advantage / Disadvantage** — pool modifier; cancels 1-for-1; net Disadvantage to 0 → Desperation (roll 2, keep worst).
+- [x] **Advantage / Disadvantage** — pool modifier; cancels 1-for-1; net Disadvantage to 0 → Desperation (roll 2, keep worst). Debug UI in `scenes/debug/` (removable at release).
   *Integration point: tied to status effects and equipment traits; does not interact with Fervor dice.*
 - [ ] **Multiple defense pools** — Resolve (Ingenuity) and Stamina (Dominion) alongside the already-implemented Stance.
   Cumulative Disadvantage on 2nd+ different pool per attack phase. Each pool resets to 0 at round start.

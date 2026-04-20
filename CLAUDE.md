@@ -25,6 +25,10 @@ Follow this workflow for every requested feature, without exception.
 ### 2. Implement
 - Edit only the files identified in the approved plan.
 - No unnecessary rewrites, refactors, or scope creep.
+- Where files are independent (no shared state, no load order dependency),
+  implement them in parallel using subagents.
+- Never parallelize writes to files that share state or that must be
+  applied in a specific order (e.g. autoloads before scenes that depend on them).
 
 ### 3. Validate (deploy a sub-agent)
 Deploy a validation sub-agent that:

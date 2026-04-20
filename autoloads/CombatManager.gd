@@ -83,11 +83,12 @@ func start_combat(player_data: CombatantData, enemy_data: CombatantData) -> void
 
 
 ## Called by BattleScene when the player presses Strike.
-func player_chose_strike() -> void:
+## net_advantage: positive = Advantage dice, negative = Disadvantage dice.
+func player_chose_strike(net_advantage: int = 0) -> void:
 	if not _waiting_for_player:
 		return
 	_waiting_for_player = false
-	_resolve_round()
+	_resolve_round(net_advantage)
 
 
 # ── Private — round flow ──────────────────────────────────────────────────────
@@ -113,13 +114,13 @@ func _begin_round() -> void:
 
 
 # Coroutine: resolves one full round then loops back.
-func _resolve_round() -> void:
+func _resolve_round(net_advantage: int = 0) -> void:
 	phase_changed.emit("Resolving…")
 	log_message.emit("Both combatants declare Strike.")
 
 	# ── Roll both attack pools ─────────────────────────────────────────────
 	var p_atk := RollEngine.resolve(
-		_player.data.tier, _player.data.dominion_size, _player.data.keep_grade
+		_player.data.tier, _player.data.dominion_size, _player.data.keep_grade, 0, net_advantage
 	)
 	var e_atk := RollEngine.resolve(
 		_enemy.data.tier, _enemy.data.dominion_size, _enemy.data.keep_grade
@@ -261,8 +262,10 @@ func _end_combat() -> void:
 # ── Formatting helpers ────────────────────────────────────────────────────────
 
 func _fmt_attack(name: String, r: Dictionary) -> String:
-	return "  %s attacks: rolled %s, kept %s → [b]%d[/b]" % [
-		name, _arr(r.dice as Array), _arr(r.kept as Array), r.total as int
+	var desperation: bool = r.desperation
+	var prefix := "[b][DESPERATION][/b] " if desperation else ""
+	return "  %s%s attacks: rolled %s, kept %s → [b]%d[/b]" % [
+		prefix, name, _arr(r.dice as Array), _arr(r.kept as Array), r.total as int
 	]
 
 
