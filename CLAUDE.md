@@ -40,7 +40,7 @@ exercise it interactively in the game view.
   ```gdscript
   @onready var _debug_x = $DebugWidget if has_node("DebugWidget") else null
   func get_x() -> SomeType:
-      return _debug_x.get_x() if _debug_x else <safe_default>
+	  return _debug_x.get_x() if _debug_x else <safe_default>
   ```
 - To remove at release: delete `scenes/debug/`, remove the child node from the parent
   `.tscn`, remove the `@onready` ref and delegation method from the parent `.gd`.
@@ -169,6 +169,8 @@ _begin_round()
   [docs/game-style/style-concept.md](docs/game-style/style-concept.md)
   @./docs/game-style/style-concept.md
 - **Project status** — what is implemented, what is next, ordered roadmap:
+  consult this before proposing any new implementation to ensure suggestions
+  align with the current development phase and do not skip planned dependencies.
   [docs/project-status.md](docs/project-status.md)
   @./docs/project-status.md
 

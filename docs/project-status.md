@@ -9,13 +9,18 @@ Tracks what is implemented and what remains. Updated after each feature ships.
 ### Core engine
 - **RollEngine** (`autoloads/RollEngine.gd`) — stateless dice resolver.
   Build Pool → Roll → Keep → Flat → Outcome. Returns `Dictionary` with `dice`, `kept`, `total`, `pool_size`, `die_size`, `keep_count`, `flat`.
-  Includes `flat` post-Keep numeric bonus parameter (already wired, currently passed as 0 everywhere).
+  Includes `flat` post-Keep numeric bonus parameter (wired; populated from equipment bonuses).
   Helpers: `is_fast(total, vt)`, `is_massive(attack, guard, defensive_size)`.
 - **CombatantData** (`resources/CombatantData.gd`) — immutable combatant config as a `.tres` Resource.
-  Fields: `combatant_name`, `tier`, `dominion_size`, `negation_size`, `keep_grade`, `velocity_threshold`, `max_wounds`.
+  Fields: `combatant_name`, `tier`, `dominion_size`, `negation_size`, `ingenuity_size`, `keep_grade`, `velocity_threshold`, `max_wounds`, `equipped_weapon`.
   Both player and enemy `max_wounds` are configurable; player default = 3, enemy values vary per `.tres` file.
+- **EquipmentData** (`resources/EquipmentData.gd`) — immutable equipment config as a `.tres` Resource.
+  Fields: `item_name`, `potency`, `flat_attack_bonus` (Forging), `flat_guard_bonus` (Warding), `max_wounds_bonus` (Fortitude), `pool_bonus` (Surge/Drain), `tags`.
+  Referenced by `CombatantData.equipped_weapon`. All effects applied at combat init or roll time; `null` = no weapon (no penalty).
+  *Deferred: Inefficiency rule (Potency → 1, Flat → 0 without training) — requires Group 3 nodes.*
 - **CombatManager** (`autoloads/CombatManager.gd`) — 1v1 combat state machine.
-  Owns all runtime state via inner class `CombatantState` (fields: `data`, `current_wounds`, `current_guard`, `stance_rolled`, `is_defeated`).
+  Owns all runtime state via inner class `CombatantState` (fields: `data`, `current_wounds`, `max_wounds`, `stance_rolled`, `is_defeated`).
+  Helpers: `_effective_tier()` (Potency cap), `_attack_flat()` (Forging), `_guard_flat()` (Warding).
   Round loop: `_begin_round → player_chose_strike → _resolve_round → _resolve_attack × 2 → loop`.
   Defeat is checked after each `_resolve_attack()`; if triggered, second attack and timer are skipped.
 
@@ -28,11 +33,14 @@ Tracks what is implemented and what remains. Updated after each feature ships.
 - **Multiple defense pools** — Stance (Negation), Resolve (Ingenuity), Stamina (Dominion) tracked independently per combatant via per-pool guard/rolled state in `CombatantState`. `guard_changed` signal carries pool name. `CombatantHUD` shows all 3 pools. Debug pool selector in `scenes/debug/` lets you target any pool mid-combat.
 - **Breach** — `attack_total >= guard`.
 - **Massive damage** — `(attack - guard) > defensive_size` → 2 Wounds instead of 1.
-- **Wound tracking + Defeat** — `wounds >= max_wounds`.
+- **Wound tracking + Defeat** — `wounds >= max_wounds` (runtime field on `CombatantState`, includes Fortitude bonus).
+- **Equipment effects** — Potency (Tier cap), Forging (flat attack +), Warding (flat guard +), Fortitude (max wounds +), Surge/Drain (pool ±). Applied via helpers in `CombatManager`; logged in combat narrative when non-zero. Tags stored for future skill prerequisites.
 
 ### Data
-- `resources/data/player_default.tres` — Tier 1, d6 off/def, keep grade 0, max wounds 3. (`velocity_threshold` field is present due to shared schema but unused for the player.)
-- `resources/data/enemy_grunt.tres` — Tier 1, d6 off / d4 def, keep grade 0, VT 10, max wounds 2.
+- `resources/data/player_default.tres` — Tier 1, d6 off/def, keep grade 0, max wounds 3; equipped with Iron Sword.
+- `resources/data/enemy_grunt.tres` — Tier 1, d6 off / d4 def, keep grade 0, VT 10, max wounds 2; equipped with Crude Club.
+- `resources/data/weapons/iron_sword.tres` — Potency 1, Forging I (+1 flat attack), tags ["Sharp"].
+- `resources/data/weapons/crude_club.tres` — Potency 1, no bonuses, tags ["Blunt"].
 
 ### UI (prototype-quality)
 - **BattleScene** (`scenes/battle/`) — root scene wiring CombatManager signals to HUDs.
@@ -61,10 +69,10 @@ Ordered by dependency. Items within a group can be parallelized.
   *Deferred: cumulative Disadvantage on 2nd+ different pool per turn; mixed-threat enemy actions.*
 
 ### Group 2 — Equipment and effect system
-- [ ] **Equipment resource** — Potency cap, flat bonus, tags. Inefficiency rule when used without training.
-  *Defines the tag set that Group 2b applies.*
-- [ ] **Effect Taxonomy integration** — Forging / Channeling / Warding / Fortitude / Surge / Drain applied from item data.
-  *Requires equipment tags to be defined first. See `docs/game-rules/reference/effect-taxonomy.md`.*
+- [x] **Equipment resource** — Potency cap, flat bonuses (Forging/Warding), Fortitude, Surge/Drain, tags.
+  *Inefficiency rule (without training) deferred to Group 3. Channeling deferred to Group 4.*
+- [x] **Effect Taxonomy integration** — Forging / Warding / Fortitude / Surge / Drain applied from item data.
+  *Channeling (magical flat) deferred to Group 4. Potency/Diminishment (die-size steps) deferred.*
 
 ### Group 3 — Progression / Constellation
 - [ ] **Node resource** — data type for constellation nodes (category, effect, unlock condition).

@@ -6,6 +6,9 @@ extends Control
 const PLAYER_DATA := preload("res://resources/data/player_default.tres")
 const ENEMY_DATA  := preload("res://resources/data/enemy_grunt.tres")
 
+# ── Debug scenes (remove path + add_child call to strip at release) ───────────
+const _DBG_WEAPON_SEL := "res://scenes/debug/DebugWeaponSelector.tscn"
+
 # ── Node references ───────────────────────────────────────────────────────────
 @onready var _player_hud:    CombatantHUD = $GameLayout/PlayerSide/PlayerHUD
 @onready var _enemy_hud:     CombatantHUD = $GameLayout/EnemySide/EnemyHUD
@@ -15,6 +18,7 @@ const ENEMY_DATA  := preload("res://resources/data/enemy_grunt.tres")
 @onready var _defeat_panel:  Panel        = $DefeatPanel
 @onready var _result_label:  Label        = $DefeatPanel/PanelContent/ResultLabel
 @onready var _restart_btn:   Button       = $DefeatPanel/PanelContent/RestartButton
+@onready var _debug_equip                 = $DebugEquipmentDisplay if has_node("DebugEquipmentDisplay") else null
 
 
 func _ready() -> void:
@@ -27,6 +31,9 @@ func _ready() -> void:
 	# Set up HUDs with initial data.
 	_player_hud.setup(PLAYER_DATA)
 	_enemy_hud.setup(ENEMY_DATA)
+
+	if _debug_equip:
+		_debug_equip.setup(PLAYER_DATA, ENEMY_DATA)
 
 	# Connect RoundHUD strike button.
 	_round_hud.strike_pressed.connect(_on_strike_pressed)
@@ -42,6 +49,10 @@ func _ready() -> void:
 	CombatManager.guard_changed.connect(_on_guard_changed)
 	CombatManager.combat_ended.connect(_on_combat_ended)
 	CombatManager.player_action_required.connect(_on_player_action_required)
+
+	# Debug widgets — instantiated at runtime; safe to remove with the const above.
+	if ResourceLoader.exists(_DBG_WEAPON_SEL):
+		add_child((load(_DBG_WEAPON_SEL) as PackedScene).instantiate())
 
 	# Start combat.
 	CombatManager.start_combat(PLAYER_DATA, ENEMY_DATA)

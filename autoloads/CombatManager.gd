@@ -47,7 +47,9 @@ signal player_action_required()
 class CombatantState:
 	var data: CombatantData
 	var current_wounds: int = 0
+	var max_wounds: int     = 3
 	var is_defeated: bool   = false
+	var weapon_override: EquipmentData = null  # set by debug tools; null = use data.equipped_weapon
 	# Per-pool guard state (Stance / Resolve / Stamina).
 	var stance_guard: int   = 0
 	var resolve_guard: int  = 0
@@ -59,6 +61,7 @@ class CombatantState:
 	func init(d: CombatantData) -> void:
 		data = d
 		current_wounds = 0
+		max_wounds = d.max_wounds + (d.equipped_weapon.max_wounds_bonus if d.equipped_weapon else 0)
 		is_defeated = false
 		reset_guard()
 
@@ -165,10 +168,13 @@ func _resolve_round(net_advantage: int = 0, target_pool: String = "stance") -> v
 
 	# ── Roll both attack pools ─────────────────────────────────────────────
 	var p_atk := RollEngine.resolve(
-		_player.data.tier, _player.data.dominion_size, _player.data.keep_grade, 0, net_advantage
+		_effective_tier(_player), _player.data.dominion_size, _player.data.keep_grade,
+		_attack_flat(_player),
+		net_advantage + _pool_bonus(_player)
 	)
 	var e_atk := RollEngine.resolve(
-		_enemy.data.tier, _enemy.data.dominion_size, _enemy.data.keep_grade
+		_effective_tier(_enemy), _enemy.data.dominion_size, _enemy.data.keep_grade,
+		_attack_flat(_enemy)
 	)
 
 	log_message.emit(_fmt_attack(_player.data.combatant_name, p_atk))
@@ -234,8 +240,9 @@ func _resolve_attack(attacker_is_player: bool, attack_result: Dictionary, target
 	# If already rolled, reuse the existing Guard value.
 	if not defender.is_pool_rolled(target_pool):
 		var def_result := RollEngine.resolve(
-			defender.data.tier, defensive_size, defender.data.keep_grade
-		)
+				_effective_tier(defender), defensive_size,
+				defender.data.keep_grade, _guard_flat(defender)
+			)
 		var guard_val: int = def_result.total as int
 		defender.set_guard_val(target_pool, guard_val)
 		defender.set_pool_rolled(target_pool, true)
@@ -271,13 +278,13 @@ func _resolve_attack(attacker_is_player: bool, attack_result: Dictionary, target
 				"  Guard broken! %s suffers [b]1 Wound[/b]. (%d/%d)" % [
 					defender.data.combatant_name,
 					defender.current_wounds,
-					defender.data.max_wounds,
+					defender.max_wounds,
 				]
 			)
 
-		wounds_changed.emit(defender_is_player, defender.current_wounds, defender.data.max_wounds)
+		wounds_changed.emit(defender_is_player, defender.current_wounds, defender.max_wounds)
 
-		if defender.current_wounds >= defender.data.max_wounds:
+		if defender.current_wounds >= defender.max_wounds:
 			defender.is_defeated = true
 			log_message.emit(
 				"  [color=red][b]%s is DEFEATED![/b][/color]" % defender.data.combatant_name
@@ -321,13 +328,45 @@ func _get_pool_size(state: CombatantState, pool: String) -> int:
 	return state.data.negation_size
 
 
+## Effective Tier capped by equipment Potency (if any).
+func _effective_tier(state: CombatantState) -> int:
+	var w: EquipmentData = state.weapon_override if state.weapon_override else state.data.equipped_weapon
+	return mini(state.data.tier, w.potency) if w else state.data.tier
+
+
+## Flat bonus applied to attack rolls from equipped weapon (Forging).
+func _attack_flat(state: CombatantState) -> int:
+	var w: EquipmentData = state.weapon_override if state.weapon_override else state.data.equipped_weapon
+	return w.flat_attack_bonus if w else 0
+
+
+## Flat bonus applied to defense rolls from equipped weapon (Warding).
+func _guard_flat(state: CombatantState) -> int:
+	var w: EquipmentData = state.weapon_override if state.weapon_override else state.data.equipped_weapon
+	return w.flat_guard_bonus if w else 0
+
+
+## Pool size modifier from equipped weapon (Surge/Drain).
+func _pool_bonus(state: CombatantState) -> int:
+	var w: EquipmentData = state.weapon_override if state.weapon_override else state.data.equipped_weapon
+	return w.pool_bonus if w else 0
+
+
+## Debug only — swap the player's weapon at runtime without restarting combat.
+func debug_set_player_weapon(weapon: EquipmentData) -> void:
+	if _player:
+		_player.weapon_override = weapon
+
+
 # ── Formatting helpers ────────────────────────────────────────────────────────
 
 func _fmt_attack(name: String, r: Dictionary) -> String:
 	var desperation: bool = r.desperation
 	var prefix := "[b][DESPERATION][/b] " if desperation else ""
-	return "  %s%s attacks: rolled %s, kept %s → [b]%d[/b]" % [
-		prefix, name, _arr(r.dice as Array), _arr(r.kept as Array), r.total as int
+	var flat: int = r.flat as int
+	var flat_part := " + %d flat" % flat if flat != 0 else ""
+	return "  %s%s attacks: rolled %s, kept %s%s → [b]%d[/b]" % [
+		prefix, name, _arr(r.dice as Array), _arr(r.kept as Array), flat_part, r.total as int
 	]
 
 
@@ -337,8 +376,10 @@ func _fmt_speed(name: String, total: int, vt: int, fast: bool) -> String:
 
 
 func _fmt_defense(name: String, r: Dictionary, pool_label: String) -> String:
-	return "  %s rolls %s: %s → kept %s → Guard [b]%d[/b]" % [
-		name, pool_label, _arr(r.dice as Array), _arr(r.kept as Array), r.total as int
+	var flat: int = r.flat as int
+	var flat_part := " + %d flat" % flat if flat != 0 else ""
+	return "  %s rolls %s: %s → kept %s%s → Guard [b]%d[/b]" % [
+		name, pool_label, _arr(r.dice as Array), _arr(r.kept as Array), flat_part, r.total as int
 	]
 
 

@@ -1,0 +1,12 @@
+[gd_scene format=3 uid="uid://bch2in1r3nayu"]
+
+[ext_resource type="Script" path="res://scenes/debug/DebugEquipmentDisplay.gd" id="1_dbgeq"]
+
+[node name="DebugEquipmentDisplay" type="VBoxContainer"]
+script = ExtResource("1_dbgeq")
+
+[node name="PlayerEquip" type="Label" parent="."]
+text = "Player: (loading...)"
+
+[node name="EnemyEquip" type="Label" parent="."]
+text = "Enemy: (loading...)"

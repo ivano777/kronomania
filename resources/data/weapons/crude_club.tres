@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="EquipmentData" format=3 uid="uid://a5t6xn3qw8dkf"]
+
+[ext_resource type="Script" path="res://resources/EquipmentData.gd" id="1_eqscr"]
+
+[resource]
+script = ExtResource("1_eqscr")
+item_name = "Crude Club"
+potency = 1
+tags = PackedStringArray("Blunt")
