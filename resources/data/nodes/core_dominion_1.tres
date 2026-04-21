@@ -8,5 +8,5 @@ node_name = "Dominion I"
 category = "Core"
 effect_type = "stat_size_dominion"
 effect_value = 8
-description = "Offensive potential deepens. (Stat size effect in future update.)"
+description = "Your offensive force deepens. Dominion die size increases to d8."
 unlock_cost = 1

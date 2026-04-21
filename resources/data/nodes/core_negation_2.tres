@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="NodeData" format=3 uid="uid://cneg2t6u7v8xa"]
+
+[ext_resource type="Script" path="res://resources/NodeData.gd" id="1_ndscr"]
+[ext_resource type="Resource" uid="uid://cneg1p2q3r4s5" path="res://resources/data/nodes/core_negation_1.tres" id="2_prereq"]
+
+[resource]
+script = ExtResource("1_ndscr")
+node_name = "Negation II"
+category = "Core"
+effect_type = "stat_size_negation"
+effect_value = 10
+description = "Impenetrable guard. Negation die size increases to d10."
+unlock_cost = 1
+prerequisites = [ExtResource("2_prereq")]

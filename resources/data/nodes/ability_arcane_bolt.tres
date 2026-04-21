@@ -12,5 +12,5 @@ effect_type = "spell"
 effect_value = 0
 description = "Pure Ingenuity burst. Pressures Stance. Fervor escalates on each Ingenuity die that rolls maximum."
 unlock_cost = 1
-prerequisite = ExtResource("2_prereq")
+prerequisites = [ExtResource("2_prereq")]
 spell = ExtResource("3_spell")

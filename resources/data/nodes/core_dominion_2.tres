@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="NodeData" format=3 uid="uid://cdom2y708yaw0"]
+
+[ext_resource type="Script" path="res://resources/NodeData.gd" id="1_ndscr"]
+[ext_resource type="Resource" uid="uid://dxf0fvyol0dhj" path="res://resources/data/nodes/core_dominion_1.tres" id="2_prereq"]
+
+[resource]
+script = ExtResource("1_ndscr")
+node_name = "Dominion II"
+category = "Core"
+effect_type = "stat_size_dominion"
+effect_value = 10
+description = "Peak offensive mastery. Dominion die size increases to d10."
+unlock_cost = 1
+prerequisites = [ExtResource("2_prereq")]

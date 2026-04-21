@@ -12,5 +12,5 @@ effect_type = "spell"
 effect_value = 0
 description = "Dominion-anchored conflagration. 1 die draws from Dominion; rest from Ingenuity. Pressures Stance."
 unlock_cost = 1
-prerequisite = ExtResource("2_prereq")
+prerequisites = [ExtResource("2_prereq")]
 spell = ExtResource("3_spell")

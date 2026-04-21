@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="NodeData" format=3 uid="uid://cneg1p2q3r4s5"]
+
+[ext_resource type="Script" path="res://resources/NodeData.gd" id="1_ndscr"]
+
+[resource]
+script = ExtResource("1_ndscr")
+node_name = "Negation I"
+category = "Core"
+effect_type = "stat_size_negation"
+effect_value = 8
+description = "Your defensive instincts sharpen. Negation die size increases to d8."
+unlock_cost = 1

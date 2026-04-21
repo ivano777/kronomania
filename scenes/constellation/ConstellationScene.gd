@@ -55,10 +55,10 @@ func _make_card(node: NodeData) -> PanelContainer:
 
 func _get_column(category: String) -> VBoxContainer:
 	match category:
-		"Core":     return $Main/Columns/CoreColumn
-		"Training": return $Main/Columns/TrainingColumn
-		"Ability":  return $Main/Columns/AbilityColumn
-		"Flavor":   return $Main/Columns/FlavorColumn
+		"Core":     return $Main/ColumnsScroll/Columns/CoreColumn
+		"Training": return $Main/ColumnsScroll/Columns/TrainingColumn
+		"Ability":  return $Main/ColumnsScroll/Columns/AbilityColumn
+		"Flavor":   return $Main/ColumnsScroll/Columns/FlavorColumn
 	return null
 
 

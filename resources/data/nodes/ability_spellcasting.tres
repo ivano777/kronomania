@@ -11,4 +11,4 @@ effect_type = "spellcasting"
 effect_value = 0
 description = "You have mastered Fervor channeling. Cast true spells using Ingenuity + a real Fervor die. Each max-roll escalates Fervor instability."
 unlock_cost = 1
-prerequisite = ExtResource("2_prereq")
+prerequisites = [ExtResource("2_prereq")]

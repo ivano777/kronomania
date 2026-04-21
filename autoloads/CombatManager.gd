@@ -154,16 +154,16 @@ func start_combat(player_data: CombatantData, enemy_data: CombatantData) -> void
 		"Encounter VT: %d\n  %s: off d%d | Stance d%d / Resolve d%d / Stamina d%d\n  %s: off d%d | Stance d%d / Resolve d%d / Stamina d%d" % [
 			enemy_data.velocity_threshold,
 			player_data.combatant_name,
-			player_data.dominion_size, player_data.negation_size,
-			player_data.ingenuity_size, player_data.dominion_size,
+			_stat_size(_player, "dominion"), _stat_size(_player, "negation"),
+			_stat_size(_player, "ingenuity"), _stat_size(_player, "dominion"),
 			enemy_data.combatant_name,
-			enemy_data.dominion_size, enemy_data.negation_size,
-			enemy_data.ingenuity_size, enemy_data.dominion_size,
+			_stat_size(_enemy, "dominion"), _stat_size(_enemy, "negation"),
+			_stat_size(_enemy, "ingenuity"), _stat_size(_enemy, "dominion"),
 		]
 	)
 
 	# Emit initial Fervor state so HUD is initialised before round 1.
-	fervor_changed.emit(true, _player.fervor_size, _player.data.ingenuity_size, _player.is_burned_out)
+	fervor_changed.emit(true, _player.fervor_size, _stat_size(_player, "ingenuity"), _player.is_burned_out)
 
 	_begin_round()
 
@@ -206,7 +206,7 @@ func debug_set_fervor(new_fervor_size: int, burned_out: bool) -> void:
 	if _player:
 		_player.fervor_size = new_fervor_size
 		_player.is_burned_out = burned_out
-		fervor_changed.emit(true, _player.fervor_size, _player.data.ingenuity_size, burned_out)
+		fervor_changed.emit(true, _player.fervor_size, _stat_size(_player, "ingenuity"), burned_out)
 
 
 # ── Private — round flow ──────────────────────────────────────────────────────
@@ -241,12 +241,12 @@ func _resolve_round(net_advantage: int = 0, target_pool: String = "stance") -> v
 
 	# ── Roll both attack pools ─────────────────────────────────────────────
 	var p_atk := RollEngine.resolve(
-		_effective_tier(_player), _player.data.dominion_size, _training_keep_grade(_player),
+		_effective_tier(_player), _stat_size(_player, "dominion"), _training_keep_grade(_player),
 		_attack_flat(_player),
 		net_advantage + _pool_bonus(_player)
 	)
 	var e_atk := RollEngine.resolve(
-		_effective_tier(_enemy), _enemy.data.dominion_size, _training_keep_grade(_enemy),
+		_effective_tier(_enemy), _stat_size(_enemy, "dominion"), _training_keep_grade(_enemy),
 		_attack_flat(_enemy)
 	)
 
@@ -293,15 +293,15 @@ func _resolve_round(net_advantage: int = 0, target_pool: String = "stance") -> v
 func _resolve_round_cantrip(spell: SpellData) -> void:
 	phase_changed.emit("Resolving…")
 	log_message.emit("%s channels %s (Ingenuity d%d, no Fervor)." % [
-		_player.data.combatant_name, spell.spell_name, _player.data.ingenuity_size
+		_player.data.combatant_name, spell.spell_name, _stat_size(_player, "ingenuity")
 	])
 
 	var p_atk := RollEngine.resolve(
-		_effective_tier(_player), _player.data.ingenuity_size, _training_keep_grade(_player),
+		_effective_tier(_player), _stat_size(_player, "ingenuity"), _training_keep_grade(_player),
 		spell.flat_bonus, _pool_bonus(_player)
 	)
 	var e_atk := RollEngine.resolve(
-		_effective_tier(_enemy), _enemy.data.dominion_size, _training_keep_grade(_enemy),
+		_effective_tier(_enemy), _stat_size(_enemy, "dominion"), _training_keep_grade(_enemy),
 		_attack_flat(_enemy)
 	)
 
@@ -342,29 +342,29 @@ func _resolve_round_spell(spell: SpellData) -> void:
 
 	var aspect_stat_size: int = 0
 	if spell.aspect_stat == "dominion":
-		aspect_stat_size = _player.data.dominion_size
+		aspect_stat_size = _stat_size(_player, "dominion")
 	elif spell.aspect_stat == "negation":
-		aspect_stat_size = _player.data.negation_size
+		aspect_stat_size = _stat_size(_player, "negation")
 
 	var aspect_label := ""
 	if spell.aspect_dice > 0 and spell.aspect_stat != "":
 		aspect_label = " [%s d%d × %d + Ingenuity d%d]" % [
 			spell.aspect_stat.capitalize(), aspect_stat_size,
-			spell.aspect_dice, _player.data.ingenuity_size
+			spell.aspect_dice, _stat_size(_player, "ingenuity")
 		]
 	else:
-		aspect_label = " [Ingenuity d%d]" % _player.data.ingenuity_size
+		aspect_label = " [Ingenuity d%d]" % _stat_size(_player, "ingenuity")
 	log_message.emit("%s casts %s%s + Fervor d%d." % [
 		_player.data.combatant_name, spell.spell_name, aspect_label, _player.fervor_size
 	])
 
 	var p_atk := RollEngine.resolve(
-		_effective_tier(_player), _player.data.ingenuity_size, _training_keep_grade(_player),
+		_effective_tier(_player), _stat_size(_player, "ingenuity"), _training_keep_grade(_player),
 		spell.flat_bonus, _pool_bonus(_player), _player.fervor_size,
 		aspect_stat_size, spell.aspect_dice
 	)
 	var e_atk := RollEngine.resolve(
-		_effective_tier(_enemy), _enemy.data.dominion_size, _training_keep_grade(_enemy),
+		_effective_tier(_enemy), _stat_size(_enemy, "dominion"), _training_keep_grade(_enemy),
 		_attack_flat(_enemy)
 	)
 
@@ -511,10 +511,10 @@ func _end_combat() -> void:
 ## Stance = Negation, Resolve = Ingenuity, Stamina = Dominion (defensive expression).
 func _get_pool_size(state: CombatantState, pool: String) -> int:
 	match pool:
-		"stance":  return state.data.negation_size
-		"resolve": return state.data.ingenuity_size
-		"stamina": return state.data.dominion_size
-	return state.data.negation_size
+		"stance":  return _stat_size(state, "negation")
+		"resolve": return _stat_size(state, "ingenuity")
+		"stamina": return _stat_size(state, "dominion")
+	return _stat_size(state, "negation")
 
 
 ## Effective Tier: tier_override if set (player Tier from Constellation), else data.tier,
@@ -543,6 +543,22 @@ func _pool_bonus(state: CombatantState) -> int:
 	return w.pool_bonus if w else 0
 
 
+## Returns the effective die size for a stat, upgraded by any unlocked Core nodes.
+## Core nodes with effect_type="stat_size_<stat>" raise the base upward.
+func _stat_size(state: CombatantState, stat: String) -> int:
+	var base: int
+	match stat:
+		"dominion":  base = state.data.dominion_size
+		"negation":  base = state.data.negation_size
+		"ingenuity": base = state.data.ingenuity_size
+		_: base = 6
+	var effect_key := "stat_size_" + stat
+	for node in state.unlocked_nodes:
+		if node.effect_type == effect_key:
+			base = maxi(base, node.effect_value)
+	return base
+
+
 ## Returns the effective keep grade for a combatant: highest Training node value,
 ## or data.keep_grade as fallback when no Training node is present.
 func _training_keep_grade(state: CombatantState) -> int:
@@ -556,7 +572,7 @@ func _training_keep_grade(state: CombatantState) -> int:
 ## Steps Fervor up by `steps` track positions. Triggers Burnout if new size exceeds
 ## the Ingenuity cap. Fervor is clamped at the cap (rules: magic/fervor.md).
 func _escalate_fervor(state: CombatantState, steps: int) -> void:
-	var cap: int = state.data.ingenuity_size
+	var cap: int = _stat_size(state, "ingenuity")
 	var idx: int = FERVOR_TRACK.find(state.fervor_size)
 	if idx == -1:
 		idx = 0

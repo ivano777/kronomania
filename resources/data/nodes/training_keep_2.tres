@@ -11,4 +11,4 @@ effect_type = "training_keep"
 effect_value = 2
 description = "Mastered form. Keep 3 dice on all rolls."
 unlock_cost = 1
-prerequisite = ExtResource("2_prereq")
+prerequisites = [ExtResource("2_prereq")]

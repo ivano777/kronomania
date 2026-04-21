@@ -42,39 +42,48 @@ text = ""
 
 [node name="Separator" type="HSeparator" parent="Main"]
 
-[node name="Columns" type="HBoxContainer" parent="Main"]
+[node name="ColumnsScroll" type="ScrollContainer" parent="Main"]
 size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="Columns" type="HBoxContainer" parent="Main/ColumnsScroll"]
+size_flags_horizontal = 3
+size_flags_vertical = 0
 add_theme_constant_override("separation") = 12
 
-[node name="CoreColumn" type="VBoxContainer" parent="Main/Columns"]
+[node name="CoreColumn" type="VBoxContainer" parent="Main/ColumnsScroll/Columns"]
 size_flags_horizontal = 3
+custom_minimum_size = Vector2(180, 0)
 add_theme_constant_override("separation") = 6
 
-[node name="CoreHeader" type="Label" parent="Main/Columns/CoreColumn"]
+[node name="CoreHeader" type="Label" parent="Main/ColumnsScroll/Columns/CoreColumn"]
 text = "Core"
 theme_override_font_sizes/font_size = 15
 
-[node name="TrainingColumn" type="VBoxContainer" parent="Main/Columns"]
+[node name="TrainingColumn" type="VBoxContainer" parent="Main/ColumnsScroll/Columns"]
 size_flags_horizontal = 3
+custom_minimum_size = Vector2(180, 0)
 add_theme_constant_override("separation") = 6
 
-[node name="TrainingHeader" type="Label" parent="Main/Columns/TrainingColumn"]
+[node name="TrainingHeader" type="Label" parent="Main/ColumnsScroll/Columns/TrainingColumn"]
 text = "Training"
 theme_override_font_sizes/font_size = 15
 
-[node name="AbilityColumn" type="VBoxContainer" parent="Main/Columns"]
+[node name="AbilityColumn" type="VBoxContainer" parent="Main/ColumnsScroll/Columns"]
 size_flags_horizontal = 3
+custom_minimum_size = Vector2(180, 0)
 add_theme_constant_override("separation") = 6
 
-[node name="AbilityHeader" type="Label" parent="Main/Columns/AbilityColumn"]
+[node name="AbilityHeader" type="Label" parent="Main/ColumnsScroll/Columns/AbilityColumn"]
 text = "Ability"
 theme_override_font_sizes/font_size = 15
 
-[node name="FlavorColumn" type="VBoxContainer" parent="Main/Columns"]
+[node name="FlavorColumn" type="VBoxContainer" parent="Main/ColumnsScroll/Columns"]
 size_flags_horizontal = 3
+custom_minimum_size = Vector2(180, 0)
 add_theme_constant_override("separation") = 6
 
-[node name="FlavorHeader" type="Label" parent="Main/Columns/FlavorColumn"]
+[node name="FlavorHeader" type="Label" parent="Main/ColumnsScroll/Columns/FlavorColumn"]
 text = "Flavor"
 theme_override_font_sizes/font_size = 15
 

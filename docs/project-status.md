@@ -21,7 +21,7 @@ Tracks what is implemented and what remains. Updated after each feature ships.
   *Deferred: Inefficiency rule (Potency → 1, Flat → 0 without training) — requires Group 3 nodes.*
 - **CombatManager** (`autoloads/CombatManager.gd`) — 1v1 combat state machine.
   `CombatantState` fields: `data`, `current_wounds`, `max_wounds`, `unlocked_nodes`, `tier_override`, `is_defeated`, `fervor_size` (d4 base), `is_burned_out`, `has_minor_studies`, `has_spellcasting`, `known_spells: Array`, `known_cantrips: Array`.
-  Helpers: `_effective_tier()`, `_training_keep_grade()`, `_attack_flat()`, `_guard_flat()`, `_escalate_fervor()`, `_stat_size()` (next feature).
+  Helpers: `_effective_tier()`, `_training_keep_grade()`, `_attack_flat()`, `_guard_flat()`, `_escalate_fervor()`, `_stat_size(state, stat)` (reads base from `CombatantData`, upgraded by matching `stat_size_*` Core nodes).
   At `start_combat()`, player's `unlocked_nodes`, `tier_override`, magic flags, and known spell lists are read from `PlayerProgression`. Initial `fervor_changed` signal emitted before first round.
   Round loop: `_begin_round → player_chose_strike / _cantrip(spell) / _spell(spell) → _resolve_round_* → _resolve_attack × 2 → loop`.
   Escalation: `steps = ingenuity_maxed_count + (1 if fervor_maxed)` — multiple steps possible per cast.
@@ -46,7 +46,12 @@ Tracks what is implemented and what remains. Updated after each feature ships.
 - `resources/data/player_default.tres` — Tier 1, d6 off/def, max wounds 3; equipped with Iron Sword. `starting_nodes` still present but overridden by `PlayerProgression` at combat init.
 - `resources/data/nodes/training_keep_1.tres` — Training, keep grade 1 (wired).
 - `resources/data/nodes/training_keep_2.tres` — Training, keep grade 2 (wired).
-- `resources/data/nodes/core_dominion_1.tres` — Core, Dominion d8 (authored; stat-size mechanic wired in Phase A).
+- `resources/data/nodes/core_dominion_1.tres` — Core, Dominion d8 (stat-size mechanic wired via `_stat_size()`).
+- `resources/data/nodes/core_dominion_2.tres` — Core, Dominion d10; prereq: Dominion I.
+- `resources/data/nodes/core_negation_1.tres` — Core, Negation d8.
+- `resources/data/nodes/core_negation_2.tres` — Core, Negation d10; prereq: Negation I.
+- `resources/data/nodes/core_ingenuity_1.tres` — Core, Ingenuity d8.
+- `resources/data/nodes/core_ingenuity_2.tres` — Core, Ingenuity d10; prereq: Ingenuity I.
 - `resources/data/nodes/ability_minor_studies.tres` — Ability, effect_type="minor_studies", gates cantrip button; will carry `spells` array in Phase B.
 - `resources/data/nodes/ability_spellcasting.tres` — Ability, effect_type="spellcasting", gates true spell button; prerequisite: Minor Studies (wired).
 - `resources/data/nodes/ability_arcane_bolt.tres` — Ability, effect_type="spell", spell=arcane_bolt (stub; will be replaced by school nodes in Phase B).
@@ -117,10 +122,10 @@ Ordered by dependency. Items within a group can be parallelized.
 Two sequential phases; Phase A is prerequisite for Phase B.
 
 **Phase A — Core stat nodes**
-- [ ] `NodeData.prerequisite: NodeData` → `prerequisites: Array[NodeData]` (compound prereqs, all existing `.tres` migrated).
-- [ ] Author remaining Core nodes: `core_dominion_2.tres` (d8→d10), `core_negation_1/2.tres`, `core_ingenuity_1/2.tres`.
-- [ ] `CombatManager`: compute effective stat sizes from unlocked Core nodes at `start_combat()`; `_stat_size(state, stat)` helper replaces direct `state.data.*_size` reads.
-- [ ] `PlayerProgression.can_unlock()`: check all entries in `prerequisites` array.
+- [x] `NodeData.prerequisite: NodeData` → `prerequisites: Array[NodeData]` (compound prereqs, all existing `.tres` migrated).
+- [x] Author remaining Core nodes: `core_dominion_2.tres` (d8→d10), `core_negation_1/2.tres`, `core_ingenuity_1/2.tres`.
+- [x] `CombatManager`: compute effective stat sizes from unlocked Core nodes at `start_combat()`; `_stat_size(state, stat)` helper replaces direct `state.data.*_size` reads.
+- [x] `PlayerProgression.can_unlock()`: check all entries in `prerequisites` array.
 
 **Phase B — Spell schools**
 - [ ] New `SpellBonusEffect` resource: `tag: String`, `bonus_type: "pool"|"keep"`, `value: int`, `stat: String`.

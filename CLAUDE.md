@@ -137,14 +137,14 @@ Group 4 implements Fervor / Burnout / Cantrips / True Spells with per-spell `Spe
 - `is_cantrip: bool` — no Fervor die, available during Burnout.
 - `tags: PackedStringArray` — used by school bonus effects (next feature).
 
-### Spell school system (next feature — not yet implemented)
+### Spell school system (Phase A done; Phase B next)
 
-The next two-phase feature replaces flat spell nodes with tiered school nodes:
+Phase A is complete. Phase B replaces flat spell nodes with tiered school nodes:
 
-**Phase A — Core stat nodes:**
-- `NodeData.prerequisite: NodeData` → `NodeData.prerequisites: Array[NodeData]` (compound prereqs).
-- Core nodes grant stat size upgrades (`effect_type="stat_size_dominion"` etc.) — already authored in `.tres`, mechanic not yet wired.
-- `CombatManager` will compute effective stat sizes from unlocked Core nodes at `start_combat()`.
+**Phase A — Core stat nodes (implemented):**
+- `NodeData.prerequisites: Array[NodeData]` — compound prereqs; all `.tres` migrated.
+- Core nodes (`core_dominion_1/2`, `core_negation_1/2`, `core_ingenuity_1/2`) grant stat size upgrades via `effect_type="stat_size_<stat>"` and `effect_value` (8 or 10).
+- `CombatManager._stat_size(state, stat)` — reads base from `CombatantData`, returns highest `effect_value` across matching unlocked Core nodes. All `state.data.*_size` reads replaced with this helper.
 
 **Phase B — Spell schools:**
 - New `SpellBonusEffect` resource: `tag: String`, `bonus_type: "pool"|"keep"`, `value: int`, `stat: String`.
@@ -210,4 +210,4 @@ The rules live in `docs/game-rules/`. The implementation must match them exactly
 | Stat sizes | Base from `CombatantData`; upgraded by Core nodes (mechanic wired in Phase A of spell school feature) |
 | Spell schools | Tiered nodes granting multiple spells + `SpellBonusEffect` bonuses; prereqs are other nodes + Core stat nodes (Phase B) |
 
-Next unimplemented feature: spell school system — Phase A (Core stat nodes wired) then Phase B (school nodes, SpellBonusEffect).
+Next unimplemented feature: spell school system — Phase B (school nodes, SpellBonusEffect, tags).

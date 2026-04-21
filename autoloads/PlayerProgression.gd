@@ -5,6 +5,11 @@ extends Node
 
 const ALL_NODES: Array = [
 	preload("res://resources/data/nodes/core_dominion_1.tres"),
+	preload("res://resources/data/nodes/core_dominion_2.tres"),
+	preload("res://resources/data/nodes/core_negation_1.tres"),
+	preload("res://resources/data/nodes/core_negation_2.tres"),
+	preload("res://resources/data/nodes/core_ingenuity_1.tres"),
+	preload("res://resources/data/nodes/core_ingenuity_2.tres"),
 	preload("res://resources/data/nodes/training_keep_1.tres"),
 	preload("res://resources/data/nodes/training_keep_2.tres"),
 	preload("res://resources/data/nodes/ability_minor_studies.tres"),
@@ -27,8 +32,9 @@ func can_unlock(node: NodeData) -> bool:
 		return false
 	if available_points < node.unlock_cost:
 		return false
-	if node.prerequisite != null and not is_unlocked(node.prerequisite):
-		return false
+	for prereq in node.prerequisites:
+		if not is_unlocked(prereq):
+			return false
 	return true
 
 

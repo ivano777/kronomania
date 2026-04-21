@@ -22,8 +22,8 @@ extends Resource
 ## Point cost to unlock this node.
 @export_range(1, 5) var unlock_cost: int = 1
 
-## Optional prerequisite node that must be unlocked before this one can be purchased.
-@export var prerequisite: NodeData = null
+## All nodes in this array must be unlocked before this node can be purchased (AND logic).
+@export var prerequisites: Array[NodeData] = []
 
 ## For effect_type="spell" nodes: the SpellData granted when this node is unlocked.
 @export var spell: SpellData = null
