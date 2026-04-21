@@ -9,6 +9,10 @@ const ALL_NODES: Array = [
 	preload("res://resources/data/nodes/training_keep_2.tres"),
 	preload("res://resources/data/nodes/ability_minor_studies.tres"),
 	preload("res://resources/data/nodes/ability_spellcasting.tres"),
+	preload("res://resources/data/nodes/ability_cantrip_spark.tres"),
+	preload("res://resources/data/nodes/ability_arcane_bolt.tres"),
+	preload("res://resources/data/nodes/ability_fireball.tres"),
+	preload("res://resources/data/nodes/ability_charm.tres"),
 	preload("res://resources/data/nodes/ability_sure_footed.tres"),
 	preload("res://resources/data/nodes/flavor_warrior_oath.tres"),
 ]
@@ -51,6 +55,24 @@ func get_category_count(category: String) -> int:
 		if node.category == category:
 			count += 1
 	return count
+
+
+## Returns all non-cantrip SpellData known by the player (effect_type="spell", is_cantrip=false).
+func get_known_spells() -> Array:
+	var result := []
+	for node in unlocked_nodes:
+		if node.effect_type == "spell" and node.spell != null and not node.spell.is_cantrip:
+			result.append(node.spell)
+	return result
+
+
+## Returns all cantrip SpellData known by the player (effect_type="spell", is_cantrip=true).
+func get_known_cantrips() -> Array:
+	var result := []
+	for node in unlocked_nodes:
+		if node.effect_type == "spell" and node.spell != null and node.spell.is_cantrip:
+			result.append(node.spell)
+	return result
 
 
 ## Returns current Tier based on breadth: min nodes per category + 1, capped at 4.

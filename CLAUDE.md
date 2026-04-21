@@ -90,14 +90,14 @@ docs/               # project-status.md (roadmap), project-index.md (generated c
 
 `CombatantData` is **immutable config** only. All runtime state lives inside `CombatManager.CombatantState`, an inner class instantiated per combat. Scene nodes hold no game state.
 
-`CombatantState` fields: `data` (CombatantData), `current_wounds`, `max_wounds`, `is_defeated`, `unlocked_nodes`, `tier_override`, `weapon_override`, plus per-pool guard state (`stance_guard`, `resolve_guard`, `stamina_guard`, and matching `_rolled` booleans), plus magic state (`fervor_size`, `is_burned_out`, `has_minor_studies`, `has_spellcasting`). Methods: `init()`, `reset_guard()`, `get_guard(pool)`, `set_guard_val(pool, value)`, `is_pool_rolled(pool)`, `set_pool_rolled(pool, value)`.
+`CombatantState` fields: `data` (CombatantData), `current_wounds`, `max_wounds`, `is_defeated`, `unlocked_nodes`, `tier_override`, `weapon_override`, plus per-pool guard state (`stance_guard`, `resolve_guard`, `stamina_guard`, and matching `_rolled` booleans), plus magic state (`fervor_size`, `is_burned_out`, `has_minor_studies`, `has_spellcasting`, `known_spells: Array`, `known_cantrips: Array`). Methods: `init()`, `reset_guard()`, `get_guard(pool)`, `set_guard_val(pool, value)`, `is_pool_rolled(pool)`, `set_pool_rolled(pool, value)`.
 
 ### Autoload singletons
 
 Signatures and signals are in `docs/project-index.md`. Architectural gotchas:
-- **`RollEngine`** — stateless. Returns `Dictionary`; always cast values with `as int` / `as Array` — the type inferencer cannot infer through `Dictionary`. `resolve()` accepts optional `fervor_size` (additive post-keep Fervor die); `aspect_stat_size` / `aspect_count` for mixed-pool spell resolution are coming in the next feature (SpellData).
-- **`CombatManager`** — all output via signals; nothing returned. Disconnect all signals before `reload_current_scene()`. Signals: `fervor_changed(is_player, fervor_size, fervor_cap, is_burned_out)`, `player_magic_available(can_cantrip, can_cast_spell)`. Public methods: `player_chose_cantrip(target_pool)`, `player_chose_spell(net_advantage, target_pool)`, `debug_set_fervor(size, burned_out)`.
-- **`PlayerProgression`** — constellation state; read by `CombatManager` at `start_combat()`. `ALL_NODES` catalog includes Minor Studies and Spellcasting nodes.
+- **`RollEngine`** — stateless. Returns `Dictionary`; always cast values with `as int` / `as Array` — the type inferencer cannot infer through `Dictionary`. `resolve()` accepts optional `fervor_size` (additive post-keep Fervor die), `aspect_stat_size` and `aspect_count` (for mixed-pool spells). Returns `ingenuity_maxed_count` — count of Ingenuity-tagged pool dice that rolled their maximum (used for Fervor escalation).
+- **`CombatManager`** — all output via signals; nothing returned. Disconnect all signals before `reload_current_scene()`. Signals: `fervor_changed(is_player, fervor_size, fervor_cap, is_burned_out)`, `player_magic_available(can_cantrip, can_cast_spell)`. Public methods: `player_chose_cantrip(spell: SpellData)`, `player_chose_spell(spell: SpellData)`, `debug_set_fervor(size, burned_out)`.
+- **`PlayerProgression`** — constellation state; read by `CombatManager` at `start_combat()`. `ALL_NODES` catalog. `get_known_spells()` and `get_known_cantrips()` scan unlocked nodes for `effect_type="spell"` entries and return the associated `SpellData` arrays.
 
 ### Round loop (CombatManager)
 
@@ -118,25 +118,41 @@ _begin_round()
 
 ### Magic system
 
-Group 4 implements Fervor / Burnout / Cantrips / True Spells:
+Group 4 implements Fervor / Burnout / Cantrips / True Spells with per-spell `SpellData`:
 
 - **Fervor** — player-only runtime state on `CombatantState`. Track: d4 → d6 → d8 → d10 (`FERVOR_TRACK` const). Cap = `data.ingenuity_size`. Resets to d4 each combat (Long Rest / Recovery persistence deferred to Group 5).
-- **Escalation** — after a true spell resolves, if the real Fervor die rolled its maximum, `_escalate_fervor(_player, 1)` steps Fervor up. If new size exceeds cap, Burnout triggers.
+- **Escalation** — after a true spell resolves, `_escalate_fervor(_player, steps)` where `steps = ingenuity_maxed_count + (1 if fervor_maxed)`. Multiple steps possible in a single cast.
 - **Burnout** — blocks `player_chose_spell()`; cantrips remain available. Cleared at combat start (Group 5 will add cross-scene persistence).
-- **Cantrip** — Ingenuity die, no Fervor die, no escalation. Available during Burnout.
-- **True spell** — Ingenuity die + real Fervor die. Per-spell aspect dice coming in next feature (see below).
+- **Cantrip** — uses `SpellData` (is_cantrip=true). Ingenuity pool, no Fervor die, no escalation. Available during Burnout. Granted directly by the Minor Studies node.
+- **True spell** — uses `SpellData`. Ingenuity pool + optional aspect dice + real Fervor die. Granted by spell school nodes (next feature).
 
-### SpellData (in-progress design — not yet implemented)
+### SpellData (implemented)
 
-The next feature adds a `SpellData` resource. Agreed design:
-- `aspect_stat: String` (`"dominion"` | `"negation"` | `""`) — non-Ingenuity stat for anchor dice; `""` = pure Ingenuity spell.
-- `aspect_dice: int` — how many normal pool dice use `aspect_stat`; the rest are Ingenuity-based (Fervor-tagged for escalation). 0 = pure Ingenuity.
+`resources/SpellData.gd` (`class_name SpellData`):
+- `spell_name: String`, `description: String`
+- `aspect_stat: String` (`"dominion"` | `"negation"` | `""`) — non-Ingenuity stat for anchor dice; `""` = pure Ingenuity.
+- `aspect_dice: int` — how many pool dice use `aspect_stat`; the rest are Ingenuity-tagged (count toward escalation even if discarded).
 - `target_pool: String` — defense pool the spell pressures.
 - `flat_bonus: int` — post-keep flat addition.
 - `is_cantrip: bool` — no Fervor die, available during Burnout.
-- Spells are unlocked via `NodeData` with `effect_type="spell"` and a `spell: SpellData` reference.
-- `RollEngine.resolve()` will gain `aspect_stat_size` and `aspect_count` params for mixed pools.
-- UI: spell selection via small popup (one button per known spell); cantrips in a separate popup.
+- `tags: PackedStringArray` — used by school bonus effects (next feature).
+
+### Spell school system (next feature — not yet implemented)
+
+The next two-phase feature replaces flat spell nodes with tiered school nodes:
+
+**Phase A — Core stat nodes:**
+- `NodeData.prerequisite: NodeData` → `NodeData.prerequisites: Array[NodeData]` (compound prereqs).
+- Core nodes grant stat size upgrades (`effect_type="stat_size_dominion"` etc.) — already authored in `.tres`, mechanic not yet wired.
+- `CombatManager` will compute effective stat sizes from unlocked Core nodes at `start_combat()`.
+
+**Phase B — Spell schools:**
+- New `SpellBonusEffect` resource: `tag: String`, `bonus_type: "pool"|"keep"`, `value: int`, `stat: String`.
+- `NodeData.spell: SpellData` → `NodeData.spells: Array[SpellData]` + `NodeData.bonus_effects: Array[SpellBonusEffect]`.
+- School nodes (e.g. Fire Magic I–IV, Arcane I–III) each grant multiple spells + optional bonuses per tier. Prereqs are other school nodes + Core stat nodes.
+- Minor Studies node will carry `spells = [cantrip_spark, arcane_touch]` directly.
+- `PlayerProgression.get_known_spells/cantrips()` will scan `node.spells` array.
+- `CombatManager` will sum matching `bonus_effects` when resolving spell attacks.
 
 ### GDScript typing rules
 
@@ -187,9 +203,11 @@ The rules live in `docs/game-rules/`. The implementation must match them exactly
 | Breach | `attack_total >= guard` (reaching exactly 0 is a breach) |
 | Wounds | 1 on breach; 2 if Massive: `(attack - guard) > defensive_size` |
 | Defeat | `wounds >= max_wounds` |
-| Cantrip | Ingenuity die, Tier pool, no Fervor die, no escalation, available during Burnout; requires Minor Studies node |
-| True spell | Ingenuity die + real Fervor die (d4 base); requires Spellcasting node; Fervor escalates on max-roll |
+| Cantrip | Ingenuity die, Tier pool, no Fervor die, no escalation, available during Burnout; spell granted by Minor Studies or school nodes (`SpellData.is_cantrip=true`) |
+| True spell | Ingenuity + optional aspect dice + real Fervor die; spell granted by school node; escalation = `ingenuity_maxed_count + (1 if fervor_maxed)` |
 | Fervor cap | = `ingenuity_size` die face; caster may act at cap; escalating **beyond** cap triggers Burnout |
 | Burnout | Blocks true spells; cantrips unaffected; clears at next combat start (Group 5 adds persistence) |
+| Stat sizes | Base from `CombatantData`; upgraded by Core nodes (mechanic wired in Phase A of spell school feature) |
+| Spell schools | Tiered nodes granting multiple spells + `SpellBonusEffect` bonuses; prereqs are other nodes + Core stat nodes (Phase B) |
 
-Next unimplemented feature: SpellData resource + per-spell resolution (aspect dice, mixed pool). Everything in the table above is live.
+Next unimplemented feature: spell school system — Phase A (Core stat nodes wired) then Phase B (school nodes, SpellBonusEffect).

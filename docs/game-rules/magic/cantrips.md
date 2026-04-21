@@ -5,28 +5,16 @@ Cantrips are safe minor-magic actions unlocked through **Minor Studies**.
 They do not use the Fervor subsystem.
 
 ## Access
-A character needs **Minor Studies (Unlock / Grade 0)** to use cantrips at all.
+A character needs **Minor Studies** to use cantrips.
 
-## Knowledge Formula
-Known cantrips are based on:
-1. **stable Ingenuity / 2** (see table below)
-2. the Minor Studies grade bonus
+## Known Cantrips
+Cantrips are granted by nodes, not by a formula:
+- **Minor Studies** directly grants a set of generic cantrips on unlock.
+- **Spell school nodes** may grant school-specific cantrips (tagged accordingly).
 
-Stable Ingenuity mapping (full table including exceptional values):
+A character knows all cantrips granted by their unlocked nodes. There is no slot limit in the current prototype.
 
-| Stable Ingenuity | Base Known Cantrips |
-|------------------|---------------------|
-| d2               | 1                   |
-| d4               | 2                   |
-| d6               | 3                   |
-| d8               | 4                   |
-| d10              | 5                   |
-| d12              | 6                   |
-
-Minor Studies bonus:
-- Unlock / Grade 0 -> +0
-- Grade 1 -> +1
-- Grade 2 -> +2
+*Deferred: cantrip count formula (Ingenuity-based slot cap) and Minor Studies grade tiers.*
 
 ## Pool Building
 Cantrips use normal Tier-based pool building: base pool size = Tier.

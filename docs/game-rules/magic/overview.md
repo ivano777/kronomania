@@ -12,17 +12,22 @@ Cantrips are safer and simpler.
 ## Spellcasting Node Structure
 
 ### Cantrip Access
-The **Minor Studies** node (see [Cantrips](./cantrips.md)) unlocks cantrip use.
+The **Minor Studies** node unlocks cantrip use and directly grants a set of generic cantrips (see [Cantrips](./cantrips.md)).
+Additional cantrips may be granted by spell school nodes.
 Cantrips do not require the Spellcasting node.
 
 ### True Spellcasting Access
-The base **Spellcasting** node unlocks:
-- the real Fervor die (or dice, if expanded by later features)
-- the first true spells
+The **Spellcasting** node (prerequisite: Minor Studies) unlocks the real Fervor die and the ability to cast true spells.
+True spells are not granted by the Spellcasting node itself — they are granted by **spell school nodes**.
 
-From the Spellcasting node, spell schools and spell-specific nodes may branch out to unlock:
-- additional true spells
-- spell school features and substitutions
-- other magic-specific effects and exceptions
+### Spell Schools
+Spell schools are tiered node chains (e.g. Fire Magic I → II → III → IV).
+Each tier grants:
+- one or more **SpellData** entries (spells unlocked on purchase)
+- optional **bonus effects** applying to spells with matching tags (e.g. "+1 pool to fire-tagged spells")
 
-A character without the Spellcasting node cannot cast true spells, even if they hold Minor Studies.
+Prerequisites for school tiers combine:
+- the previous tier of the same school
+- specific **Core stat nodes** (e.g. Dominion d8 required for Fire Magic III)
+
+A character without the Spellcasting node cannot cast true spells from school nodes, even if a school node is unlocked.

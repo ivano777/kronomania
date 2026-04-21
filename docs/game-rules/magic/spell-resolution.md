@@ -4,18 +4,20 @@ True spells use the shared action engine with the Fervor subsystem layered on to
 
 ## Full Resolution Order
 
-1. Determine the **normal spell pool** from Tier.
-2. Apply **Advantage / Disadvantage / Desperation** to the normal pool.
-3. Apply **substitutions** to the normal pool (convert applicable dice to Ingenuity-based Fervor-tagged dice).
-4. **Roll** the normal pool.
-5. Apply normal **Keep**.
-6. **Roll the real Fervor dice** (additive, not part of the normal pool).
-7. **Sum**: kept normal total + total of all real Fervor dice.
-8. Apply **Flat modifiers**.
-9. **Resolve outcome** (compare against Guard, apply effects).
-10. After resolution, check all **Fervor-tagged dice**: for each one that rolled its maximum value, increase Fervor by 1 step. If multiple Fervor-tagged dice rolled maximum, Fervor increases by 1 step per die — a single cast may increase Fervor by multiple steps (see [Fervor — General Escalation Rule](./fervor.md#general-escalation-rule)).
-11. If the new Fervor level would exceed the current Ingenuity cap, the caster enters **Burnout**.
-12. The Fervor value is clamped at the cap; it does not rise above it.
+1. Determine the **normal spell pool** from Tier (+ Advantage/Disadvantage).
+2. Split the normal pool into **aspect dice** and **Ingenuity-tagged dice** per the spell's `aspect_dice` count.
+   - `aspect_dice` dice use the spell's `aspect_stat` die size.
+   - The remaining `(Tier − aspect_dice)` dice use Ingenuity die size and are **Fervor-tagged**.
+   - Pure-Ingenuity spells (`aspect_dice = 0`) treat all pool dice as Ingenuity-tagged.
+3. **Roll** all normal pool dice combined.
+4. Apply normal **Keep** (best `keep_count` from the combined pool, regardless of type).
+5. **Roll the real Fervor die** (additive, post-Keep, cannot be discarded).
+6. **Sum**: kept total + Fervor die result.
+7. Apply **Flat modifiers** (from spell `flat_bonus` + school bonus effects).
+8. **Resolve outcome** (compare against Guard, apply effects).
+9. After resolution, count **escalation steps**: one step per Ingenuity-tagged die (pre-Keep) that rolled its maximum, plus one step if the Fervor die rolled its maximum. A single cast may escalate Fervor by multiple steps.
+10. If the new Fervor level would exceed the current Ingenuity cap, the caster enters **Burnout**.
+11. The Fervor value is clamped at the cap; it does not rise above it.
 
 ## Timing
 True spells follow normal VT timing.

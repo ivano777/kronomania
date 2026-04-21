@@ -8,8 +8,8 @@ Tracks what is implemented and what remains. Updated after each feature ships.
 
 ### Core engine
 - **RollEngine** (`autoloads/RollEngine.gd`) — stateless dice resolver.
-  Build Pool → Roll → Keep → Flat → Outcome. Returns `Dictionary` with `dice`, `kept`, `total`, `pool_size`, `die_size`, `keep_count`, `flat`, `fervor_roll`, `fervor_maxed`.
-  Optional `fervor_size` parameter: if > 0, rolls one additive Fervor die post-Keep; result included in total and flagged if it rolled maximum.
+  Build Pool → Roll → Keep → Flat → Outcome. Returns `Dictionary` with `dice`, `kept`, `total`, `pool_size`, `die_size`, `keep_count`, `flat`, `fervor_roll`, `fervor_maxed`, `ingenuity_maxed_count`.
+  Optional params: `fervor_size` (additive post-Keep Fervor die), `aspect_stat_size` + `aspect_count` (mixed-pool spells: aspect dice + Ingenuity-tagged dice combined before Keep). `ingenuity_maxed_count` = count of Ingenuity-tagged dice that rolled their max (pre-keep).
   Helpers: `is_fast(total, vt)`, `is_massive(attack, guard, defensive_size)`.
 - **CombatantData** (`resources/CombatantData.gd`) — immutable combatant config as a `.tres` Resource.
   Fields: `combatant_name`, `tier`, `dominion_size`, `negation_size`, `ingenuity_size`, `keep_grade`, `velocity_threshold`, `max_wounds`, `equipped_weapon`, `starting_nodes`.
@@ -20,14 +20,15 @@ Tracks what is implemented and what remains. Updated after each feature ships.
   Referenced by `CombatantData.equipped_weapon`. All effects applied at combat init or roll time; `null` = no weapon (no penalty).
   *Deferred: Inefficiency rule (Potency → 1, Flat → 0 without training) — requires Group 3 nodes.*
 - **CombatManager** (`autoloads/CombatManager.gd`) — 1v1 combat state machine.
-  `CombatantState` fields: `data`, `current_wounds`, `max_wounds`, `unlocked_nodes`, `tier_override`, `is_defeated`, `fervor_size` (d4 base), `is_burned_out`, `has_minor_studies`, `has_spellcasting`.
-  Helpers: `_effective_tier()`, `_training_keep_grade()`, `_attack_flat()`, `_guard_flat()`, `_escalate_fervor()`.
-  At `start_combat()`, player's `unlocked_nodes`, `tier_override`, and magic flags are read from `PlayerProgression`. Initial `fervor_changed` signal emitted before first round.
-  Round loop: `_begin_round → player_chose_strike / _cantrip / _spell → _resolve_round_* → _resolve_attack × 2 → loop`.
+  `CombatantState` fields: `data`, `current_wounds`, `max_wounds`, `unlocked_nodes`, `tier_override`, `is_defeated`, `fervor_size` (d4 base), `is_burned_out`, `has_minor_studies`, `has_spellcasting`, `known_spells: Array`, `known_cantrips: Array`.
+  Helpers: `_effective_tier()`, `_training_keep_grade()`, `_attack_flat()`, `_guard_flat()`, `_escalate_fervor()`, `_stat_size()` (next feature).
+  At `start_combat()`, player's `unlocked_nodes`, `tier_override`, magic flags, and known spell lists are read from `PlayerProgression`. Initial `fervor_changed` signal emitted before first round.
+  Round loop: `_begin_round → player_chose_strike / _cantrip(spell) / _spell(spell) → _resolve_round_* → _resolve_attack × 2 → loop`.
+  Escalation: `steps = ingenuity_maxed_count + (1 if fervor_maxed)` — multiple steps possible per cast.
   Signals: `fervor_changed(is_player, fervor_size, fervor_cap, is_burned_out)`, `player_magic_available(can_cantrip, can_cast_spell)`.
 - **PlayerProgression** (`autoloads/PlayerProgression.gd`) — singleton owning Constellation state across scenes.
   `ALL_NODES` catalog, `unlocked_nodes: Array[NodeData]`, `available_points`.
-  Methods: `can_unlock`, `unlock`, `is_unlocked`, `get_category_count`, `get_tier` (breadth check).
+  Methods: `can_unlock`, `unlock`, `is_unlocked`, `get_category_count`, `get_tier` (breadth check), `get_known_spells()` (non-cantrip SpellData from unlocked spell nodes), `get_known_cantrips()` (cantrip SpellData).
 
 ### Combat mechanics
 - **Roll / Keep** — Tier-based pool, grade-based keep (0→1, 1→2, 2→3).
@@ -45,9 +46,14 @@ Tracks what is implemented and what remains. Updated after each feature ships.
 - `resources/data/player_default.tres` — Tier 1, d6 off/def, max wounds 3; equipped with Iron Sword. `starting_nodes` still present but overridden by `PlayerProgression` at combat init.
 - `resources/data/nodes/training_keep_1.tres` — Training, keep grade 1 (wired).
 - `resources/data/nodes/training_keep_2.tres` — Training, keep grade 2 (wired).
-- `resources/data/nodes/core_dominion_1.tres` — Core, Dominion stat size (authored; mechanic deferred).
-- `resources/data/nodes/ability_minor_studies.tres` — Ability, effect_type="minor_studies", gates cantrips (wired).
-- `resources/data/nodes/ability_spellcasting.tres` — Ability, effect_type="spellcasting", gates true spells; prerequisite: Minor Studies (wired).
+- `resources/data/nodes/core_dominion_1.tres` — Core, Dominion d8 (authored; stat-size mechanic wired in Phase A).
+- `resources/data/nodes/ability_minor_studies.tres` — Ability, effect_type="minor_studies", gates cantrip button; will carry `spells` array in Phase B.
+- `resources/data/nodes/ability_spellcasting.tres` — Ability, effect_type="spellcasting", gates true spell button; prerequisite: Minor Studies (wired).
+- `resources/data/nodes/ability_arcane_bolt.tres` — Ability, effect_type="spell", spell=arcane_bolt (stub; will be replaced by school nodes in Phase B).
+- `resources/data/nodes/ability_fireball.tres` — Ability, effect_type="spell", spell=fireball (stub; Phase B).
+- `resources/data/nodes/ability_charm.tres` — Ability, effect_type="spell", spell=charm (stub; Phase B).
+- `resources/data/nodes/ability_cantrip_spark.tres` — Ability, effect_type="spell", spell=cantrip_spark (stub; Phase B).
+- `resources/data/spells/arcane_bolt.tres`, `fireball.tres`, `charm.tres`, `cantrip_spark.tres` — SpellData files; will gain `tags` in Phase B.
 - `resources/data/nodes/ability_sure_footed.tres` — Ability, flavor node.
 - `resources/data/nodes/flavor_warrior_oath.tres` — Flavor, flavor node.
 - `resources/data/enemy_grunt.tres` — Tier 1, d6 off / d4 def, keep grade 0, VT 10, max wounds 2; equipped with Crude Club.
@@ -58,7 +64,7 @@ Tracks what is implemented and what remains. Updated after each feature ships.
 - **BattleScene** (`scenes/battle/`) — root scene wiring CombatManager signals to HUDs. "Constellation" button (top-right) navigates to ConstellationScene; extracts `_teardown_signals()` helper for safe scene transitions.
 - **ConstellationScene** (`scenes/constellation/`) — standalone skill tree. 4-column layout (Core / Training / Ability / Flavor), node cards with unlock buttons, point budget, tier badge and progress line. Back button returns to BattleScene. Reads/writes `PlayerProgression`.
 - **CombatantHUD** — name, wound slots, guard value per combatant. Player HUD shows Fervor row (d-size / cap + BURNOUT indicator).
-- **RoundHUD** — round label, phase label, Strike / Cantrip / Spell buttons (magic buttons appear only when relevant nodes are unlocked), scrollable BBCode combat log.
+- **RoundHUD** — round label, phase label, Strike / Cantrip / Spell buttons (magic buttons appear only when known spells/cantrips exist), scrollable BBCode combat log. Spell/Cantrip buttons open an in-code popup listing known spells; single-spell auto-cast skips popup.
 - **Combatant** — placeholder visual (colored rect + name label).
 - **Combat narrative** — BBCode-formatted log with attack rolls, speed check, breach/wound outcomes, and Massive highlights.
 
@@ -99,16 +105,32 @@ Ordered by dependency. Items within a group can be parallelized.
 - [x] **Fervor subsystem** — real Fervor die (d4 base, additive post-keep, cannot be discarded) rolled on true spells; escalates on max-roll (d4 → d6 → d8 → d10); cap = `ingenuity_size`; `fervor_changed` signal updates HUD. `RollEngine.resolve()` extended with optional `fervor_size` param.
   *Deferred: substitution dice, multiple real Fervor dice.*
 - [x] **Burnout state** — triggered when escalation exceeds Ingenuity cap. Blocks true spells; cantrips unaffected. Fervor clamped at cap. Resets each combat (Long Rest / Recovery Scene persistence deferred to Group 5).
-- [x] **Cantrips** — Minor Studies node gates cantrips. Ingenuity-based attack, no Fervor cost, available during Burnout. `player_chose_cantrip()` action.
-  *Deferred: named cantrip list, cantrip count formula (known slots).*
-- [~] **True spells** — Spellcasting node gates true spells (prerequisite: Minor Studies). Fervor die, VT check, escalation check all wired. `player_chose_spell()` action. Debug: `DebugFervorDisplay`.
-  *Current implementation is a generic stub: uses full Ingenuity pool for all dice, no per-spell data, no spell selection UI. Full per-spell resolution requires SpellData (see below).*
-- [ ] **SpellData resource + per-spell resolution** — `SpellData` resource class with fields: `spell_name`, `description`, `aspect_stat: String` ("dominion"|"negation"|""), `aspect_dice: int`, `target_pool: String`, `flat_bonus: int`, `is_cantrip: bool`.
-  Resolution: normal pool = `aspect_dice` dice of `aspect_stat` size + `(Tier - aspect_dice)` dice of `ingenuity_size` (Fervor-tagged, contribute to escalation on max-roll even if discarded during Keep) + real Fervor die (additive post-keep). Escalation steps = count of Ingenuity-pool dice that maxed + (1 if Fervor die maxed).
-  `NodeData` gains `@export var spell: SpellData = null`; `effect_type="spell"` nodes grant that spell on unlock. `PlayerProgression` derives `known_spells` from unlocked nodes. `CombatManager.player_chose_spell(spell: SpellData)` replaces the generic action. `RollEngine.resolve()` gains `aspect_stat_size: int` and `aspect_count: int` params for mixed pools.
-  UI: small popup on Spell/Cantrip button showing known spells; player picks one, resolution uses that spell's data.
-  Sample spells to author: Arcane Bolt (aspect="", 0, stance), Fireball (aspect="dominion", 1, stance), Charm (aspect="", 0, resolve), Cantrip Spark (cantrip, stance).
+- [x] **Cantrips** — Named cantrip spells via `SpellData` (is_cantrip=true) gated by Minor Studies prerequisite. Spell selection popup in RoundHUD. `player_chose_cantrip(spell: SpellData)` action.
+  *Deferred: cantrip count formula (known slots).*
+- [x] **True spells** — `SpellData` resource with per-spell resolution: `aspect_stat`, `aspect_dice`, `target_pool`, `flat_bonus`. Mixed pools (aspect + Ingenuity dice). Escalation steps = Ingenuity-tagged dice that maxed + (1 if Fervor die maxed). Spell selection popup in RoundHUD. `player_chose_spell(spell: SpellData)`.
+  Sample spells: Arcane Bolt (pure Ingenuity, stance), Fireball (Dominion×1 + Ingenuity, stance), Charm (pure Ingenuity, resolve), Cantrip Spark (cantrip, stance).
+  `NodeData` gains `@export var spell: SpellData`. `PlayerProgression.get_known_spells()` / `get_known_cantrips()`. `RollEngine.resolve()` gains `aspect_stat_size` and `aspect_count` params; returns `ingenuity_maxed_count`.
   *Deferred: multiple real Fervor dice, Fervor persistence across combats (Group 5), cantrip count formula.*
+
+### Group 4.5 — Spell school system (next)
+
+Two sequential phases; Phase A is prerequisite for Phase B.
+
+**Phase A — Core stat nodes**
+- [ ] `NodeData.prerequisite: NodeData` → `prerequisites: Array[NodeData]` (compound prereqs, all existing `.tres` migrated).
+- [ ] Author remaining Core nodes: `core_dominion_2.tres` (d8→d10), `core_negation_1/2.tres`, `core_ingenuity_1/2.tres`.
+- [ ] `CombatManager`: compute effective stat sizes from unlocked Core nodes at `start_combat()`; `_stat_size(state, stat)` helper replaces direct `state.data.*_size` reads.
+- [ ] `PlayerProgression.can_unlock()`: check all entries in `prerequisites` array.
+
+**Phase B — Spell schools**
+- [ ] New `SpellBonusEffect` resource: `tag: String`, `bonus_type: "pool"|"keep"`, `value: int`, `stat: String`.
+- [ ] `NodeData`: `spell → spells: Array[SpellData]`; add `bonus_effects: Array[SpellBonusEffect]`.
+- [ ] `SpellData`: add `tags: PackedStringArray`.
+- [ ] Remove 4 flat stub spell nodes; `ability_minor_studies.tres` gains `spells = [cantrip_spark, arcane_touch]`.
+- [ ] Author spell schools: Fire Magic I–IV (Sparks, Fire Orb, Fireball, Wall of Fire, Meteor; +1 pool bonus tier II, +1 keep bonus tier IV); Arcane I–III (Arcane Missile, Mind Spike, Void Bolt).
+- [ ] `PlayerProgression.get_known_spells/cantrips()`: scan `node.spells` array.
+- [ ] `CombatManager`: apply `bonus_effects` at spell resolution (tag-matched pool/keep bonuses).
+- [ ] Constellation UI: unchanged for now (tree visual deferred to Group 6).
 
 ### Group 5 — Full game loop
 - [ ] **Hub scene** — safe zone; access to character sheet, rest, loadout.

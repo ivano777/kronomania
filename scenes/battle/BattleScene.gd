@@ -36,10 +36,16 @@ func _ready() -> void:
 	if _debug_equip:
 		_debug_equip.setup(PLAYER_DATA, ENEMY_DATA)
 
-	# Connect RoundHUD action buttons.
+	# Connect RoundHUD action buttons/selections.
 	_round_hud.strike_pressed.connect(_on_strike_pressed)
-	_round_hud.cantrip_pressed.connect(_on_cantrip_pressed)
-	_round_hud.spell_pressed.connect(_on_spell_pressed)
+	_round_hud.cantrip_selected.connect(_on_cantrip_selected)
+	_round_hud.spell_selected.connect(_on_spell_selected)
+
+	# Pass known spells to RoundHUD before combat starts.
+	_round_hud.set_spell_lists(
+		PlayerProgression.get_known_spells(),
+		PlayerProgression.get_known_cantrips()
+	)
 
 	# Connect restart button.
 	_restart_btn.pressed.connect(_on_restart_pressed)
@@ -131,12 +137,12 @@ func _on_strike_pressed() -> void:
 	CombatManager.player_chose_strike(_round_hud.get_net_advantage(), _round_hud.get_target_pool())
 
 
-func _on_cantrip_pressed() -> void:
-	CombatManager.player_chose_cantrip(_round_hud.get_target_pool())
+func _on_cantrip_selected(spell: SpellData) -> void:
+	CombatManager.player_chose_cantrip(spell)
 
 
-func _on_spell_pressed() -> void:
-	CombatManager.player_chose_spell(_round_hud.get_net_advantage(), _round_hud.get_target_pool())
+func _on_spell_selected(spell: SpellData) -> void:
+	CombatManager.player_chose_spell(spell)
 
 
 func _on_restart_pressed() -> void:

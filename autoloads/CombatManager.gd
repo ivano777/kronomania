@@ -73,6 +73,8 @@ class CombatantState:
 	var is_burned_out: bool = false # blocks true spells when true
 	var has_minor_studies: bool = false  # derived from unlocked_nodes in start_combat()
 	var has_spellcasting: bool  = false  # derived from unlocked_nodes in start_combat()
+	var known_spells: Array   = []  # Array[SpellData] — non-cantrip spells, player only
+	var known_cantrips: Array = []  # Array[SpellData] — cantrip spells, player only
 
 	func init(d: CombatantData) -> void:
 		data = d
@@ -140,6 +142,8 @@ func start_combat(player_data: CombatantData, enemy_data: CombatantData) -> void
 	_player.has_spellcasting  = _player.unlocked_nodes.any(func(n: NodeData): return n.effect_type == "spellcasting")
 	_player.fervor_size = 4
 	_player.is_burned_out = false
+	_player.known_spells   = PlayerProgression.get_known_spells()
+	_player.known_cantrips = PlayerProgression.get_known_cantrips()
 	_enemy = CombatantState.new()
 	_enemy.init(enemy_data)
 	_round = 0
@@ -174,27 +178,27 @@ func player_chose_strike(net_advantage: int = 0, target_pool: String = "stance")
 	_resolve_round(net_advantage, target_pool)
 
 
-## Called by BattleScene when the player presses Cantrip.
+## Called by BattleScene when the player selects a cantrip spell.
 ## Ingenuity-based attack; no Fervor cost; available during Burnout.
-func player_chose_cantrip(target_pool: String = "resolve") -> void:
+func player_chose_cantrip(spell: SpellData) -> void:
 	if not _waiting_for_player:
 		return
 	_waiting_for_player = false
-	_resolve_round_cantrip(target_pool)
+	_resolve_round_cantrip(spell)
 
 
-## Called by BattleScene when the player presses Cast Spell.
+## Called by BattleScene when the player selects a true spell.
 ## Ingenuity-based attack with a real Fervor die; blocked during Burnout.
-func player_chose_spell(net_advantage: int = 0, target_pool: String = "resolve") -> void:
+func player_chose_spell(spell: SpellData) -> void:
 	if not _waiting_for_player:
 		return
 	if _player.is_burned_out:
 		log_message.emit("[color=orange]Burnout! True spells are blocked — choose Strike or Cantrip.[/color]")
-		player_magic_available.emit(_player.has_minor_studies, false)
+		player_magic_available.emit(_player.known_cantrips.size() > 0, false)
 		player_action_required.emit()
 		return
 	_waiting_for_player = false
-	_resolve_round_spell(net_advantage, target_pool)
+	_resolve_round_spell(spell)
 
 
 ## Debug only — override Fervor state at runtime.
@@ -224,8 +228,8 @@ func _begin_round() -> void:
 
 	_waiting_for_player = true
 	player_magic_available.emit(
-		_player.has_minor_studies,
-		_player.has_spellcasting and not _player.is_burned_out
+		_player.known_cantrips.size() > 0,
+		_player.known_spells.size() > 0 and not _player.is_burned_out
 	)
 	player_action_required.emit()
 
@@ -286,15 +290,15 @@ func _resolve_round(net_advantage: int = 0, target_pool: String = "stance") -> v
 
 
 # Coroutine: Cantrip — Ingenuity-based attack, no Fervor die, available during Burnout.
-func _resolve_round_cantrip(target_pool: String = "resolve") -> void:
+func _resolve_round_cantrip(spell: SpellData) -> void:
 	phase_changed.emit("Resolving…")
-	log_message.emit("%s channels a cantrip (Ingenuity d%d)." % [
-		_player.data.combatant_name, _player.data.ingenuity_size
+	log_message.emit("%s channels %s (Ingenuity d%d, no Fervor)." % [
+		_player.data.combatant_name, spell.spell_name, _player.data.ingenuity_size
 	])
 
 	var p_atk := RollEngine.resolve(
 		_effective_tier(_player), _player.data.ingenuity_size, _training_keep_grade(_player),
-		0, _pool_bonus(_player)
+		spell.flat_bonus, _pool_bonus(_player)
 	)
 	var e_atk := RollEngine.resolve(
 		_effective_tier(_enemy), _enemy.data.dominion_size, _training_keep_grade(_enemy),
@@ -315,14 +319,14 @@ func _resolve_round_cantrip(target_pool: String = "resolve") -> void:
 		log_message.emit("%s is Slow — %s acts first." % [_player.data.combatant_name, _enemy.data.combatant_name])
 		phase_changed.emit("Slow Phase — Enemy acts first")
 
-	_resolve_attack(player_first, p_atk if player_first else e_atk, target_pool)
+	_resolve_attack(player_first, p_atk if player_first else e_atk, spell.target_pool)
 	if _player.is_defeated or _enemy.is_defeated:
 		_end_combat()
 		return
 
 	var second_is_player := not player_first
 	phase_changed.emit("Slow Phase" if p_fast else "Fast Phase (2nd)")
-	_resolve_attack(second_is_player, p_atk if second_is_player else e_atk, target_pool)
+	_resolve_attack(second_is_player, p_atk if second_is_player else e_atk, spell.target_pool)
 	if _player.is_defeated or _enemy.is_defeated:
 		_end_combat()
 		return
@@ -331,16 +335,33 @@ func _resolve_round_cantrip(target_pool: String = "resolve") -> void:
 	_begin_round()
 
 
-# Coroutine: True Spell — Ingenuity + real Fervor die; escalates Fervor on max-roll.
-func _resolve_round_spell(net_advantage: int = 0, target_pool: String = "resolve") -> void:
+# Coroutine: True Spell — Ingenuity (+ optional aspect dice) + real Fervor die.
+# Escalation = count of Ingenuity-tagged dice that maxed + 1 if Fervor die maxed.
+func _resolve_round_spell(spell: SpellData) -> void:
 	phase_changed.emit("Resolving…")
-	log_message.emit("%s casts a true spell (Ingenuity d%d + Fervor d%d)." % [
-		_player.data.combatant_name, _player.data.ingenuity_size, _player.fervor_size
+
+	var aspect_stat_size: int = 0
+	if spell.aspect_stat == "dominion":
+		aspect_stat_size = _player.data.dominion_size
+	elif spell.aspect_stat == "negation":
+		aspect_stat_size = _player.data.negation_size
+
+	var aspect_label := ""
+	if spell.aspect_dice > 0 and spell.aspect_stat != "":
+		aspect_label = " [%s d%d × %d + Ingenuity d%d]" % [
+			spell.aspect_stat.capitalize(), aspect_stat_size,
+			spell.aspect_dice, _player.data.ingenuity_size
+		]
+	else:
+		aspect_label = " [Ingenuity d%d]" % _player.data.ingenuity_size
+	log_message.emit("%s casts %s%s + Fervor d%d." % [
+		_player.data.combatant_name, spell.spell_name, aspect_label, _player.fervor_size
 	])
 
 	var p_atk := RollEngine.resolve(
 		_effective_tier(_player), _player.data.ingenuity_size, _training_keep_grade(_player),
-		0, net_advantage + _pool_bonus(_player), _player.fervor_size
+		spell.flat_bonus, _pool_bonus(_player), _player.fervor_size,
+		aspect_stat_size, spell.aspect_dice
 	)
 	var e_atk := RollEngine.resolve(
 		_effective_tier(_enemy), _enemy.data.dominion_size, _training_keep_grade(_enemy),
@@ -361,21 +382,24 @@ func _resolve_round_spell(net_advantage: int = 0, target_pool: String = "resolve
 		log_message.emit("%s is Slow — %s acts first." % [_player.data.combatant_name, _enemy.data.combatant_name])
 		phase_changed.emit("Slow Phase — Enemy acts first")
 
-	_resolve_attack(player_first, p_atk if player_first else e_atk, target_pool)
+	_resolve_attack(player_first, p_atk if player_first else e_atk, spell.target_pool)
 	if _player.is_defeated or _enemy.is_defeated:
 		_end_combat()
 		return
 
 	var second_is_player := not player_first
 	phase_changed.emit("Slow Phase" if p_fast else "Fast Phase (2nd)")
-	_resolve_attack(second_is_player, p_atk if second_is_player else e_atk, target_pool)
+	_resolve_attack(second_is_player, p_atk if second_is_player else e_atk, spell.target_pool)
 	if _player.is_defeated or _enemy.is_defeated:
 		_end_combat()
 		return
 
-	# Post-resolution: check Fervor escalation (rules: magic/fervor.md).
-	if p_atk.fervor_maxed as bool:
-		_escalate_fervor(_player, 1)
+	# Post-resolution: Fervor escalation (rules: magic/fervor.md).
+	# Steps = count of Ingenuity-tagged dice that rolled max + 1 if Fervor die rolled max.
+	var fervor_maxed: bool = p_atk.fervor_maxed
+	var escalation_steps: int = (p_atk.ingenuity_maxed_count as int) + (1 if fervor_maxed else 0)
+	if escalation_steps > 0:
+		_escalate_fervor(_player, escalation_steps)
 
 	await get_tree().create_timer(0.8).timeout
 	_begin_round()

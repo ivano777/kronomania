@@ -24,3 +24,6 @@ extends Resource
 
 ## Optional prerequisite node that must be unlocked before this one can be purchased.
 @export var prerequisite: NodeData = null
+
+## For effect_type="spell" nodes: the SpellData granted when this node is unlocked.
+@export var spell: SpellData = null

@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="SpellData" format=3 uid="uid://spellfireball01"]
+
+[ext_resource type="Script" path="res://resources/SpellData.gd" id="1_spscr"]
+
+[resource]
+script = ExtResource("1_spscr")
+spell_name = "Fireball"
+description = "Dominion-anchored conflagration. 1 pool die draws from Dominion; the rest channel Ingenuity."
+aspect_stat = "dominion"
+aspect_dice = 1
+target_pool = "stance"
+flat_bonus = 0
+is_cantrip = false

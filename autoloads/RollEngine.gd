@@ -31,30 +31,58 @@ func keep_worst(dice: Array[int], keep_count: int) -> Array[int]:
 
 
 # Full resolution: Build Pool → Roll → Keep → Flat → total.
-# tier          : int — base pool size (1 die per Tier)
-# die_size      : int — face value of the stat die (4, 6, 8, or 10)
-# keep_grade    : int — training grade: 0 → keep 1, 1 → keep 2, 2 → keep 3
-# flat          : int — additive bonus applied after Keep (0 if unused)
-# net_advantage : int — positive = extra dice, negative = fewer dice;
-#                       pool ≤ 0 triggers Desperation (roll 2, keep worst)
-# fervor_size   : int — if > 0, roll one additive Fervor die of this face value
-#                       after Keep; cannot be discarded; result included in total.
+# tier             : int — base pool size (1 die per Tier)
+# die_size         : int — face value of the Ingenuity/primary stat die (4, 6, 8, or 10)
+# keep_grade       : int — training grade: 0 → keep 1, 1 → keep 2, 2 → keep 3
+# flat             : int — additive bonus applied after Keep (0 if unused)
+# net_advantage    : int — positive = extra dice, negative = fewer dice;
+#                          pool ≤ 0 triggers Desperation (roll 2, keep worst)
+# fervor_size      : int — if > 0, roll one additive Fervor die of this face value
+#                          after Keep; cannot be discarded; result included in total.
+# aspect_stat_size : int — face value of the aspect stat die (for mixed-pool spells)
+# aspect_count     : int — how many pool dice use aspect_stat_size; the rest use die_size
+#                          (Ingenuity-tagged; count toward Fervor escalation on max-roll)
 # Returns a Dictionary with full audit trail for the log.
-func resolve(tier: int, die_size: int, keep_grade: int, flat: int = 0, net_advantage: int = 0, fervor_size: int = 0) -> Dictionary:
+func resolve(tier: int, die_size: int, keep_grade: int, flat: int = 0, net_advantage: int = 0, fervor_size: int = 0, aspect_stat_size: int = 0, aspect_count: int = 0) -> Dictionary:
 	var pool_size: int = tier + net_advantage
 	var desperation := pool_size <= 0
 
 	var dice: Array[int]
 	var kept: Array[int]
+	var ingenuity_maxed_count := 0
 
 	if desperation:
-		# Desperation: roll 2 dice, keep the worst 1.
+		# Desperation: roll 2 dice, keep the worst 1. All treated as Ingenuity-tagged.
 		dice = roll_dice(2, die_size)
 		kept = keep_worst(dice, 1)
+		for d in dice:
+			if d == die_size:
+				ingenuity_maxed_count += 1
+	elif aspect_count > 0 and aspect_stat_size > 0:
+		# Mixed pool: aspect dice + ingenuity dice combined, keep best overall.
+		var clamped_aspect: int = mini(aspect_count, pool_size)
+		var ing_count: int = pool_size - clamped_aspect
+		var aspect_dice_arr: Array[int] = roll_dice(clamped_aspect, aspect_stat_size)
+		var ing_dice_arr: Array[int] = roll_dice(ing_count, die_size) if ing_count > 0 else []
+		# Count Ingenuity maxes before combining (pre-keep, per rules).
+		for d in ing_dice_arr:
+			if d == die_size:
+				ingenuity_maxed_count += 1
+		# Combine and keep best.
+		var combined: Array[int] = []
+		combined.append_array(aspect_dice_arr)
+		combined.append_array(ing_dice_arr)
+		dice = combined
+		var keep_count: int = mini(keep_grade + 1, pool_size)
+		kept = keep_best(dice, keep_count)
 	else:
+		# Pure pool: all dice are Ingenuity-tagged.
 		var keep_count: int = mini(keep_grade + 1, pool_size)
 		dice = roll_dice(pool_size, die_size)
 		kept = keep_best(dice, keep_count)
+		for d in dice:
+			if d == die_size:
+				ingenuity_maxed_count += 1
 
 	var total := flat
 	for d in kept:
@@ -69,17 +97,18 @@ func resolve(tier: int, die_size: int, keep_grade: int, flat: int = 0, net_advan
 		fervor_maxed = (fervor_roll == fervor_size)
 
 	return {
-		"dice":          dice,
-		"kept":          kept,
-		"total":         total,
-		"pool_size":     pool_size,
-		"die_size":      die_size,
-		"keep_count":    kept.size(),
-		"flat":          flat,
-		"net_advantage": net_advantage,
-		"desperation":   desperation,
-		"fervor_roll":   fervor_roll,
-		"fervor_maxed":  fervor_maxed,
+		"dice":                 dice,
+		"kept":                 kept,
+		"total":                total,
+		"pool_size":            pool_size,
+		"die_size":             die_size,
+		"keep_count":           kept.size(),
+		"flat":                 flat,
+		"net_advantage":        net_advantage,
+		"desperation":          desperation,
+		"fervor_roll":          fervor_roll,
+		"fervor_maxed":         fervor_maxed,
+		"ingenuity_maxed_count": ingenuity_maxed_count,
 	}
 
 

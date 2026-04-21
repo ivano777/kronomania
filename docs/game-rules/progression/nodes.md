@@ -19,11 +19,26 @@ Training nodes often define:
 Baseline rules stay simple.
 Exceptions usually live in nodes.
 
-## Minor Studies Consistency
-Use this progression consistently:
-- **Minor Studies (Unlock / Grade 0)** -> unlock cantrips, +0 known cantrips
-- **Minor Studies I (Grade 1)** -> +1 known cantrip
-- **Minor Studies II (Grade 2)** -> +2 known cantrips
+## Prerequisites
+A node may require one or more other nodes to be unlocked before it can be purchased.
+All listed prerequisites must be satisfied simultaneously — they are AND conditions.
+
+Examples:
+- A spell school tier may require the previous school tier AND a Core stat node.
+- The Spellcasting node requires Minor Studies.
+
+## Spell School Nodes
+Spell school nodes grant:
+- `spells: Array[SpellData]` — one or more spells unlocked on purchase
+- `bonus_effects: Array[SpellBonusEffect]` — optional bonuses applied at spell resolution
+
+`SpellBonusEffect` fields: `tag` (matches spell tags), `bonus_type` (`"pool"` or `"keep"`), `value` (integer), `stat` (which stat the pool/keep bonus applies to).
+
+Bonuses are cumulative across all unlocked nodes and apply only to spells whose tags match.
+
+## Minor Studies
+Minor Studies unlocks cantrip use and directly grants a set of generic cantrips.
+*Deferred: grade tiers (Minor Studies I / II) and Ingenuity-based slot formula.*
 
 ## Unarmed Combat Node Pattern
 

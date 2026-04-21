@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="NodeData" format=3 uid="uid://8m61s1w5qlr1"]
+
+[ext_resource type="Script" path="res://resources/NodeData.gd" id="1_ndscr"]
+[ext_resource type="Resource" uid="uid://csp4lx7saynb2" path="res://resources/data/nodes/ability_minor_studies.tres" id="2_prereq"]
+[ext_resource type="Resource" uid="uid://spellcspark0001" path="res://resources/data/spells/cantrip_spark.tres" id="3_spell"]
+
+[resource]
+script = ExtResource("1_ndscr")
+node_name = "Cantrip Spark"
+category = "Ability"
+effect_type = "spell"
+effect_value = 0
+description = "A minor spark of Ingenuity. No Fervor cost; available even during Burnout. Pressures Stance."
+unlock_cost = 1
+prerequisite = ExtResource("2_prereq")
+spell = ExtResource("3_spell")
