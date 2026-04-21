@@ -417,7 +417,7 @@ func _resolve_round_spell(spell: SpellData) -> void:
 	# Post-resolution: Fervor escalation (rules: magic/fervor.md).
 	# Steps = count of Ingenuity-tagged dice that rolled max + 1 if Fervor die rolled max.
 	var fervor_maxed: bool = p_atk.fervor_maxed
-	var escalation_steps: int = (p_atk.ingenuity_maxed_count as int) + (1 if fervor_maxed else 0)
+	var escalation_steps: int = (p_atk.primary_dice_maxed_count as int) + (1 if fervor_maxed else 0)
 	if escalation_steps > 0:
 		_escalate_fervor(_player, escalation_steps)
 
@@ -589,21 +589,26 @@ func _training_keep_grade(state: CombatantState) -> int:
 	return best
 
 
-## Steps Fervor up by `steps` track positions. Triggers Burnout if new size exceeds
-## the Ingenuity cap. Fervor is clamped at the cap (rules: magic/fervor.md).
+## Steps Fervor up by `steps` track positions. Triggers Burnout if escalation
+## would push the index past the cap's slot in FERVOR_TRACK — including the
+## d10/d10 ceiling case where new_size == cap but steps remain (magic/fervor.md).
 func _escalate_fervor(state: CombatantState, steps: int) -> void:
 	var cap: int = _stat_size(state, "ingenuity")
+	var cap_idx: int = FERVOR_TRACK.find(cap)
+	if cap_idx == -1:
+		cap_idx = FERVOR_TRACK.size() - 1
 	var idx: int = FERVOR_TRACK.find(state.fervor_size)
 	if idx == -1:
 		idx = 0
 	var prev_size: int = FERVOR_TRACK[idx]
-	idx = mini(idx + steps, FERVOR_TRACK.size() - 1)
-	var new_size: int = FERVOR_TRACK[idx]
+	var raw_new_idx: int = idx + steps
+	var clamped_idx: int = mini(raw_new_idx, FERVOR_TRACK.size() - 1)
+	var new_size: int = FERVOR_TRACK[clamped_idx]
 	if new_size != prev_size:
 		log_message.emit("  [color=magenta]Fervor escalates: d%d → d%d[/color]" % [prev_size, new_size])
 	else:
 		log_message.emit("  [color=magenta]Fervor at maximum track position (d%d).[/color]" % new_size)
-	if new_size > cap and not state.is_burned_out:
+	if raw_new_idx > cap_idx and not state.is_burned_out:
 		state.is_burned_out = true
 		log_message.emit("[color=orange][b]BURNOUT![/b] Fervor surged beyond control. True spells blocked until next combat.[/color]")
 	state.fervor_size = mini(new_size, cap)

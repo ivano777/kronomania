@@ -49,25 +49,27 @@ func resolve(tier: int, die_size: int, keep_grade: int, flat: int = 0, net_advan
 
 	var dice: Array[int]
 	var kept: Array[int]
-	var ingenuity_maxed_count := 0
+	# Counts non-aspect (primary) pool dice that rolled their maximum face value.
+	# In spell resolution these are always Ingenuity-tagged; in Strike the value is unused.
+	var primary_dice_maxed_count := 0
 
 	if desperation:
-		# Desperation: roll 2 dice, keep the worst 1. All treated as Ingenuity-tagged.
+		# Desperation: roll 2 dice, keep the worst 1. All treated as primary-tagged.
 		dice = roll_dice(2, die_size)
 		kept = keep_worst(dice, 1)
 		for d in dice:
 			if d == die_size:
-				ingenuity_maxed_count += 1
+				primary_dice_maxed_count += 1
 	elif aspect_count > 0 and aspect_stat_size > 0:
-		# Mixed pool: aspect dice + ingenuity dice combined, keep best overall.
+		# Mixed pool: aspect dice + primary (Ingenuity) dice combined, keep best overall.
 		var clamped_aspect: int = mini(aspect_count, pool_size)
 		var ing_count: int = pool_size - clamped_aspect
 		var aspect_dice_arr: Array[int] = roll_dice(clamped_aspect, aspect_stat_size)
 		var ing_dice_arr: Array[int] = roll_dice(ing_count, die_size) if ing_count > 0 else []
-		# Count Ingenuity maxes before combining (pre-keep, per rules).
+		# Count primary maxes before combining (pre-keep, per rules).
 		for d in ing_dice_arr:
 			if d == die_size:
-				ingenuity_maxed_count += 1
+				primary_dice_maxed_count += 1
 		# Combine and keep best.
 		var combined: Array[int] = []
 		combined.append_array(aspect_dice_arr)
@@ -76,13 +78,13 @@ func resolve(tier: int, die_size: int, keep_grade: int, flat: int = 0, net_advan
 		var keep_count: int = mini(keep_grade + 1, pool_size)
 		kept = keep_best(dice, keep_count)
 	else:
-		# Pure pool: all dice are Ingenuity-tagged.
+		# Pure pool: all dice are primary-tagged.
 		var keep_count: int = mini(keep_grade + 1, pool_size)
 		dice = roll_dice(pool_size, die_size)
 		kept = keep_best(dice, keep_count)
 		for d in dice:
 			if d == die_size:
-				ingenuity_maxed_count += 1
+				primary_dice_maxed_count += 1
 
 	var total := flat
 	for d in kept:
@@ -108,7 +110,7 @@ func resolve(tier: int, die_size: int, keep_grade: int, flat: int = 0, net_advan
 		"desperation":          desperation,
 		"fervor_roll":          fervor_roll,
 		"fervor_maxed":         fervor_maxed,
-		"ingenuity_maxed_count": ingenuity_maxed_count,
+		"primary_dice_maxed_count": primary_dice_maxed_count,
 	}
 
 

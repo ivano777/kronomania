@@ -99,7 +99,7 @@ docs/               # project-status.md (roadmap), project-index.md (generated c
 ### Autoload singletons
 
 Signatures and signals are in `docs/project-index.md`. Architectural gotchas:
-- **`RollEngine`** — stateless. Returns `Dictionary`; always cast values with `as int` / `as Array` — the type inferencer cannot infer through `Dictionary`. `resolve()` accepts optional `fervor_size` (additive post-keep Fervor die), `aspect_stat_size` and `aspect_count` (for mixed-pool spells). Returns `ingenuity_maxed_count` — count of Ingenuity-tagged pool dice that rolled their maximum (used for Fervor escalation).
+- **`RollEngine`** — stateless. Returns `Dictionary`; always cast values with `as int` / `as Array` — the type inferencer cannot infer through `Dictionary`. `resolve()` accepts optional `fervor_size` (additive post-keep Fervor die), `aspect_stat_size` and `aspect_count` (for mixed-pool spells). Returns `primary_dice_maxed_count` — count of non-aspect (primary) pool dice that rolled their maximum face value; stat-agnostic, always Ingenuity dice when called from spell resolution (used for Fervor escalation).
 - **`CombatManager`** — all output via signals; nothing returned. Disconnect all signals before `reload_current_scene()`. Signals: `fervor_changed(is_player, fervor_size, fervor_cap, is_burned_out)`, `player_magic_available(can_cantrip, can_cast_spell)`. Public methods: `player_chose_cantrip(spell: SpellData)`, `player_chose_spell(spell: SpellData)`, `debug_set_fervor(size, burned_out)`.
 - **`PlayerProgression`** — constellation state; read by `CombatManager` at `start_combat()`. `ALL_NODES` catalog. `get_known_spells()` and `get_known_cantrips()` iterate all unlocked nodes and collect from `node.spells` (is_cantrip=false / true).
 
@@ -125,7 +125,7 @@ _begin_round()
 Group 4 implements Fervor / Burnout / Cantrips / True Spells with per-spell `SpellData`:
 
 - **Fervor** — player-only runtime state on `CombatantState`. Track: d4 → d6 → d8 → d10 (`FERVOR_TRACK` const). Cap = `data.ingenuity_size`. Resets to d4 each combat (Long Rest / Recovery persistence deferred to Group 5).
-- **Escalation** — after a true spell resolves, `_escalate_fervor(_player, steps)` where `steps = ingenuity_maxed_count + (1 if fervor_maxed)`. Multiple steps possible in a single cast.
+- **Escalation** — after a true spell resolves, `_escalate_fervor(_player, steps)` where `steps = primary_dice_maxed_count + (1 if fervor_maxed)`. Multiple steps possible in a single cast.
 - **Burnout** — blocks `player_chose_spell()`; cantrips remain available. Cleared at combat start (Group 5 will add cross-scene persistence).
 - **Cantrip** — uses `SpellData` (is_cantrip=true). Ingenuity pool, no Fervor die, no escalation. Available during Burnout. Granted via `node.spells` (Minor Studies carries cantrip_spark + arcane_touch; Fire Magic I carries Sparks).
 - **True spell** — uses `SpellData`. Ingenuity pool + optional aspect dice + real Fervor die. Granted by spell school nodes (Fire Magic II–IV, Arcane I–III).
@@ -206,7 +206,7 @@ The rules live in `docs/game-rules/`. The implementation must match them exactly
 | Wounds | 1 on breach; 2 if Massive: `(attack - guard) > defensive_size` |
 | Defeat | `wounds >= max_wounds` |
 | Cantrip | Ingenuity die, Tier pool, no Fervor die, no escalation, available during Burnout; spell granted by Minor Studies or school nodes (`SpellData.is_cantrip=true`) |
-| True spell | Ingenuity + optional aspect dice + real Fervor die; spell granted by school node; escalation = `ingenuity_maxed_count + (1 if fervor_maxed)` |
+| True spell | Ingenuity + optional aspect dice + real Fervor die; spell granted by school node; escalation = `primary_dice_maxed_count + (1 if fervor_maxed)` |
 | Fervor cap | = `ingenuity_size` die face; caster may act at cap; escalating **beyond** cap triggers Burnout |
 | Burnout | Blocks true spells; cantrips unaffected; clears at next combat start (Group 5 adds persistence) |
 | Stat sizes | Base from `CombatantData`; upgraded by Core nodes (mechanic wired in Phase A of spell school feature) |
