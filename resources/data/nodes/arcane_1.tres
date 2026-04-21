@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="NodeData" format=3 uid="uid://rcane100001"]
+
+[ext_resource type="Script" path="res://resources/NodeData.gd" id="1_ndscr"]
+[ext_resource type="Resource" uid="uid://bspellcast001" path="res://resources/data/nodes/ability_spellcasting.tres" id="2_prereq"]
+[ext_resource type="Resource" uid="uid://cing1a0b1c2d3" path="res://resources/data/nodes/core_ingenuity_1.tres" id="3_prereq2"]
+[ext_resource type="Resource" uid="uid://arcmissile01" path="res://resources/data/spells/arcane_missile.tres" id="4_spell"]
+
+[resource]
+script = ExtResource("1_ndscr")
+node_name = "Arcane I"
+category = "Ability"
+effect_type = "spell_school"
+description = "Entry into the arcane arts. Unlocks Arcane Missile."
+unlock_cost = 1
+prerequisites = [ExtResource("2_prereq"), ExtResource("3_prereq2")]
+spells = [ExtResource("4_spell")]

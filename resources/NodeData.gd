@@ -25,5 +25,8 @@ extends Resource
 ## All nodes in this array must be unlocked before this node can be purchased (AND logic).
 @export var prerequisites: Array[NodeData] = []
 
-## For effect_type="spell" nodes: the SpellData granted when this node is unlocked.
-@export var spell: SpellData = null
+## SpellData granted when this node is unlocked (cantrips and true spells).
+@export var spells: Array[SpellData] = []
+
+## Bonus effects applied at spell resolution when a spell's tags match.
+@export var bonus_effects: Array[SpellBonusEffect] = []

@@ -358,8 +358,28 @@ func _resolve_round_spell(spell: SpellData) -> void:
 		_player.data.combatant_name, spell.spell_name, aspect_label, _player.fervor_size
 	])
 
+	# Collect school bonus effects for spells matching any of this spell's tags.
+	var spell_pool_bonus := 0
+	var spell_keep_bonus := 0
+	for n in _player.unlocked_nodes:
+		for be in n.bonus_effects:
+			if spell.tags.has(be.tag):
+				if be.bonus_type == "pool":
+					spell_pool_bonus += be.value
+				elif be.bonus_type == "keep":
+					spell_keep_bonus += be.value
+	if spell_pool_bonus > 0 or spell_keep_bonus > 0:
+		var parts: Array = []
+		if spell_pool_bonus > 0:
+			parts.append("+%d pool" % spell_pool_bonus)
+		if spell_keep_bonus > 0:
+			parts.append("+%d keep" % spell_keep_bonus)
+		log_message.emit("  [color=yellow]School bonus: %s[/color]" % ", ".join(parts))
+
 	var p_atk := RollEngine.resolve(
-		_effective_tier(_player), _stat_size(_player, "ingenuity"), _training_keep_grade(_player),
+		_effective_tier(_player) + spell_pool_bonus,
+		_stat_size(_player, "ingenuity"),
+		_training_keep_grade(_player) + spell_keep_bonus,
 		spell.flat_bonus, _pool_bonus(_player), _player.fervor_size,
 		aspect_stat_size, spell.aspect_dice
 	)

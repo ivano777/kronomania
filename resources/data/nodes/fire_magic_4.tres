@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="NodeData" format=3 uid="uid://firemag40001"]
+
+[ext_resource type="Script" path="res://resources/NodeData.gd" id="1_ndscr"]
+[ext_resource type="Script" path="res://resources/SpellBonusEffect.gd" id="2_bescr"]
+[ext_resource type="Resource" uid="uid://wallfire0001" path="res://resources/data/spells/wall_of_fire.tres" id="3_spell1"]
+[ext_resource type="Resource" uid="uid://meteor00001" path="res://resources/data/spells/meteor.tres" id="4_spell2"]
+[ext_resource type="Resource" uid="uid://firemag30001" path="res://resources/data/nodes/fire_magic_3.tres" id="5_prereq"]
+
+[sub_resource type="Resource" id="SubResource_1"]
+script = ExtResource("2_bescr")
+tag = "fire"
+bonus_type = "keep"
+value = 1
+stat = ""
+
+[resource]
+script = ExtResource("1_ndscr")
+node_name = "Fire Magic IV"
+category = "Ability"
+effect_type = "spell_school"
+description = "Inferno mastery. Unlocks Wall of Fire and Meteor. Grants +1 keep die to all fire spells."
+unlock_cost = 1
+prerequisites = [ExtResource("5_prereq")]
+spells = [ExtResource("3_spell1"), ExtResource("4_spell2")]
+bonus_effects = [SubResource("SubResource_1")]

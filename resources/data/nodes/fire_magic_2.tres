@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="NodeData" format=3 uid="uid://firemag20001"]
+
+[ext_resource type="Script" path="res://resources/NodeData.gd" id="1_ndscr"]
+[ext_resource type="Script" path="res://resources/SpellBonusEffect.gd" id="2_bescr"]
+[ext_resource type="Resource" uid="uid://fireorb00001" path="res://resources/data/spells/fire_orb.tres" id="3_spell"]
+[ext_resource type="Resource" uid="uid://firemag10001" path="res://resources/data/nodes/fire_magic_1.tres" id="4_prereq1"]
+[ext_resource type="Resource" uid="uid://bspellcast001" path="res://resources/data/nodes/ability_spellcasting.tres" id="5_prereq2"]
+[ext_resource type="Resource" uid="uid://dxf0fvyol0dhj" path="res://resources/data/nodes/core_dominion_1.tres" id="6_prereq3"]
+
+[sub_resource type="Resource" id="SubResource_1"]
+script = ExtResource("2_bescr")
+tag = "fire"
+bonus_type = "pool"
+value = 1
+stat = ""
+
+[resource]
+script = ExtResource("1_ndscr")
+node_name = "Fire Magic II"
+category = "Ability"
+effect_type = "spell_school"
+description = "Flames coalesce into a focused orb. Unlocks Fire Orb. Grants +1 pool die to all fire spells."
+unlock_cost = 1
+prerequisites = [ExtResource("4_prereq1"), ExtResource("5_prereq2"), ExtResource("6_prereq3")]
+spells = [ExtResource("3_spell")]
+bonus_effects = [SubResource("SubResource_1")]

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="NodeData" format=3 uid="uid://rcane300001"]
+
+[ext_resource type="Script" path="res://resources/NodeData.gd" id="1_ndscr"]
+[ext_resource type="Resource" uid="uid://arcane200001" path="res://resources/data/nodes/arcane_2.tres" id="2_prereq"]
+[ext_resource type="Resource" uid="uid://voidbolt0001" path="res://resources/data/spells/void_bolt.tres" id="3_spell"]
+
+[resource]
+script = ExtResource("1_ndscr")
+node_name = "Arcane III"
+category = "Ability"
+effect_type = "spell_school"
+description = "Entropic mastery. Unlocks Void Bolt — an unstable arcane strike with innate flat power."
+unlock_cost = 1
+prerequisites = [ExtResource("2_prereq")]
+spells = [ExtResource("3_spell")]

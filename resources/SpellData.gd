@@ -25,3 +25,6 @@ extends Resource
 
 ## If true: no Fervor die, no escalation; available during Burnout.
 @export var is_cantrip: bool = false
+
+## School tags matched against SpellBonusEffect.tag (e.g. "fire", "arcane").
+@export var tags: PackedStringArray = []

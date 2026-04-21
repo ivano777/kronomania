@@ -52,13 +52,29 @@ Tracks what is implemented and what remains. Updated after each feature ships.
 - `resources/data/nodes/core_negation_2.tres` — Core, Negation d10; prereq: Negation I.
 - `resources/data/nodes/core_ingenuity_1.tres` — Core, Ingenuity d8.
 - `resources/data/nodes/core_ingenuity_2.tres` — Core, Ingenuity d10; prereq: Ingenuity I.
-- `resources/data/nodes/ability_minor_studies.tres` — Ability, effect_type="minor_studies", gates cantrip button; will carry `spells` array in Phase B.
+- `resources/data/nodes/ability_minor_studies.tres` — Ability, effect_type="minor_studies", gates cantrip button; carries `spells=[cantrip_spark, arcane_touch]`.
 - `resources/data/nodes/ability_spellcasting.tres` — Ability, effect_type="spellcasting", gates true spell button; prerequisite: Minor Studies (wired).
 - `resources/data/nodes/ability_arcane_bolt.tres` — Ability, effect_type="spell", spell=arcane_bolt (stub; will be replaced by school nodes in Phase B).
 - `resources/data/nodes/ability_fireball.tres` — Ability, effect_type="spell", spell=fireball (stub; Phase B).
 - `resources/data/nodes/ability_charm.tres` — Ability, effect_type="spell", spell=charm (stub; Phase B).
 - `resources/data/nodes/ability_cantrip_spark.tres` — Ability, effect_type="spell", spell=cantrip_spark (stub; Phase B).
-- `resources/data/spells/arcane_bolt.tres`, `fireball.tres`, `charm.tres`, `cantrip_spark.tres` — SpellData files; will gain `tags` in Phase B.
+- `resources/data/spells/arcane_bolt.tres`, `charm.tres`, `cantrip_spark.tres` — SpellData files (stub/orphaned; no longer in ALL_NODES).
+- `resources/data/spells/fireball.tres` — SpellData, tags=["fire"], used by Fire Magic III.
+- `resources/data/spells/sparks.tres` — cantrip, fire tag, stance (Fire Magic I).
+- `resources/data/spells/arcane_touch.tres` — cantrip, arcane tag, resolve (Minor Studies).
+- `resources/data/spells/fire_orb.tres` — fire tag, stance (Fire Magic II).
+- `resources/data/spells/wall_of_fire.tres` — fire tag, stance, dominion×1 (Fire Magic IV).
+- `resources/data/spells/meteor.tres` — fire tag, stance, dominion×2 (Fire Magic IV).
+- `resources/data/spells/arcane_missile.tres` — arcane tag, stance (Arcane I).
+- `resources/data/spells/mind_spike.tres` — arcane tag, resolve (Arcane II).
+- `resources/data/spells/void_bolt.tres` — arcane tag, stance, flat+2 (Arcane III).
+- `resources/data/nodes/fire_magic_1.tres` — Ability, spells=[sparks], prereq=minor_studies.
+- `resources/data/nodes/fire_magic_2.tres` — Ability, spells=[fire_orb], bonus fire pool+1, prereqs=fire_magic_1+spellcasting.
+- `resources/data/nodes/fire_magic_3.tres` — Ability, spells=[fireball], prereq=fire_magic_2.
+- `resources/data/nodes/fire_magic_4.tres` — Ability, spells=[wall_of_fire, meteor], bonus fire keep+1, prereq=fire_magic_3.
+- `resources/data/nodes/arcane_1.tres` — Ability, spells=[arcane_missile], prereq=spellcasting.
+- `resources/data/nodes/arcane_2.tres` — Ability, spells=[mind_spike], prereq=arcane_1.
+- `resources/data/nodes/arcane_3.tres` — Ability, spells=[void_bolt], prereq=arcane_2.
 - `resources/data/nodes/ability_sure_footed.tres` — Ability, flavor node.
 - `resources/data/nodes/flavor_warrior_oath.tres` — Flavor, flavor node.
 - `resources/data/enemy_grunt.tres` — Tier 1, d6 off / d4 def, keep grade 0, VT 10, max wounds 2; equipped with Crude Club.
@@ -128,14 +144,14 @@ Two sequential phases; Phase A is prerequisite for Phase B.
 - [x] `PlayerProgression.can_unlock()`: check all entries in `prerequisites` array.
 
 **Phase B — Spell schools**
-- [ ] New `SpellBonusEffect` resource: `tag: String`, `bonus_type: "pool"|"keep"`, `value: int`, `stat: String`.
-- [ ] `NodeData`: `spell → spells: Array[SpellData]`; add `bonus_effects: Array[SpellBonusEffect]`.
-- [ ] `SpellData`: add `tags: PackedStringArray`.
-- [ ] Remove 4 flat stub spell nodes; `ability_minor_studies.tres` gains `spells = [cantrip_spark, arcane_touch]`.
-- [ ] Author spell schools: Fire Magic I–IV (Sparks, Fire Orb, Fireball, Wall of Fire, Meteor; +1 pool bonus tier II, +1 keep bonus tier IV); Arcane I–III (Arcane Missile, Mind Spike, Void Bolt).
-- [ ] `PlayerProgression.get_known_spells/cantrips()`: scan `node.spells` array.
-- [ ] `CombatManager`: apply `bonus_effects` at spell resolution (tag-matched pool/keep bonuses).
-- [ ] Constellation UI: unchanged for now (tree visual deferred to Group 6).
+- [x] New `SpellBonusEffect` resource: `tag: String`, `bonus_type: "pool"|"keep"`, `value: int`, `stat: String`.
+- [x] `NodeData`: `spell → spells: Array[SpellData]`; add `bonus_effects: Array[SpellBonusEffect]`.
+- [x] `SpellData`: add `tags: PackedStringArray`.
+- [x] Remove 4 flat stub spell nodes; `ability_minor_studies.tres` gains `spells = [cantrip_spark, arcane_touch]`.
+- [x] Author spell schools: Fire Magic I–IV (Sparks, Fire Orb, Fireball, Wall of Fire, Meteor; +1 pool bonus tier II, +1 keep bonus tier IV); Arcane I–III (Arcane Missile, Mind Spike, Void Bolt).
+- [x] `PlayerProgression.get_known_spells/cantrips()`: scan `node.spells` array.
+- [x] `CombatManager`: apply `bonus_effects` at spell resolution (tag-matched pool/keep bonuses).
+- [x] Constellation UI: unchanged (tree visual deferred to Group 6).
 
 ### Group 5 — Full game loop
 - [ ] **Hub scene** — safe zone; access to character sheet, rest, loadout.

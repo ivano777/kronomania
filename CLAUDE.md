@@ -97,7 +97,7 @@ docs/               # project-status.md (roadmap), project-index.md (generated c
 Signatures and signals are in `docs/project-index.md`. Architectural gotchas:
 - **`RollEngine`** — stateless. Returns `Dictionary`; always cast values with `as int` / `as Array` — the type inferencer cannot infer through `Dictionary`. `resolve()` accepts optional `fervor_size` (additive post-keep Fervor die), `aspect_stat_size` and `aspect_count` (for mixed-pool spells). Returns `ingenuity_maxed_count` — count of Ingenuity-tagged pool dice that rolled their maximum (used for Fervor escalation).
 - **`CombatManager`** — all output via signals; nothing returned. Disconnect all signals before `reload_current_scene()`. Signals: `fervor_changed(is_player, fervor_size, fervor_cap, is_burned_out)`, `player_magic_available(can_cantrip, can_cast_spell)`. Public methods: `player_chose_cantrip(spell: SpellData)`, `player_chose_spell(spell: SpellData)`, `debug_set_fervor(size, burned_out)`.
-- **`PlayerProgression`** — constellation state; read by `CombatManager` at `start_combat()`. `ALL_NODES` catalog. `get_known_spells()` and `get_known_cantrips()` scan unlocked nodes for `effect_type="spell"` entries and return the associated `SpellData` arrays.
+- **`PlayerProgression`** — constellation state; read by `CombatManager` at `start_combat()`. `ALL_NODES` catalog. `get_known_spells()` and `get_known_cantrips()` iterate all unlocked nodes and collect from `node.spells` (is_cantrip=false / true).
 
 ### Round loop (CombatManager)
 
@@ -123,8 +123,8 @@ Group 4 implements Fervor / Burnout / Cantrips / True Spells with per-spell `Spe
 - **Fervor** — player-only runtime state on `CombatantState`. Track: d4 → d6 → d8 → d10 (`FERVOR_TRACK` const). Cap = `data.ingenuity_size`. Resets to d4 each combat (Long Rest / Recovery persistence deferred to Group 5).
 - **Escalation** — after a true spell resolves, `_escalate_fervor(_player, steps)` where `steps = ingenuity_maxed_count + (1 if fervor_maxed)`. Multiple steps possible in a single cast.
 - **Burnout** — blocks `player_chose_spell()`; cantrips remain available. Cleared at combat start (Group 5 will add cross-scene persistence).
-- **Cantrip** — uses `SpellData` (is_cantrip=true). Ingenuity pool, no Fervor die, no escalation. Available during Burnout. Granted directly by the Minor Studies node.
-- **True spell** — uses `SpellData`. Ingenuity pool + optional aspect dice + real Fervor die. Granted by spell school nodes (next feature).
+- **Cantrip** — uses `SpellData` (is_cantrip=true). Ingenuity pool, no Fervor die, no escalation. Available during Burnout. Granted via `node.spells` (Minor Studies carries cantrip_spark + arcane_touch; Fire Magic I carries Sparks).
+- **True spell** — uses `SpellData`. Ingenuity pool + optional aspect dice + real Fervor die. Granted by spell school nodes (Fire Magic II–IV, Arcane I–III).
 
 ### SpellData (implemented)
 
@@ -135,24 +135,22 @@ Group 4 implements Fervor / Burnout / Cantrips / True Spells with per-spell `Spe
 - `target_pool: String` — defense pool the spell pressures.
 - `flat_bonus: int` — post-keep flat addition.
 - `is_cantrip: bool` — no Fervor die, available during Burnout.
-- `tags: PackedStringArray` — used by school bonus effects (next feature).
+- `tags: PackedStringArray` — matched against `SpellBonusEffect.tag` at spell resolution.
 
-### Spell school system (Phase A done; Phase B next)
-
-Phase A is complete. Phase B replaces flat spell nodes with tiered school nodes:
+### Spell school system (implemented — Groups 4.5 A + B)
 
 **Phase A — Core stat nodes (implemented):**
 - `NodeData.prerequisites: Array[NodeData]` — compound prereqs; all `.tres` migrated.
 - Core nodes (`core_dominion_1/2`, `core_negation_1/2`, `core_ingenuity_1/2`) grant stat size upgrades via `effect_type="stat_size_<stat>"` and `effect_value` (8 or 10).
 - `CombatManager._stat_size(state, stat)` — reads base from `CombatantData`, returns highest `effect_value` across matching unlocked Core nodes. All `state.data.*_size` reads replaced with this helper.
 
-**Phase B — Spell schools:**
-- New `SpellBonusEffect` resource: `tag: String`, `bonus_type: "pool"|"keep"`, `value: int`, `stat: String`.
+**Phase B — Spell schools (implemented):**
+- `SpellBonusEffect` resource (`resources/SpellBonusEffect.gd`): `tag: String`, `bonus_type: "pool"|"keep"`, `value: int`, `stat: String`.
 - `NodeData.spell: SpellData` → `NodeData.spells: Array[SpellData]` + `NodeData.bonus_effects: Array[SpellBonusEffect]`.
-- School nodes (e.g. Fire Magic I–IV, Arcane I–III) each grant multiple spells + optional bonuses per tier. Prereqs are other school nodes + Core stat nodes.
-- Minor Studies node will carry `spells = [cantrip_spark, arcane_touch]` directly.
-- `PlayerProgression.get_known_spells/cantrips()` will scan `node.spells` array.
-- `CombatManager` will sum matching `bonus_effects` when resolving spell attacks.
+- School nodes Fire Magic I–IV and Arcane I–III in `resources/data/nodes/`. Each grants spells via `spells` array; Fire Magic II adds fire pool +1, Fire Magic IV adds fire keep +1.
+- Minor Studies carries `spells = [cantrip_spark, arcane_touch]`; the 4 old flat spell stub nodes removed from `ALL_NODES`.
+- `PlayerProgression.get_known_spells/cantrips()` scans `node.spells` on all unlocked nodes.
+- `CombatManager._resolve_round_spell()` sums matching `bonus_effects` from all unlocked nodes before calling `RollEngine`: effective tier += pool bonus, keep_grade += keep bonus.
 
 ### GDScript typing rules
 
@@ -208,6 +206,6 @@ The rules live in `docs/game-rules/`. The implementation must match them exactly
 | Fervor cap | = `ingenuity_size` die face; caster may act at cap; escalating **beyond** cap triggers Burnout |
 | Burnout | Blocks true spells; cantrips unaffected; clears at next combat start (Group 5 adds persistence) |
 | Stat sizes | Base from `CombatantData`; upgraded by Core nodes (mechanic wired in Phase A of spell school feature) |
-| Spell schools | Tiered nodes granting multiple spells + `SpellBonusEffect` bonuses; prereqs are other nodes + Core stat nodes (Phase B) |
+| Spell schools | Fire Magic I–IV + Arcane I–III; `SpellBonusEffect` pool/keep bonuses applied at spell resolution (implemented) |
 
-Next unimplemented feature: spell school system — Phase B (school nodes, SpellBonusEffect, tags).
+Next unimplemented feature: Group 5 — full game loop (hub scene, rest/recovery, reward loop, enemy roster).

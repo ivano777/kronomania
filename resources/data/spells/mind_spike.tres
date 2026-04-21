@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="SpellData" format=3 uid="uid://mindspike001"]
+
+[ext_resource type="Script" path="res://resources/SpellData.gd" id="1_spscr"]
+
+[resource]
+script = ExtResource("1_spscr")
+spell_name = "Mind Spike"
+description = "A sharp psychic needle that bypasses physical defence and strikes at Resolve."
+aspect_stat = ""
+aspect_dice = 0
+target_pool = "resolve"
+flat_bonus = 0
+is_cantrip = false
+tags = PackedStringArray("arcane")

@@ -14,17 +14,20 @@ const ALL_NODES: Array = [
 	preload("res://resources/data/nodes/training_keep_2.tres"),
 	preload("res://resources/data/nodes/ability_minor_studies.tres"),
 	preload("res://resources/data/nodes/ability_spellcasting.tres"),
-	preload("res://resources/data/nodes/ability_cantrip_spark.tres"),
-	preload("res://resources/data/nodes/ability_arcane_bolt.tres"),
-	preload("res://resources/data/nodes/ability_fireball.tres"),
-	preload("res://resources/data/nodes/ability_charm.tres"),
 	preload("res://resources/data/nodes/ability_sure_footed.tres"),
+	preload("res://resources/data/nodes/fire_magic_1.tres"),
+	preload("res://resources/data/nodes/fire_magic_2.tres"),
+	preload("res://resources/data/nodes/fire_magic_3.tres"),
+	preload("res://resources/data/nodes/fire_magic_4.tres"),
+	preload("res://resources/data/nodes/arcane_1.tres"),
+	preload("res://resources/data/nodes/arcane_2.tres"),
+	preload("res://resources/data/nodes/arcane_3.tres"),
 	preload("res://resources/data/nodes/flavor_warrior_oath.tres"),
 ]
 
 var unlocked_nodes: Array[NodeData] = []
 ## Starting budget; reward integration (Group 5) will add points after each duel.
-var available_points: int = 5
+var available_points: int = 99
 
 
 func can_unlock(node: NodeData) -> bool:
@@ -63,21 +66,23 @@ func get_category_count(category: String) -> int:
 	return count
 
 
-## Returns all non-cantrip SpellData known by the player (effect_type="spell", is_cantrip=false).
+## Returns all non-cantrip SpellData known by the player (scans spells array on all unlocked nodes).
 func get_known_spells() -> Array:
 	var result := []
 	for node in unlocked_nodes:
-		if node.effect_type == "spell" and node.spell != null and not node.spell.is_cantrip:
-			result.append(node.spell)
+		for spell in node.spells:
+			if not spell.is_cantrip:
+				result.append(spell)
 	return result
 
 
-## Returns all cantrip SpellData known by the player (effect_type="spell", is_cantrip=true).
+## Returns all cantrip SpellData known by the player (scans spells array on all unlocked nodes).
 func get_known_cantrips() -> Array:
 	var result := []
 	for node in unlocked_nodes:
-		if node.effect_type == "spell" and node.spell != null and node.spell.is_cantrip:
-			result.append(node.spell)
+		for spell in node.spells:
+			if spell.is_cantrip:
+				result.append(spell)
 	return result
 
 

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="NodeData" format=3 uid="uid://firemag30001"]
+
+[ext_resource type="Script" path="res://resources/NodeData.gd" id="1_ndscr"]
+[ext_resource type="Resource" uid="uid://spellfireball01" path="res://resources/data/spells/fireball.tres" id="2_spell"]
+[ext_resource type="Resource" uid="uid://firemag20001" path="res://resources/data/nodes/fire_magic_2.tres" id="3_prereq"]
+
+[resource]
+script = ExtResource("1_ndscr")
+node_name = "Fire Magic III"
+category = "Ability"
+effect_type = "spell_school"
+description = "Mastery of combustion. Unlocks Fireball — Dominion-anchored conflagration."
+unlock_cost = 1
+prerequisites = [ExtResource("3_prereq")]
+spells = [ExtResource("2_spell")]

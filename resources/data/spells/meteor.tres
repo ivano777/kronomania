@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="SpellData" format=3 uid="uid://meteor00001"]
+
+[ext_resource type="Script" path="res://resources/SpellData.gd" id="1_spscr"]
+
+[resource]
+script = ExtResource("1_spscr")
+spell_name = "Meteor"
+description = "Catastrophic impact. Two Dominion dice channel raw force alongside Ingenuity."
+aspect_stat = "dominion"
+aspect_dice = 2
+target_pool = "stance"
+flat_bonus = 0
+is_cantrip = false
+tags = PackedStringArray("fire")

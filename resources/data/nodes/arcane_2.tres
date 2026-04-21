@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="NodeData" format=3 uid="uid://rcane200001"]
+
+[ext_resource type="Script" path="res://resources/NodeData.gd" id="1_ndscr"]
+[ext_resource type="Resource" uid="uid://arcane100001" path="res://resources/data/nodes/arcane_1.tres" id="2_prereq"]
+[ext_resource type="Resource" uid="uid://mindspike001" path="res://resources/data/spells/mind_spike.tres" id="3_spell"]
+
+[resource]
+script = ExtResource("1_ndscr")
+node_name = "Arcane II"
+category = "Ability"
+effect_type = "spell_school"
+description = "Arcane precision refined. Unlocks Mind Spike — a psychic strike that bypasses physical guard."
+unlock_cost = 1
+prerequisites = [ExtResource("2_prereq")]
+spells = [ExtResource("3_spell")]

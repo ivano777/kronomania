@@ -1,11 +1,11 @@
-[gd_resource type="Resource" script_class="SpellData" format=3 uid="uid://spellfireball01"]
+[gd_resource type="Resource" script_class="SpellData" format=3 uid="uid://wallfire0001"]
 
 [ext_resource type="Script" path="res://resources/SpellData.gd" id="1_spscr"]
 
 [resource]
 script = ExtResource("1_spscr")
-spell_name = "Fireball"
-description = "Dominion-anchored conflagration. 1 pool die draws from Dominion; the rest channel Ingenuity."
+spell_name = "Wall of Fire"
+description = "A Dominion-anchored inferno. One Dominion die fuels the wall; the rest channel Ingenuity."
 aspect_stat = "dominion"
 aspect_dice = 1
 target_pool = "stance"
