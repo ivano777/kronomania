@@ -153,6 +153,26 @@ Two sequential phases; Phase A is prerequisite for Phase B.
 - [x] `CombatManager`: apply `bonus_effects` at spell resolution (tag-matched pool/keep bonuses).
 - [x] Constellation UI: unchanged (tree visual deferred to Group 6).
 
+### Group 4.6 — Constellation Tier Gating + Per-Tier Slot Budget
+
+Two sequential phases.
+
+**Phase A — Node tier gate**
+- [ ] Add `required_tier: int` to `NodeData` (`resources/NodeData.gd`); default 1.
+- [ ] Author `required_tier` values on all existing `.tres` node files: Core I / Training I / tier-1 Ability nodes → 1; Core II / Training II / Fire Magic II / Arcane II → 2; Fire Magic III / Arcane III → 3; Fire Magic IV → 4.
+- [ ] `PlayerProgression.can_unlock()`: add check `get_tier() >= node.required_tier`.
+- [ ] Constellation UI: show locked-by-tier nodes as visually dimmed with a tier badge.
+- [ ] Run `/refresh-index` after `NodeData` schema change.
+
+**Phase B — Per-tier slot budget**
+- [ ] Confirm slot budget values with user before implementing (proposed: T1: 3 slots, T2: 2 slots, T3: 2 slots, T4: 1 slot).
+- [ ] `PlayerProgression`: replace or supplement `available_points` with `tier_slots_remaining: int` that resets per tier from the budget; spending a node costs 1 slot.
+- [ ] `can_unlock()`: also check `tier_slots_remaining > 0`.
+- [ ] Constellation UI: show "X picks remaining this tier" counter.
+- [ ] Tie slot grants into Group 5 reward loop (slot granted on tier advancement from XP/reward flow).
+
+*Deferred: mutually exclusive node choices within a tier (requires `exclusive_group` on NodeData — Group 6+).*
+
 ### Group 5 — Full game loop
 - [ ] **Hub scene** — safe zone; access to character sheet, rest, loadout.
 - [ ] **Character sheet UI** — stats, wounds, constellation summary.
