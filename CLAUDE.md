@@ -29,6 +29,10 @@ Follow this workflow for every requested feature, without exception.
   implement them in parallel using subagents.
 - Never parallelize writes to files that share state or that must be
   applied in a specific order (e.g. autoloads before scenes that depend on them).
+- Match subagent model to task complexity:
+  - `haiku` — validation runs, headless checks, single-file doc/typo fixes, simple searches.
+  - `sonnet` — single-file feature work, moderate reasoning, most implementation tasks.
+  - `opus` — multi-file architecture, complex cross-system reasoning, design decisions.
 
 ### 2b. Debug & Testability
 Every feature that introduces a new mechanic or runtime value must ship with a way to exercise it interactively.
