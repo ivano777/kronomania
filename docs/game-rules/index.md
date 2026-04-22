@@ -39,6 +39,8 @@ It is a structured gameplay guideline that can be translated into code, tools, c
 - [Tiers](./progression/tiers.md)
 - [Categories](./progression/categories.md)
 - [Nodes](./progression/nodes.md)
+- **Trees**
+  - [Dominion Path](./progression/trees/dominion.md)
 
 ### Magic
 - [Overview](./magic/overview.md)

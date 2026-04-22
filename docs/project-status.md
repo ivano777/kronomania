@@ -216,6 +216,57 @@ Three sequential implementation phases.
 - [ ] Locked-by-tier nodes remain visually dimmed (from Group 4.6 Phase A); no logic change required.
 - [ ] Run `/refresh-index` only if any new `@export` field is added to `NodeData` during this work.
 
+### Group 4.8 — Dominion Physical Tree (Multi-Level Node Refactor)
+
+Implements the Dominion ("Meat Tank") skill tree and introduces the **Multi-Level Node** data model, which replaces the current one-`.tres`-per-level-up approach. Depends on Group 4.6 Phase A (`required_tier` on `NodeData`) and Group 4.7 Phase A (tier counter in `PlayerProgression`) being complete first.
+
+Four sequential implementation phases.
+
+**Phase A — `NodeData.gd` schema refactor**
+- [ ] Add `max_level: int` to `NodeData` (default 1 — all existing nodes remain valid without changes).
+- [ ] Author `NodeEffect` resource (`resources/NodeEffect.gd`): `effect_type: String`, `effect_value: int`, `stat: String`, `weapon_tags: PackedStringArray`, `uses_per_combat: int` (0 = passive/unlimited).
+- [ ] Author `NodeLevelReq` resource (`resources/NodeLevelReq.gd`): `node: NodeData`, `required_level: int`.
+- [ ] Replace `NodeData.effects_per_level: Array[NodeEffect]` (one entry per level, index 0 = L1 effect).
+- [ ] Replace `NodeData.prerequisites: Array[NodeData]` → `level_prerequisites: Array[NodeLevelReq]`.
+- [ ] Refactor `PlayerProgression`: replace `unlocked_nodes: Array[NodeData]` with `node_levels: Dictionary` (`NodeData → int`). Update `can_unlock` → `can_upgrade`, `unlock` → `upgrade`, `is_unlocked` → `get_level(node) > 0`.
+- [ ] Run `/refresh-index` after schema changes.
+
+**Phase B — `ConstellationScene.gd` multi-level node cards**
+- [ ] Node cards show level pips or counter (e.g. `●●○` for L2/3).
+- [ ] "Unlock" button becomes "Upgrade"; disabled when `level >= max_level` or prerequisites unmet.
+- [ ] Connection lines light up progressively when source node level meets `NodeLevelReq.required_level`.
+- [ ] Locked-by-tier dimming from Group 4.6 Phase A is preserved; no logic change.
+
+**Phase C — Author Dominion tree data (11 `.tres` files)**
+
+Create under `resources/data/nodes/dominion/`:
+
+| File | `max_level` | Key `level_prerequisites` |
+|------|-------------|--------------------------|
+| `dom_core.tres` | 3 | — |
+| `dom_martial_arts.tres` | 2 | dom_core L2 |
+| `dom_melee.tres` | 2 | dom_martial_arts L1 |
+| `dom_ranged.tres` | 2 | dom_martial_arts L1 |
+| `dom_dual_wield.tres` | 2 | dom_melee L1 |
+| `dom_titans_grip.tres` | 2 | dom_melee L1 |
+| `dom_disarm.tres` | 2 | dom_melee L1 |
+| `dom_brutal.tres` | 3 | dom_titans_grip L1 |
+| `dom_wounds.tres` | 3 | L1: dom_core L1 · L2: dom_core L2 + dom_wounds L1 · L3: dom_core L3 + dom_wounds L2 |
+| `dom_meat_grinder.tres` | 2 | dom_wounds L2 |
+| `dom_earthshatter.tres` | 1 | dom_brutal L3 |
+
+- [ ] Confirm with user whether base Dominion stat changes from d6 → d4 in `player_default.tres` before authoring.
+- [ ] Add all 11 nodes to `PlayerProgression.ALL_NODES`.
+- [ ] Run `/refresh-index` after adding new `.tres` files.
+
+**Phase D — Combat hook architecture (new mechanics)**
+- [ ] **Passive modifiers** (Core Dominion size, Martial Arts keep grade, Wounds max wounds, Titan's Grip Forging I on 2H, Brutal L3 keep +1 on 2H): extend `CombatManager` helpers to read `node_levels` and sum `NodeEffect` entries — mirrors existing `_stat_size()` / `_training_keep_grade()` pattern.
+- [ ] **Earthshatter** (post-Keep additive die): add optional `post_keep_bonus_size: int` param to `RollEngine.resolve()`, parallel to `fervor_size`. `CombatManager` passes current stable Dominion size when player has `dom_earthshatter` at L1. Applies to Stance-pool and melee physical attacks only.
+- [ ] **Brutal L1** (VT trade): add a toggle in `RoundHUD` visible when `dom_brutal >= 1`; passes `brutal_trade: bool` into `player_chose_strike()`. `CombatManager` applies −5 to the VT check and +5 Flat to that attack's resolution.
+- [ ] **Meat for the Grinder** (reactive charges): add `stamina_degrade_charges: int` to `CombatantState` (set from `dom_meat_grinder` level at `start_combat()`). When `_resolve_attack()` would apply Massive Damage to the player and charges > 0, emit `player_massive_incoming()`. `RoundHUD` prompts the player to spend a charge and degrade to 1 Wound.
+- [ ] *Deferred: Melee L2 (Space Domination) reactive Advantage flag — requires one-round stateful flag in `CombatantState` (Group 5 infrastructure).* 
+- [ ] *Deferred: Brutal L2 (Cleave) multi-enemy overflow — requires Group 5 enemy roster and multi-target resolution.*
+
 ### Group 5 — Full game loop
 - [ ] **Hub scene** — safe zone; access to character sheet, rest, loadout.
 - [ ] **Character sheet UI** — stats, wounds, constellation summary.
