@@ -173,6 +173,49 @@ Two sequential phases.
 
 *Deferred: mutually exclusive node choices within a tier (requires `exclusive_group` on NodeData — Group 6+).*
 
+### Group 4.7 — Progression Rules Redesign
+
+Implements the new "5 Combat + 2 Flavor" tier advancement rule, passive wound bonuses, and the Triangle constellation UI. Depends on Group 4.6 Phase A (`required_tier` on `NodeData`) being complete first. Group 4.6 Phase B (per-tier slot budget) is **superseded** by this group and should not be implemented.
+
+Three sequential implementation phases.
+
+**Phase A — `PlayerProgression.gd` tier calculation refactor**
+- [ ] Add two runtime counters: `_tier_combat_spent: int` and `_tier_flavor_spent: int`, tracking slots spent in the **current** tier (reset to 0 on tier advance).
+- [ ] Rewrite `can_unlock(node)`:
+  - If node.category in ["Core", "Training", "Ability"]: check `_tier_combat_spent < 5`.
+  - If node.category == "Flavor": check `_tier_flavor_spent < 2`.
+  - Existing prerequisite and `required_tier` checks remain.
+- [ ] Rewrite `unlock(node)`: increment the matching counter. If `_tier_combat_spent >= 5 AND _tier_flavor_spent >= 2` and `_tier < 4`, advance `_tier` by 1 and reset both counters to 0.
+- [ ] `get_tier()` returns the stored `_tier` value rather than computing breadth dynamically.
+- [ ] `get_category_count()` is retained as-is for any UI display needs.
+- [ ] `available_points` plumbing is retained unchanged (Group 5 reward loop depends on it).
+- [ ] No `.tres` file changes required.
+
+**Phase B — Passive Max Wounds injection in `CombatManager.gd`**
+- [ ] Add private helper `_tier_wound_bonus(tier: int) -> int`:
+  - Returns `(1 if tier >= 2 else 0) + (1 if tier >= 4 else 0)`.
+- [ ] At `start_combat()`, compute `_player.max_wounds = data.max_wounds + equipment_bonus + _tier_wound_bonus(_player_tier)`.
+  - `_player_tier` = `PlayerProgression.get_tier()` read once at combat init.
+  - Enemy `max_wounds` is unaffected; enemy tier is not player-progression-driven.
+  - Base `.tres` files (e.g. `player_default.tres`) are **never mutated**.
+- [ ] Emit `wounds_changed` signal after updating `max_wounds` so the HUD reflects the new cap immediately.
+
+**Phase C — `ConstellationScene` UI restructure**
+- [ ] Replace 4-column grid layout with a triangular canvas.
+  - Each node card's screen position is derived from its vertex affiliation (Dominion / Negation / Ingenuity) and distance from center.
+  - Core nodes sit at the three vertices.
+  - Edge nodes (hybrid paths between two stats) interpolate between two vertex positions.
+  - Training and Ability nodes fill the interior, grouped by dominant stat.
+- [ ] Add a central non-interactive **Tier + HP display widget** overlaid at the triangle center:
+  - Reads `PlayerProgression.get_tier()` and player wounds on scene open.
+  - Refreshes on `PlayerProgression.unlock()` (connect a local callback).
+  - No game-state ownership — display only.
+- [ ] Add a **"Background / Traits"** tab hosting all Flavor-category nodes:
+  - Implemented as a separate tab (TabContainer or equivalent) entirely distinct from the triangle canvas.
+  - Flavor nodes are not visible on the triangle.
+- [ ] Locked-by-tier nodes remain visually dimmed (from Group 4.6 Phase A); no logic change required.
+- [ ] Run `/refresh-index` only if any new `@export` field is added to `NodeData` during this work.
+
 ### Group 5 — Full game loop
 - [ ] **Hub scene** — safe zone; access to character sheet, rest, loadout.
 - [ ] **Character sheet UI** — stats, wounds, constellation summary.
