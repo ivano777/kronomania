@@ -11,4 +11,5 @@ effect_type = "stat_size_negation"
 effect_value = 10
 description = "Impenetrable guard. Negation die size increases to d10."
 unlock_cost = 1
+required_tier = 2
 prerequisites = [ExtResource("2_prereq")]

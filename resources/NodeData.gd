@@ -22,6 +22,9 @@ extends Resource
 ## Point cost to unlock this node.
 @export_range(1, 5) var unlock_cost: int = 1
 
+## Minimum player Tier required to unlock this node (1–4).
+@export_range(1, 4) var required_tier: int = 1
+
 ## All nodes in this array must be unlocked before this node can be purchased (AND logic).
 @export var prerequisites: Array[NodeData] = []
 

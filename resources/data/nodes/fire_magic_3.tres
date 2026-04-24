@@ -11,5 +11,6 @@ category = "Ability"
 effect_type = "spell_school"
 description = "Mastery of combustion. Unlocks Fireball — Dominion-anchored conflagration."
 unlock_cost = 1
+required_tier = 3
 prerequisites = [ExtResource("3_prereq")]
 spells = [ExtResource("2_spell")]

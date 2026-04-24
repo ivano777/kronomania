@@ -20,6 +20,7 @@ category = "Ability"
 effect_type = "spell_school"
 description = "Inferno mastery. Unlocks Wall of Fire and Meteor. Grants +1 keep die to all fire spells."
 unlock_cost = 1
+required_tier = 4
 prerequisites = [ExtResource("5_prereq")]
 spells = [ExtResource("3_spell1"), ExtResource("4_spell2")]
 bonus_effects = [SubResource("SubResource_1")]

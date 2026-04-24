@@ -35,6 +35,8 @@ func can_unlock(node: NodeData) -> bool:
 		return false
 	if available_points < node.unlock_cost:
 		return false
+	if get_tier() < node.required_tier:
+		return false
 	for prereq in node.prerequisites:
 		if not is_unlocked(prereq):
 			return false

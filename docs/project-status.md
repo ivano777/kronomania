@@ -158,11 +158,11 @@ Two sequential phases; Phase A is prerequisite for Phase B.
 Two sequential phases.
 
 **Phase A — Node tier gate**
-- [ ] Add `required_tier: int` to `NodeData` (`resources/NodeData.gd`); default 1.
-- [ ] Author `required_tier` values on all existing `.tres` node files: Core I / Training I / tier-1 Ability nodes → 1; Core II / Training II / Fire Magic II / Arcane II → 2; Fire Magic III / Arcane III → 3; Fire Magic IV → 4.
-- [ ] `PlayerProgression.can_unlock()`: add check `get_tier() >= node.required_tier`.
-- [ ] Constellation UI: show locked-by-tier nodes as visually dimmed with a tier badge.
-- [ ] Run `/refresh-index` after `NodeData` schema change.
+- [x] Add `required_tier: int` to `NodeData` (`resources/NodeData.gd`); default 1.
+- [x] Author `required_tier` values on all existing `.tres` node files: Core I / Training I / tier-1 Ability nodes → 1; Core II / Training II / Fire Magic II / Arcane II → 2; Fire Magic III / Arcane III → 3; Fire Magic IV → 4.
+- [x] `PlayerProgression.can_unlock()`: add check `get_tier() >= node.required_tier`.
+- [x] Constellation UI: show locked-by-tier nodes as visually dimmed with a tier badge.
+- [x] Run `/refresh-index` after `NodeData` schema change.
 
 **Phase B — Per-tier slot budget**
 - [ ] Confirm slot budget values with user before implementing (proposed: T1: 3 slots, T2: 2 slots, T3: 2 slots, T4: 1 slot).

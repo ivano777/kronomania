@@ -9,6 +9,7 @@ const CATEGORIES := ["Core", "Training", "Ability", "Flavor"]
 @onready var _reset_btn: Button = $Main/Footer/ResetButton
 
 var _node_buttons: Dictionary = {}  # NodeData -> Button
+var _node_cards: Dictionary = {}   # NodeData -> PanelContainer
 
 
 func _ready() -> void:
@@ -45,6 +46,7 @@ func _make_card(node: NodeData) -> PanelContainer:
 	var btn := Button.new()
 	btn.pressed.connect(_on_unlock.bind(node))
 	_node_buttons[node] = btn
+	_node_cards[node] = card
 
 	vbox.add_child(name_lbl)
 	vbox.add_child(desc_lbl)
@@ -85,15 +87,25 @@ func _refresh() -> void:
 	for node in _node_buttons:
 		var nd := node as NodeData
 		var btn: Button = _node_buttons[node]
+		var card: PanelContainer = _node_cards[node]
+		var tier_locked := PlayerProgression.get_tier() < nd.required_tier
+
 		if PlayerProgression.is_unlocked(nd):
 			btn.text = "Unlocked"
 			btn.disabled = true
+			card.modulate = Color.WHITE
+		elif tier_locked:
+			btn.text = "Requires Tier %d" % nd.required_tier
+			btn.disabled = true
+			card.modulate = Color(1, 1, 1, 0.4)
 		elif PlayerProgression.can_unlock(nd):
 			btn.text = "Unlock (%d pt)" % nd.unlock_cost
 			btn.disabled = false
+			card.modulate = Color.WHITE
 		else:
 			btn.text = "Need %d pt" % nd.unlock_cost
 			btn.disabled = true
+			card.modulate = Color.WHITE
 
 
 func _on_unlock(node: NodeData) -> void:

@@ -21,6 +21,7 @@ category = "Ability"
 effect_type = "spell_school"
 description = "Flames coalesce into a focused orb. Unlocks Fire Orb. Grants +1 pool die to all fire spells."
 unlock_cost = 1
+required_tier = 2
 prerequisites = [ExtResource("4_prereq1"), ExtResource("5_prereq2"), ExtResource("6_prereq3")]
 spells = [ExtResource("3_spell")]
 bonus_effects = [SubResource("SubResource_1")]
