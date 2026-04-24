@@ -65,4 +65,49 @@ Each level of a Multi-Level Node delivers a distinct effect (or a cumulative inc
 
 ### Backward compatibility
 
-Existing single-upgrade nodes (all current `.tres` files) are treated as Multi-Level Nodes with `max_level = 1`. No schema change is required for existing data until they are explicitly migrated to the multi-level format.
+Existing single-upgrade nodes (all current `.tres` files) are treated as Multi-Level Nodes with `max_levels = 1`. No schema change is required for existing data until they are explicitly migrated to the multi-level format.
+
+---
+
+## Data Architecture: Nested Resource Model
+
+This is the **mandated implementation schema** for Multi-Level Nodes. It must be followed exactly to prevent duplicating common identity data across levels and to keep the Godot Editor Inspector usable without custom tooling.
+
+### Root Resource — `NodeData.gd`
+
+Holds all common, level-agnostic data. One `.tres` file per node.
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `node_id` | `String` | Stable unique identifier used in prerequisite references (e.g. `"dom_core"`) |
+| `display_name` | `String` | Human-readable name shown in the Constellation UI |
+| `icon` | `Texture2D` | Node icon |
+| `base_description` | `String` | Flavour/overview description shared across all levels |
+| `max_levels` | `int` | Maximum level the node can reach (1 for all legacy single-upgrade nodes) |
+| `category` | `String` | Constellation category — `"Core"`, `"Training"`, `"Ability"`, `"Flavor"` |
+| `levels_data` | `Array[NodeLevelData]` | Ordered sub-resource list; index 0 = Level 1, index N−1 = Level `max_levels` |
+
+### Sub-Resource — `NodeLevelData.gd`
+
+Holds **exclusively** data that changes per level. Stored inline inside `levels_data` — never as a standalone `.tres` file.
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `level_index` | `int` | 1-based level number this entry describes |
+| `cost` | `int` | Slot cost to reach this level (usually 1) |
+| `required_tier` | `int` | Minimum player Tier before this level may be purchased |
+| `prerequisites` | `Array[Dictionary]` | Each entry: `{ "node_id": String, "required_level": int }`. All must be satisfied simultaneously. |
+| `level_effect_description` | `String` | Human-readable description of the effect granted at this level |
+
+Mechanical effect payload fields (e.g. `effect_type: String`, `effect_value: int`, `stat: String`, `weapon_tags: PackedStringArray`, `uses_per_combat: int`) belong as additional fields on `NodeLevelData`, not on the root. `CombatManager` reads them from the current-level entry indexed by `node_levels[node] - 1`.
+
+Spell and bonus-effect data (`spells: Array[SpellData]`, `bonus_effects: Array[SpellBonusEffect]`) also migrate here, since spells and bonuses are granted at specific level thresholds.
+
+### Design rationale
+
+| Concern | How this model addresses it |
+|---------|----------------------------|
+| **No data duplication** | `display_name`, `icon`, `base_description`, `category` live once on `NodeData` |
+| **Inspector-friendly** | `Array[NodeLevelData]` renders as collapsible sub-inspectors in the Godot Editor — one per level, all fields visible without custom tooling |
+| **Prerequisite clarity** | Prerequisites are per-level (some levels require more than others) and use stable `node_id` strings to avoid circular resource references between `.tres` files |
+| **Backward compatibility** | All existing nodes become `max_levels = 1` with a single `NodeLevelData` entry; no `.tres` file is invalidated until explicitly migrated |

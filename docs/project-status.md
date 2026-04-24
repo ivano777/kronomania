@@ -225,15 +225,15 @@ Implements the Dominion ("Meat Tank") skill tree and introduces the **Multi-Leve
 
 Four sequential implementation phases.
 
-**Phase A — `NodeData.gd` schema refactor**
-- [ ] Add `max_level: int` to `NodeData` (default 1 — all existing nodes remain valid without changes).
-- [ ] Author `NodeEffect` resource (`resources/NodeEffect.gd`): `effect_type: String`, `effect_value: int`, `stat: String`, `weapon_tags: PackedStringArray`, `uses_per_combat: int` (0 = passive/unlimited).
-- [ ] Author `NodeLevelReq` resource (`resources/NodeLevelReq.gd`): `node: NodeData`, `required_level: int`.
-- [ ] Replace `NodeData.effects_per_level: Array[NodeEffect]` (one entry per level, index 0 = L1 effect).
-- [ ] Replace `NodeData.prerequisites: Array[NodeData]` → `level_prerequisites: Array[NodeLevelReq]`.
-- [ ] Refactor `PlayerProgression`: replace `unlocked_nodes: Array[NodeData]` with `node_levels: Dictionary` (`NodeData → int`). Update `can_unlock` → `can_upgrade`, `unlock` → `upgrade`, `is_unlocked` → `get_level(node) > 0`.
+**Phase A — `NodeData.gd` schema refactor (Nested Resource Architecture)**
+
+Per-level data is consolidated into a single `NodeLevelData` sub-resource. `NodeData` holds only level-agnostic identity data. This eliminates the need for separate `NodeEffect` and `NodeLevelReq` resource files and keeps the Godot Inspector usable without custom tooling. Full schema mandate in `docs/game-rules/progression/constellation.md`.
+
+- [ ] **Author `NodeLevelData` resource** (`resources/NodeLevelData.gd`): `level_index: int`, `cost: int`, `required_tier: int`, `prerequisites: Array[Dictionary]` (each entry: `{"node_id": String, "required_level": int}`), `level_effect_description: String`. Mechanical effect payload fields (`effect_type: String`, `effect_value: int`, `stat: String`, `weapon_tags: PackedStringArray`, `uses_per_combat: int`) and spell/bonus-effect data (`spells: Array[SpellData]`, `bonus_effects: Array[SpellBonusEffect]`) belong here — not on the root.
+- [ ] **Refactor `NodeData.gd`**: rename `node_name` → `display_name`, `description` → `base_description`; add `node_id: String`, `icon: Texture2D`, `max_levels: int` (default 1); replace `prerequisites: Array[NodeData]`, `effect_type`, `effect_value`, `unlock_cost`, `spells`, and `bonus_effects` with `levels_data: Array[NodeLevelData]`. Retain `category: String` unchanged.
+- [ ] **Refactor `PlayerProgression`**: replace `unlocked_nodes: Array[NodeData]` with `node_levels: Dictionary` (`NodeData → int`). Update `can_unlock` → `can_upgrade`, `unlock` → `upgrade`, `is_unlocked` → `get_level(node) > 0`.
 - [ ] **Atomic rename** — the method rename above must be a single commit that simultaneously updates all callers: `CombatManager.gd`, `ConstellationScene.gd`, and `BattleScene.gd`. Do not split across multiple commits or phases.
-- [ ] Migrate ALL existing `.tres` node files to include `effects_per_level: Array[NodeEffect]` entries. The old `effect_type`/`effect_value` fields may be retained during transition but are deprecated in favor of `NodeEffect` entries.
+- [ ] Migrate ALL existing `.tres` node files to the new schema: populate `levels_data` with one `NodeLevelData` entry each (all current nodes have `max_levels = 1`); move `effect_type`, `effect_value`, `unlock_cost`, `spells`, and `bonus_effects` values into that entry.
 - [ ] Run `/refresh-index` after schema changes.
 
 **Phase B — `ConstellationScene.gd` multi-level node cards**
@@ -243,7 +243,7 @@ Four sequential implementation phases.
 
 Create under `resources/data/nodes/dominion/`:
 
-| File | `max_level` | Key `level_prerequisites` |
+| File | `max_levels` | Key `prerequisites` (per `NodeLevelData` entry) |
 |------|-------------|--------------------------|
 | `dom_core.tres` | 3 | — |
 | `dom_martial_arts.tres` | 2 | dom_core L2 |
@@ -263,9 +263,9 @@ Create under `resources/data/nodes/dominion/`:
 - [ ] Run `/refresh-index` after adding new `.tres` files.
 
 **Phase D — Combat hook architecture (new mechanics)**
-- [ ] **Passive modifiers** (Core Dominion size, Martial Arts keep grade, Titan's Grip Forging I on 2H, Brutal L3 keep +1 on 2H): extend `CombatManager` helpers to read `node_levels` and sum `NodeEffect` entries — mirrors existing `_stat_size()` / `_training_keep_grade()` pattern.
-- [ ] **Wounds node max_wounds integration**: add `_wounds_node_bonus(state: CombatantState) -> int` helper (scan `node_levels` for `dom_wounds`, sum `effect_value` per unlocked level). Extend the `start_combat()` formula: `_player.max_wounds = data.max_wounds + equipment_bonus + _tier_wound_bonus(_player_tier) + _wounds_node_bonus(_player)`. Each `NodeEffect` entry in `dom_wounds.tres` must carry `effect_type="training_wounds"` and `effect_value=1`.
-- [ ] **Martial Arts physical_keep**: add `_physical_keep_grade(state: CombatantState) -> int` helper scanning for `effect_type="physical_keep"` nodes; pass result as the keep grade for physical attack rolls only (distinct from `_training_keep_grade()` which applies to all rolls). The `dom_martial_arts.tres` `NodeEffect` entries must use `effect_type="physical_keep"`.
+- [ ] **Passive modifiers** (Core Dominion size, Martial Arts keep grade, Titan's Grip Forging I on 2H, Brutal L3 keep +1 on 2H): extend `CombatManager` helpers to read `node_levels` and sum `effect_value` from `NodeLevelData` entries up to the node's current level — mirrors existing `_stat_size()` / `_training_keep_grade()` pattern.
+- [ ] **Wounds node max_wounds integration**: add `_wounds_node_bonus(state: CombatantState) -> int` helper (scan `node_levels` for `dom_wounds`, sum `effect_value` across all purchased `NodeLevelData` entries). Extend the `start_combat()` formula: `_player.max_wounds = data.max_wounds + equipment_bonus + _tier_wound_bonus(_player_tier) + _wounds_node_bonus(_player)`. Each `NodeLevelData` entry in `dom_wounds.tres` must carry `effect_type="training_wounds"` and `effect_value=1`.
+- [ ] **Martial Arts physical_keep**: add `_physical_keep_grade(state: CombatantState) -> int` helper scanning for `effect_type="physical_keep"` in `NodeLevelData` entries; pass result as the keep grade for physical attack rolls only (distinct from `_training_keep_grade()` which applies to all rolls). The `dom_martial_arts.tres` `NodeLevelData` entries must use `effect_type="physical_keep"`.
 - [ ] **Earthshatter** (post-Keep additive die): add optional `post_keep_bonus_size: int` param to `RollEngine.resolve()`, parallel to `fervor_size`. `CombatManager` passes current stable Dominion size when player has `dom_earthshatter` at L1. Applies to Stance-pool and melee physical attacks only.
 - [ ] **Brutal L1** (VT trade): add a toggle in `RoundHUD` visible when `dom_brutal >= 1`; passes `brutal_trade: bool` into `player_chose_strike()`. `CombatManager` applies −5 to the VT check and +5 Flat to that attack's resolution.
 - [ ] **Meat for the Grinder** (reactive charges): add `stamina_degrade_charges: int` to `CombatantState` (set from `dom_meat_grinder` level at `start_combat()`). When `_resolve_attack()` would apply Massive Damage to the player and charges > 0, emit `player_massive_incoming()`. `RoundHUD` prompts the player to spend a charge and degrade to 1 Wound.
