@@ -145,7 +145,7 @@ Core Dominion (L1 / L2 / L3)
 | Level | Effect |
 |---|---|
 | L1 | A successful Disarm action (attack beats Guard) forces the enemy to drop their weapon. |
-| L2 | **Synergy I** — if Melee is at max level (L2), a successful Disarm additionally grants Advantage on your next attack. |
+| L2 | **Melee Mastery** — if Melee is at max level (L2), a successful Disarm additionally grants Advantage on your next attack this combat. |
 
 ---
 
@@ -198,9 +198,9 @@ Core Dominion (L1 / L2 / L3)
 ## Design Notes
 
 - **Ranged and Dual Wield** are parallel branches off Martial Arts L1. Neither requires Melee.
-- **Disarm L2 synergy** uses the canonical Synergy effect-taxonomy pattern (see `docs/game-rules/reference/effect-taxonomy.md`).
+- **Disarm L2 (Melee Mastery)** grants Advantage on the next attack when Melee is maxed — a Situation modifier, not a flat bonus. It is not labeled Synergy.
 - **Brutal L1** is a player-declared trade before each attack — it is not a passive. The UI must surface a toggle when `Brutal ≥ L1`.
 - **Brutal L2 (Cleave)** requires multi-enemy routing and is deferred to Group 5.
-- **Melee L2 (Space Domination)** grants a one-round reactive Advantage flag on the player's Stamina pool. This requires a stateful flag on `CombatantState` (cleared at round start).
+- **Melee L2 (Space Domination)** grants an Advantage flag on the player's next Stamina defense roll this combat. The flag persists until triggered, then clears. This requires a stateful flag on `CombatantState`.
 - **Earthshatter** is deliberately narrow: Stance-pool attacks and melee physical attacks only. It does not apply to magical attacks or Resolve/Stamina-pool physical options.
 - The **base Dominion stat starts at d4**. This is a change from the current `player_default.tres` (d6). The implementation plan (Group 4.8) flags this for confirmation before authoring data files.

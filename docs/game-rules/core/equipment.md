@@ -32,7 +32,9 @@ They are the basis for skill prerequisites and Synergy conditions.
 Tags are **open-ended** — new tags are defined as items are authored.
 Multiple tags may appear on a single item.
 
-Examples: `[Sharp]`, `[Pointed]`, `[Flame]`, `[Heavy]`, `[Blunt]`
+Examples: `[Sharp]`, `[Pointed]`, `[Flame]`, `[Heavy]`, `[Blunt]`, `[2H]`
+
+- `[2H]` — Two-Handed. Marks weapons designed for two-handed use. Required by skills that gate effects on two-handed weapons (e.g. Titan's Grip, Brutal L3 Heavy Momentum).
 
 ## Skill Prerequisites
 

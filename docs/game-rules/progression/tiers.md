@@ -31,6 +31,8 @@ Each tier has a fixed slot budget:
 **Combat slots** are consumed by unlocking any node with category **Core**, **Training**, or **Ability**.
 **Flavor slots** are consumed by unlocking any node with category **Flavor**.
 
+> **Core-node cost:** Core-category upgrades consume **2 Combat slots each** (not 1). A single Core node with 3 levels costs 6 Combat slots total. See [Nodes — Node Costs](./nodes.md) for the full cost table.
+
 The two budgets are independent. Exhausting Combat slots blocks further Combat unlocks for that tier but does not affect Flavor slots, and vice versa.
 
 Once **both** budgets for the current tier are fully spent, the player automatically advances to the next tier and receives a fresh 5 Combat + 2 Flavor budget. There is no way to unlock additional nodes in a tier beyond its budget.

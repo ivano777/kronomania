@@ -19,6 +19,21 @@ Training nodes often define:
 Baseline rules stay simple.
 Exceptions usually live in nodes.
 
+## Node Costs
+
+Each node upgrade (unlocking a level) normally costs **1 Combat slot** from the current tier budget.
+
+**Exception — Core nodes cost 2 Combat slots per upgrade.** All nodes with category **Core** (stat-size upgrades for Dominion, Negation, and Ingenuity) consume 2 slots per level-up. This taxes "must-take" stat growth to create meaningful build tradeoffs and encourage multi-path exploration.
+
+| Category | Slots per upgrade |
+|---|---|
+| Core | 2 |
+| Training | 1 |
+| Ability | 1 |
+| Flavor | 1 (from Flavor budget, not Combat budget) |
+
+A Core node with `max_level = 3` costs 6 Combat slots total — more than one tier's full budget — to fully max.
+
 ## Prerequisites
 A node may require one or more other nodes to be unlocked before it can be purchased.
 All listed prerequisites must be satisfied simultaneously — they are AND conditions.
