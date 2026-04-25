@@ -53,7 +53,7 @@ signal fervor_changed(is_player: bool, fervor_size: int, fervor_cap: int, is_bur
 ## Emitted when a Massive Wound against the player can be degraded (charges_left > 0).
 signal player_massive_incoming(charges_left: int)
 ## Internal coroutine gate: resolved when the player decides whether to spend a charge.
-signal _massive_decision_resolved(use_charge: bool)
+signal _massive_decision_gate(use_charge: bool)
 
 
 # ── Runtime state ─────────────────────────────────────────────────────────────
@@ -215,7 +215,7 @@ func player_chose_spell(spell: SpellData) -> void:
 
 ## Called by RoundHUD (via BattleScene) when the player resolves a Meat for the Grinder prompt.
 func player_chose_degrade_wound(use_charge: bool) -> void:
-	_massive_decision_resolved.emit(use_charge)
+	_massive_decision_gate.emit(use_charge)
 
 
 ## Debug only — override Fervor state at runtime.
@@ -453,7 +453,7 @@ func _resolve_round_spell(spell: SpellData) -> void:
 
 	# Post-resolution: Fervor escalation (rules: magic/fervor.md).
 	# Steps = count of Ingenuity-tagged dice that rolled max + 1 if Fervor die rolled max.
-	var fervor_maxed: bool = p_atk.fervor_maxed
+	var fervor_maxed: bool = p_atk.fervor_maxed as bool
 	var escalation_steps: int = (p_atk.primary_dice_maxed_count as int) + (1 if fervor_maxed else 0)
 	if escalation_steps > 0:
 		_escalate_fervor(_player, escalation_steps)
@@ -512,7 +512,7 @@ func _resolve_attack(attacker_is_player: bool, attack_result: Dictionary, target
 		# Meat for the Grinder: player can spend a charge to degrade Massive → 1 Wound.
 		if wounds == 2 and not attacker_is_player and _player.stamina_degrade_charges > 0:
 			player_massive_incoming.emit(_player.stamina_degrade_charges)
-			var use_charge: bool = await _massive_decision_resolved
+			var use_charge: bool = await _massive_decision_gate
 			if use_charge:
 				_player.stamina_degrade_charges -= 1
 				wounds = 1

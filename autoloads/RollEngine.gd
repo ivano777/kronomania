@@ -6,6 +6,7 @@ extends Node
 
 # Roll `n` dice of `size` faces. Returns raw results as Array[int].
 func roll_dice(n: int, size: int) -> Array[int]:
+	assert(size > 0, "RollEngine.roll_dice: die size must be positive, got %d" % size)
 	var results: Array[int] = []
 	for i in n:
 		results.append(randi_range(1, size))

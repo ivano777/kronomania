@@ -9,6 +9,7 @@ var _enemy_data: CombatantData  # set from DungeonManager in _ready()
 # ── Debug scenes (remove path + add_child call to strip at release) ───────────
 const _DBG_WEAPON_SEL   := "res://scenes/debug/DebugWeaponSelector.tscn"
 const _DBG_FERVOR_DISP  := "res://scenes/debug/DebugFervorDisplay.tscn"
+var _dbg_fervor_disp = null
 
 # ── Node references ───────────────────────────────────────────────────────────
 @onready var _player_hud:    CombatantHUD = $GameLayout/PlayerSide/PlayerHUD
@@ -86,7 +87,8 @@ func _ready() -> void:
 	if ResourceLoader.exists(_DBG_WEAPON_SEL):
 		add_child((load(_DBG_WEAPON_SEL) as PackedScene).instantiate())
 	if ResourceLoader.exists(_DBG_FERVOR_DISP):
-		add_child((load(_DBG_FERVOR_DISP) as PackedScene).instantiate())
+		_dbg_fervor_disp = (load(_DBG_FERVOR_DISP) as PackedScene).instantiate()
+		add_child(_dbg_fervor_disp)
 
 	# Start combat.
 	CombatManager.start_combat(PLAYER_DATA, _enemy_data)
@@ -188,3 +190,5 @@ func _teardown_signals() -> void:
 	CombatManager.player_magic_available.disconnect(_on_player_magic_available)
 	CombatManager.fervor_changed.disconnect(_on_fervor_changed)
 	CombatManager.player_massive_incoming.disconnect(_on_player_massive_incoming)
+	if _dbg_fervor_disp:
+		CombatManager.fervor_changed.disconnect(_dbg_fervor_disp._on_fervor_changed)

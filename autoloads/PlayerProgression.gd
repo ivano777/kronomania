@@ -44,6 +44,7 @@ var available_points: int = 3
 var tier_combat_spent: int = 0
 var tier_flavor_spent: int = 0
 
+const MAX_TIER: int = 4
 var _tier: int = 1
 
 ## Fervor state persisted across combats (Group 5). Long Rest resets to 4; Recovery clears burnout only.
@@ -93,7 +94,7 @@ func upgrade(node: NodeData) -> void:
 		tier_flavor_spent += 1
 	else:
 		tier_combat_spent += ld.cost
-	if tier_combat_spent >= 5 and tier_flavor_spent >= 2 and _tier < 4:
+	if tier_combat_spent >= 5 and tier_flavor_spent >= 2 and _tier < MAX_TIER:
 		_tier += 1
 		tier_combat_spent = 0
 		tier_flavor_spent = 0
@@ -128,7 +129,7 @@ func debug_set_points(n: int) -> void:
 
 
 func debug_set_tier(t: int) -> void:
-	_tier = clampi(t, 1, 4)
+	_tier = clampi(t, 1, MAX_TIER)
 
 
 func get_category_count(category: String) -> int:
@@ -174,4 +175,5 @@ func _node_by_id(id: String) -> NodeData:
 	for node in ALL_NODES:
 		if (node as NodeData).node_id == id:
 			return node as NodeData
+	push_warning("PlayerProgression: node_id '%s' not found in ALL_NODES." % id)
 	return null
