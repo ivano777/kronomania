@@ -1,12 +1,22 @@
 [gd_resource type="Resource" script_class="NodeData" format=3 uid="uid://cing1a0b1c2d3"]
 
 [ext_resource type="Script" path="res://resources/NodeData.gd" id="1_ndscr"]
+[ext_resource type="Script" path="res://resources/NodeLevelData.gd" id="2_ldscr"]
+
+[sub_resource type="Resource" id="Level_1"]
+script = ExtResource("2_ldscr")
+level_index = 1
+cost = 2
+required_tier = 1
+level_effect_description = "Your arcane potential expands. Ingenuity die size increases to d8."
+effect_type = "stat_size_ingenuity"
+effect_value = 8
 
 [resource]
 script = ExtResource("1_ndscr")
-node_name = "Ingenuity I"
+node_id = "core_ingenuity_1"
+display_name = "Ingenuity I"
 category = "Core"
-effect_type = "stat_size_ingenuity"
-effect_value = 8
-description = "Your arcane potential expands. Ingenuity die size increases to d8."
-unlock_cost = 1
+base_description = "Your arcane potential expands. Ingenuity die size increases to d8."
+max_levels = 1
+levels_data = [SubResource("Level_1")]

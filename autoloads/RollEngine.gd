@@ -43,7 +43,7 @@ func keep_worst(dice: Array[int], keep_count: int) -> Array[int]:
 # aspect_count     : int — how many pool dice use aspect_stat_size; the rest use die_size
 #                          (Ingenuity-tagged; count toward Fervor escalation on max-roll)
 # Returns a Dictionary with full audit trail for the log.
-func resolve(tier: int, die_size: int, keep_grade: int, flat: int = 0, net_advantage: int = 0, fervor_size: int = 0, aspect_stat_size: int = 0, aspect_count: int = 0) -> Dictionary:
+func resolve(tier: int, die_size: int, keep_grade: int, flat: int = 0, net_advantage: int = 0, fervor_size: int = 0, aspect_stat_size: int = 0, aspect_count: int = 0, post_keep_bonus_size: int = 0) -> Dictionary:
 	var pool_size: int = tier + net_advantage
 	var desperation := pool_size <= 0
 
@@ -98,6 +98,12 @@ func resolve(tier: int, die_size: int, keep_grade: int, flat: int = 0, net_advan
 		total += fervor_roll
 		fervor_maxed = (fervor_roll == fervor_size)
 
+	# Post-keep bonus die (e.g. Earthshatter): additive, not discarded.
+	var post_keep_bonus_roll := 0
+	if post_keep_bonus_size > 0:
+		post_keep_bonus_roll = roll_dice(1, post_keep_bonus_size)[0]
+		total += post_keep_bonus_roll
+
 	return {
 		"dice":                 dice,
 		"kept":                 kept,
@@ -111,6 +117,7 @@ func resolve(tier: int, die_size: int, keep_grade: int, flat: int = 0, net_advan
 		"fervor_roll":          fervor_roll,
 		"fervor_maxed":         fervor_maxed,
 		"primary_dice_maxed_count": primary_dice_maxed_count,
+		"post_keep_bonus_roll": post_keep_bonus_roll,
 	}
 
 

@@ -1,26 +1,34 @@
 [gd_resource type="Resource" script_class="NodeData" format=3 uid="uid://firemag40001"]
 
 [ext_resource type="Script" path="res://resources/NodeData.gd" id="1_ndscr"]
-[ext_resource type="Script" path="res://resources/SpellBonusEffect.gd" id="2_bescr"]
-[ext_resource type="Resource" uid="uid://wallfire0001" path="res://resources/data/spells/wall_of_fire.tres" id="3_spell1"]
-[ext_resource type="Resource" uid="uid://meteor00001" path="res://resources/data/spells/meteor.tres" id="4_spell2"]
-[ext_resource type="Resource" uid="uid://firemag30001" path="res://resources/data/nodes/fire_magic_3.tres" id="5_prereq"]
+[ext_resource type="Script" path="res://resources/NodeLevelData.gd" id="2_ldscr"]
+[ext_resource type="Script" path="res://resources/SpellBonusEffect.gd" id="3_bescr"]
+[ext_resource type="Resource" uid="uid://wallfire0001" path="res://resources/data/spells/wall_of_fire.tres" id="4_spell1"]
+[ext_resource type="Resource" uid="uid://meteor00001" path="res://resources/data/spells/meteor.tres" id="5_spell2"]
 
-[sub_resource type="Resource" id="SubResource_1"]
-script = ExtResource("2_bescr")
+[sub_resource type="Resource" id="BonusEffect_1"]
+script = ExtResource("3_bescr")
 tag = "fire"
 bonus_type = "keep"
 value = 1
 stat = ""
 
+[sub_resource type="Resource" id="Level_1"]
+script = ExtResource("2_ldscr")
+level_index = 1
+cost = 1
+required_tier = 4
+prerequisites = [{"node_id": "fire_magic_3", "required_level": 1}]
+level_effect_description = "Inferno mastery. Unlocks Wall of Fire and Meteor. Grants +1 keep die to all fire spells."
+effect_type = "spell_school"
+spells = [ExtResource("4_spell1"), ExtResource("5_spell2")]
+bonus_effects = [SubResource("BonusEffect_1")]
+
 [resource]
 script = ExtResource("1_ndscr")
-node_name = "Fire Magic IV"
+node_id = "fire_magic_4"
+display_name = "Fire Magic IV"
 category = "Ability"
-effect_type = "spell_school"
-description = "Inferno mastery. Unlocks Wall of Fire and Meteor. Grants +1 keep die to all fire spells."
-unlock_cost = 1
-required_tier = 4
-prerequisites = [ExtResource("5_prereq")]
-spells = [ExtResource("3_spell1"), ExtResource("4_spell2")]
-bonus_effects = [SubResource("SubResource_1")]
+base_description = "Inferno mastery. Unlocks Wall of Fire and Meteor. Grants +1 keep die to all fire spells."
+max_levels = 1
+levels_data = [SubResource("Level_1")]

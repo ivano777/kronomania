@@ -40,6 +40,7 @@ func _ready() -> void:
 	_round_hud.strike_pressed.connect(_on_strike_pressed)
 	_round_hud.cantrip_selected.connect(_on_cantrip_selected)
 	_round_hud.spell_selected.connect(_on_spell_selected)
+	_round_hud.wound_degrade_chosen.connect(_on_wound_degrade_chosen)
 
 	# Pass known spells to RoundHUD before combat starts.
 	_round_hud.set_spell_lists(
@@ -74,6 +75,7 @@ func _ready() -> void:
 	CombatManager.player_action_required.connect(_on_player_action_required)
 	CombatManager.player_magic_available.connect(_on_player_magic_available)
 	CombatManager.fervor_changed.connect(_on_fervor_changed)
+	CombatManager.player_massive_incoming.connect(_on_player_massive_incoming)
 
 	# Debug widgets — instantiated at runtime; safe to remove with the consts above.
 	if ResourceLoader.exists(_DBG_WEAPON_SEL):
@@ -133,8 +135,16 @@ func _on_fervor_changed(is_player: bool, fervor_size: int, fervor_cap: int, is_b
 		_player_hud.set_fervor(fervor_size, fervor_cap, is_burned_out)
 
 
+func _on_player_massive_incoming(charges_left: int) -> void:
+	_round_hud.show_massive_prompt(charges_left)
+
+
+func _on_wound_degrade_chosen(use_charge: bool) -> void:
+	CombatManager.player_chose_degrade_wound(use_charge)
+
+
 func _on_strike_pressed() -> void:
-	CombatManager.player_chose_strike(_round_hud.get_net_advantage(), _round_hud.get_target_pool())
+	CombatManager.player_chose_strike(_round_hud.get_net_advantage(), _round_hud.get_target_pool(), _round_hud.get_brutal_trade())
 
 
 func _on_cantrip_selected(spell: SpellData) -> void:
@@ -165,3 +175,4 @@ func _teardown_signals() -> void:
 	CombatManager.player_action_required.disconnect(_on_player_action_required)
 	CombatManager.player_magic_available.disconnect(_on_player_magic_available)
 	CombatManager.fervor_changed.disconnect(_on_fervor_changed)
+	CombatManager.player_massive_incoming.disconnect(_on_player_massive_incoming)

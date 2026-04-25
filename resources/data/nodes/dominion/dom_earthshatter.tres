@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="NodeData" format=3 uid="uid://earthshat0001"]
+
+[ext_resource type="Script" path="res://resources/NodeData.gd" id="1_ndscr"]
+[ext_resource type="Script" path="res://resources/NodeLevelData.gd" id="2_ldscr"]
+
+[sub_resource type="Resource" id="Level_1"]
+script = ExtResource("2_ldscr")
+level_index = 1
+cost = 1
+required_tier = 4
+prerequisites = [{"node_id": "dom_brutal", "required_level": 3}]
+level_effect_description = "Earthshatter: after keeping dice on a Stance attack, roll your full Dominion die and add it to the total."
+effect_type = "earthshatter"
+effect_value = 1
+
+[resource]
+script = ExtResource("1_ndscr")
+node_id = "dom_earthshatter"
+display_name = "Earthshatter"
+category = "Ability"
+base_description = "The ground trembles at your strike. A post-keep Dominion bonus die added to Stance attacks."
+max_levels = 1
+levels_data = [SubResource("Level_1")]

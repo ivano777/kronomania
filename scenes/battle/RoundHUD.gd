@@ -6,6 +6,7 @@ extends VBoxContainer
 signal strike_pressed
 signal spell_selected(spell: SpellData)
 signal cantrip_selected(spell: SpellData)
+signal wound_degrade_chosen(use_charge: bool)
 
 @onready var _round_label:  Label         = $RoundLabel
 @onready var _phase_label:  Label         = $PhaseLabel
@@ -24,6 +25,13 @@ var _known_cantrips: Array = []  # Array[SpellData]
 var _popup: PanelContainer
 var _popup_list: VBoxContainer
 
+# Brutal Trade toggle — visible only when dom_brutal >= 1.
+var _brutal_toggle: CheckButton
+
+# Meat for the Grinder prompt overlay.
+var _massive_overlay: PanelContainer
+var _massive_spend_btn: Button
+
 
 func _ready() -> void:
 	_strike_btn.pressed.connect(_on_strike_pressed)
@@ -33,12 +41,36 @@ func _ready() -> void:
 	_cantrip_btn.disabled = true
 	_spell_btn.disabled = true
 
+	# Brutal Trade toggle (visible only when dom_brutal is purchased).
+	_brutal_toggle = CheckButton.new()
+	_brutal_toggle.text = "Brutal Trade  (VT −5 / Flat +5)"
+	_brutal_toggle.visible = PlayerProgression.get_node_level_by_id("dom_brutal") >= 1
+	add_child(_brutal_toggle)
+	move_child(_brutal_toggle, _strike_btn.get_index() + 1)
+
 	# Build spell selection popup.
 	_popup = PanelContainer.new()
 	_popup.visible = false
 	_popup_list = VBoxContainer.new()
 	_popup.add_child(_popup_list)
 	add_child(_popup)
+
+	# Meat for the Grinder decision overlay.
+	_massive_overlay = PanelContainer.new()
+	_massive_overlay.visible = false
+	var _overlay_vbox := VBoxContainer.new()
+	var _overlay_label := Label.new()
+	_overlay_label.text = "Massive Wound incoming!"
+	_overlay_vbox.add_child(_overlay_label)
+	_massive_spend_btn = Button.new()
+	_massive_spend_btn.pressed.connect(func() -> void: _on_massive_choice(true))
+	_overlay_vbox.add_child(_massive_spend_btn)
+	var _accept_btn := Button.new()
+	_accept_btn.text = "Accept Massive Wound"
+	_accept_btn.pressed.connect(func() -> void: _on_massive_choice(false))
+	_overlay_vbox.add_child(_accept_btn)
+	_massive_overlay.add_child(_overlay_vbox)
+	add_child(_massive_overlay)
 
 
 # ── Public API called by BattleScene ─────────────────────────────────────────
@@ -100,6 +132,20 @@ func get_target_pool() -> String:
 	return _debug_pool.get_target_pool() if _debug_pool else "stance"
 
 
+## Returns whether Brutal Trade is toggled on (false if toggle absent or not visible).
+func get_brutal_trade() -> bool:
+	return _brutal_toggle.button_pressed if (_brutal_toggle and _brutal_toggle.visible) else false
+
+
+## Show the Meat for the Grinder decision overlay; disables normal action buttons.
+func show_massive_prompt(charges_left: int) -> void:
+	_strike_btn.disabled = true
+	_cantrip_btn.disabled = true
+	_spell_btn.disabled = true
+	_massive_spend_btn.text = "Meat for the Grinder — spend charge (%d left)" % charges_left
+	_massive_overlay.visible = true
+
+
 # ── Private ───────────────────────────────────────────────────────────────────
 
 func _on_strike_pressed() -> void:
@@ -124,6 +170,11 @@ func _on_spell_pressed() -> void:
 		spell_selected.emit(_known_spells[0] as SpellData)
 	else:
 		_show_popup(_known_spells, false)
+
+
+func _on_massive_choice(use_charge: bool) -> void:
+	_massive_overlay.visible = false
+	wound_degrade_chosen.emit(use_charge)
 
 
 func _show_popup(spells: Array, is_cantrip: bool) -> void:

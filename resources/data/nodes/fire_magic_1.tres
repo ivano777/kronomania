@@ -1,15 +1,24 @@
 [gd_resource type="Resource" script_class="NodeData" format=3 uid="uid://firemag10001"]
 
 [ext_resource type="Script" path="res://resources/NodeData.gd" id="1_ndscr"]
-[ext_resource type="Resource" uid="uid://csp4lx7saynb2" path="res://resources/data/nodes/ability_minor_studies.tres" id="2_prereq"]
-[ext_resource type="Resource" uid="uid://spkbtspark01" path="res://resources/data/spells/sparks.tres" id="3_spell"]
+[ext_resource type="Script" path="res://resources/NodeLevelData.gd" id="2_ldscr"]
+[ext_resource type="Resource" uid="uid://spkbtspark01" path="res://resources/data/spells/sparks.tres" id="3_spell1"]
+
+[sub_resource type="Resource" id="Level_1"]
+script = ExtResource("2_ldscr")
+level_index = 1
+cost = 1
+required_tier = 1
+prerequisites = [{"node_id": "minor_studies", "required_level": 1}]
+level_effect_description = "The first flickering of fire magic. Unlocks the Sparks cantrip."
+effect_type = "spell_school"
+spells = [ExtResource("3_spell1")]
 
 [resource]
 script = ExtResource("1_ndscr")
-node_name = "Fire Magic I"
+node_id = "fire_magic_1"
+display_name = "Fire Magic I"
 category = "Ability"
-effect_type = "spell_school"
-description = "The first flickering of fire magic. Unlocks the Sparks cantrip."
-unlock_cost = 1
-prerequisites = [ExtResource("2_prereq")]
-spells = [ExtResource("3_spell")]
+base_description = "The first flickering of fire magic. Unlocks the Sparks cantrip."
+max_levels = 1
+levels_data = [SubResource("Level_1")]

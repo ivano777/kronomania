@@ -7,5 +7,6 @@
 [resource]
 script = ExtResource("1_cdscr")
 combatant_name = "Player"
+dominion_size = 4
 equipped_weapon = ExtResource("2_weapon")
 starting_nodes = [ExtResource("3_node")]

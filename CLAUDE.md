@@ -39,6 +39,9 @@ Every feature that introduces a new mechanic or runtime value must ship with a w
 
 Debug widgets live exclusively in `scenes/debug/`. Reference via null-safe `@onready` delegate: `@onready var _dbg = $Widget if has_node("Widget") else null`. Remove at release: delete `scenes/debug/`, remove the child from the parent `.tscn`, remove the `@onready` and its delegation method — nothing else changes. If a mechanic has no tunable parameters, a log-only approach is acceptable; document the decision in the feature report.
 
+### 2c. Inter-phase context compaction
+When implementing a multi-phase feature (e.g. Phase A / B / C), it is acceptable — and encouraged when the context window is growing large — to `/compact` the conversation between phases. Compact after each phase's validation passes and before starting the next phase. This keeps context healthy without losing continuity: the phase boundary is a natural checkpoint, the plan file preserves intent, and the next phase can be resumed from the plan.
+
 ### 3. Validate (deploy a sub-agent)
 Deploy a sub-agent: run headless (see Engine section), check for SCRIPT ERRORs and ERRORs (UID WARNINGs are safe), verify `@onready` paths, signal connections, and `class_name` registrations in `.godot/global_script_class_cache.cfg`.
 
@@ -94,14 +97,14 @@ docs/               # project-status.md (roadmap), project-index.md (generated c
 
 `CombatantData` is **immutable config** only. All runtime state lives inside `CombatManager.CombatantState`, an inner class instantiated per combat. Scene nodes hold no game state.
 
-`CombatantState` fields: `data` (CombatantData), `current_wounds`, `max_wounds`, `is_defeated`, `unlocked_nodes`, `tier_override`, `weapon_override`, plus per-pool guard state (`stance_guard`, `resolve_guard`, `stamina_guard`, and matching `_rolled` booleans), plus magic state (`fervor_size`, `is_burned_out`, `has_minor_studies`, `has_spellcasting`, `known_spells: Array`, `known_cantrips: Array`). Methods: `init()`, `reset_guard()`, `get_guard(pool)`, `set_guard_val(pool, value)`, `is_pool_rolled(pool)`, `set_pool_rolled(pool, value)`.
+`CombatantState` fields: `data` (CombatantData), `current_wounds`, `max_wounds`, `is_defeated`, `node_levels: Dictionary` (NodeData → int), `tier_override`, `weapon_override`, `stamina_degrade_charges` (Meat for the Grinder charges), plus per-pool guard state (`stance_guard`, `resolve_guard`, `stamina_guard`, and matching `_rolled` booleans), plus magic state (`fervor_size`, `is_burned_out`, `has_minor_studies`, `has_spellcasting`, `known_spells: Array`, `known_cantrips: Array`). Methods: `init()`, `reset_guard()`, `get_guard(pool)`, `set_guard_val(pool, value)`, `is_pool_rolled(pool)`, `set_pool_rolled(pool, value)`.
 
 ### Autoload singletons
 
 Signatures and signals are in `docs/project-index.md`. Architectural gotchas:
-- **`RollEngine`** — stateless. Returns `Dictionary`; always cast values with `as int` / `as Array` — the type inferencer cannot infer through `Dictionary`. `resolve()` accepts optional `fervor_size` (additive post-keep Fervor die), `aspect_stat_size` and `aspect_count` (for mixed-pool spells). Returns `primary_dice_maxed_count` — count of non-aspect (primary) pool dice that rolled their maximum face value; stat-agnostic, always Ingenuity dice when called from spell resolution (used for Fervor escalation).
-- **`CombatManager`** — all output via signals; nothing returned. Disconnect all signals before `reload_current_scene()`. Signals: `fervor_changed(is_player, fervor_size, fervor_cap, is_burned_out)`, `player_magic_available(can_cantrip, can_cast_spell)`. Public methods: `player_chose_cantrip(spell: SpellData)`, `player_chose_spell(spell: SpellData)`, `debug_set_fervor(size, burned_out)`.
-- **`PlayerProgression`** — constellation state; read by `CombatManager` at `start_combat()`. `ALL_NODES` catalog. `get_known_spells()` and `get_known_cantrips()` iterate all unlocked nodes and collect from `node.spells` (is_cantrip=false / true).
+- **`RollEngine`** — stateless. Returns `Dictionary`; always cast values with `as int` / `as Array` — the type inferencer cannot infer through `Dictionary`. `resolve()` accepts optional `fervor_size` (additive post-Keep Fervor die), `aspect_stat_size` and `aspect_count` (for mixed-pool spells), `post_keep_bonus_size` (additive post-Keep bonus die, e.g. Earthshatter). Returns `primary_dice_maxed_count` (Fervor escalation) and `post_keep_bonus_roll` (Earthshatter die result).
+- **`CombatManager`** — all output via signals; nothing returned. Disconnect all signals before `reload_current_scene()`. Signals: `fervor_changed(is_player, fervor_size, fervor_cap, is_burned_out)`, `player_magic_available(can_cantrip, can_cast_spell)`, `player_massive_incoming(charges_left)`. Public methods: `player_chose_strike(net_advantage, target_pool, brutal_trade)`, `player_chose_cantrip(spell: SpellData)`, `player_chose_spell(spell: SpellData)`, `player_chose_degrade_wound(use_charge: bool)`, `debug_set_fervor(size, burned_out)`.
+- **`PlayerProgression`** — constellation state; read by `CombatManager` at `start_combat()`. `ALL_NODES` catalog (now includes 11 Dominion nodes; old core_dominion_1/2 replaced by dom_core). `get_known_spells()` and `get_known_cantrips()` iterate all purchased `node_levels`, collect from `levels_data[0..level-1].spells`. `get_node_level_by_id(id)` looks up a node by string ID and returns its current level (0 if absent).
 
 ### Round loop (CombatManager)
 
@@ -118,7 +121,7 @@ _begin_round()
   → _begin_round()  ← loops until defeat
 ```
 
-`_resolve_round*` are GDScript coroutines (use `await`). Calling them without `await` from the `player_chose_*` methods is intentional — they run cooperatively on the main thread, yielding at the timer.
+`_resolve_round*` are GDScript coroutines (use `await`). Calling them without `await` from the `player_chose_*` methods is intentional — they run cooperatively on the main thread, yielding at the timer. `_resolve_attack()` is also a coroutine (conditionally awaits `_massive_decision_resolved` for Meat for the Grinder); all `_resolve_round*` calls to it use `await`.
 
 ### Magic system
 
@@ -144,17 +147,19 @@ Group 4 implements Fervor / Burnout / Cantrips / True Spells with per-spell `Spe
 ### Spell school system (implemented — Groups 4.5 A + B)
 
 **Phase A — Core stat nodes (implemented):**
-- `NodeData.prerequisites: Array[NodeData]` — compound prereqs; all `.tres` migrated.
-- Core nodes (`core_dominion_1/2`, `core_negation_1/2`, `core_ingenuity_1/2`) grant stat size upgrades via `effect_type="stat_size_<stat>"` and `effect_value` (8 or 10).
-- `CombatManager._stat_size(state, stat)` — reads base from `CombatantData`, returns highest `effect_value` across matching unlocked Core nodes. All `state.data.*_size` reads replaced with this helper.
+- Core nodes (`core_negation_1/2`, `core_ingenuity_1/2`, and now `dom_core` L1–L3 for Dominion) grant stat size upgrades via `effect_type="stat_size_<stat>"` and `effect_value`.
+- `CombatManager._stat_size(state, stat)` — reads base from `CombatantData`, returns highest `effect_value` across all purchased `NodeLevelData` entries for `"stat_size_<stat>"`.
 
 **Phase B — Spell schools (implemented):**
 - `SpellBonusEffect` resource (`resources/SpellBonusEffect.gd`): `tag: String`, `bonus_type: "pool"|"keep"`, `value: int`, `stat: String`.
-- `NodeData.spell: SpellData` → `NodeData.spells: Array[SpellData]` + `NodeData.bonus_effects: Array[SpellBonusEffect]`.
-- School nodes Fire Magic I–IV and Arcane I–III in `resources/data/nodes/`. Each grants spells via `spells` array; Fire Magic II adds fire pool +1, Fire Magic IV adds fire keep +1.
-- Minor Studies carries `spells = [cantrip_spark, arcane_touch]`; the 4 old flat spell stub nodes removed from `ALL_NODES`.
-- `PlayerProgression.get_known_spells/cantrips()` scans `node.spells` on all unlocked nodes.
-- `CombatManager._resolve_round_spell()` sums matching `bonus_effects` from all unlocked nodes before calling `RollEngine`: effective tier += pool bonus, keep_grade += keep bonus.
+- School nodes Fire Magic I–IV and Arcane I–III grant spells via `levels_data[0].spells`. Fire Magic II adds fire pool +1, Fire Magic IV adds fire keep +1 via `bonus_effects` on the `NodeLevelData`.
+- `CombatManager._resolve_round_spell()` sums matching `bonus_effects` from all purchased `node_levels → levels_data` entries.
+
+**Multi-level Node Schema (implemented — Group 4.8 Phase A):**
+- `NodeData` fields: `node_id: String`, `display_name: String`, `category: String`, `base_description: String`, `icon: Texture2D`, `max_levels: int`, `levels_data: Array[NodeLevelData]`.
+- `NodeLevelData` fields: `level_index`, `cost`, `required_tier`, `prerequisites: Array` (untyped, `[{node_id: String, required_level: int}]`), `level_effect_description`, `effect_type`, `effect_value`, `stat`, `weapon_tags: PackedStringArray`, `uses_per_combat`, `spells: Array[SpellData]`, `bonus_effects: Array[SpellBonusEffect]`.
+- `PlayerProgression.node_levels: Dictionary` (NodeData → int); methods: `can_upgrade(node)`, `upgrade(node)`, `get_level(node)`, `get_node_level_by_id(id)`.
+- `CombatManager` helpers: `_node_effect_max(state, key)`, `_node_effect_sum(state, key)`, `_node_weapon_bonus_sum(state, key)`, `_has_effect_type(state, key)`, `_physical_keep_grade(state)`, `_wounds_node_bonus(state)`, `_meat_grinder_charges(state)`.
 
 ### GDScript typing rules
 
@@ -213,5 +218,11 @@ The rules live in `docs/game-rules/`. The implementation must match them exactly
 | Spell schools | Fire Magic I–IV + Arcane I–III; `SpellBonusEffect` pool/keep bonuses applied at spell resolution (implemented) |
 | Tier advancement | Slot-budget model: **5 combat slots + 2 Flavor slots** per tier; spending both advances the tier and resets counters. **Core nodes cost 2 combat slots** (Training / Ability cost 1; Flavor costs 1 from the Flavor budget). `PlayerProgression.tier_combat_spent` / `tier_flavor_spent` are public vars. |
 | Passive wounds | +1 Max Wounds at Tier 2, +1 at Tier 4 (cumulative +2). Applied at `start_combat()` via `_tier_wound_bonus(tier)`; base `.tres` files never mutated. |
+| Player base Dominion | d4 (base in `player_default.tres`). `dom_core` L1→d6, L2→d8, L3→d10 via `_stat_size()`. |
+| Physical keep grade | `_physical_keep_grade()` = max(`_training_keep_grade()`, `physical_keep` nodes). Applied to physical Strike only. |
+| Brutal Trade | Toggle in RoundHUD (visible when `dom_brutal >= 1`): VT −5, Flat +5 on player physical attack. |
+| Earthshatter | Post-keep Dominion die added to Stance physical attacks when `dom_earthshatter` is purchased. Passed as `post_keep_bonus_size` to `RollEngine.resolve()`. |
+| Meat for the Grinder | `stamina_degrade_charges` on `CombatantState` (from `dom_meat_grinder`). When Massive Wound would hit player, `player_massive_incoming` emitted; RoundHUD shows prompt; player can spend charge → 1 Wound instead of 2. |
+| Wounds Training | `dom_wounds` NodeLevelData entries (effect_type="training_wounds", effect_value=1 each) summed by `_wounds_node_bonus()` at `start_combat()`. |
 
-Next unimplemented feature: Group 4.8 — Dominion Physical Tree (multi-level node schema refactor + Dominion tree data + combat hooks).
+Next unimplemented feature: Group 5 — Full game loop (Hub scene, character sheet, rest/recovery, enemy roster, reward loop, dungeon flow).

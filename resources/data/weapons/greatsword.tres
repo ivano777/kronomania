@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="EquipmentData" format=3 uid="uid://greatsword001"]
+
+[ext_resource type="Script" path="res://resources/EquipmentData.gd" id="1_eqscr"]
+
+[resource]
+script = ExtResource("1_eqscr")
+item_name = "Greatsword"
+potency = 2
+flat_attack_bonus = 1
+tags = PackedStringArray("Sharp", "TwoHanded")

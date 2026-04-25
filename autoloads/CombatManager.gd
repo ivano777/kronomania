@@ -50,6 +50,11 @@ signal player_magic_available(can_cantrip: bool, can_cast_spell: bool)
 ## Emitted whenever the player's Fervor state changes (initial emit at combat start).
 signal fervor_changed(is_player: bool, fervor_size: int, fervor_cap: int, is_burned_out: bool)
 
+## Emitted when a Massive Wound against the player can be degraded (charges_left > 0).
+signal player_massive_incoming(charges_left: int)
+## Internal coroutine gate: resolved when the player decides whether to spend a charge.
+signal _massive_decision_resolved(use_charge: bool)
+
 
 # ── Runtime state ─────────────────────────────────────────────────────────────
 
@@ -59,7 +64,7 @@ class CombatantState:
 	var max_wounds: int     = 3
 	var is_defeated: bool   = false
 	var weapon_override: EquipmentData = null  # set by debug tools; null = use data.equipped_weapon
-	var unlocked_nodes: Array[NodeData] = []   # runtime copy; for player, overridden from PlayerProgression
+	var node_levels: Dictionary = {}           # NodeData → int; runtime copy from PlayerProgression for player
 	var tier_override: int = 0                 # when > 0, overrides data.tier (used for player Tier from Constellation)
 	# Per-pool guard state (Stance / Resolve / Stamina).
 	var stance_guard: int   = 0
@@ -75,20 +80,22 @@ class CombatantState:
 	var has_spellcasting: bool  = false  # derived from unlocked_nodes in start_combat()
 	var known_spells: Array   = []  # Array[SpellData] — non-cantrip spells, player only
 	var known_cantrips: Array = []  # Array[SpellData] — cantrip spells, player only
+	var stamina_degrade_charges: int = 0  # Meat for the Grinder: charges to degrade Massive Wounds
 
 	func init(d: CombatantData) -> void:
 		data = d
 		current_wounds = 0
 		max_wounds = d.max_wounds + (d.equipped_weapon.max_wounds_bonus if d.equipped_weapon else 0)
 		is_defeated = false
-		unlocked_nodes.clear()
+		node_levels.clear()
 		for n in d.starting_nodes:
 			if n is NodeData:
-				unlocked_nodes.append(n as NodeData)
+				node_levels[n as NodeData] = 1
 		fervor_size = 4
 		is_burned_out = false
 		has_minor_studies = false
 		has_spellcasting = false
+		stamina_degrade_charges = 0
 		reset_guard()
 
 	func reset_guard() -> void:
@@ -136,12 +143,14 @@ var _waiting_for_player: bool = false
 func start_combat(player_data: CombatantData, enemy_data: CombatantData) -> void:
 	_player = CombatantState.new()
 	_player.init(player_data)
-	_player.unlocked_nodes = PlayerProgression.unlocked_nodes.duplicate()
+	_player.node_levels = PlayerProgression.node_levels.duplicate()
 	_player.tier_override = PlayerProgression.get_tier()
 	_player.max_wounds += _tier_wound_bonus(_player.tier_override)
+	_player.max_wounds += _wounds_node_bonus(_player)
+	_player.stamina_degrade_charges = _meat_grinder_charges(_player)
 	wounds_changed.emit(true, _player.current_wounds, _player.max_wounds)
-	_player.has_minor_studies = _player.unlocked_nodes.any(func(n: NodeData): return n.effect_type == "minor_studies")
-	_player.has_spellcasting  = _player.unlocked_nodes.any(func(n: NodeData): return n.effect_type == "spellcasting")
+	_player.has_minor_studies = _has_effect_type(_player, "minor_studies")
+	_player.has_spellcasting  = _has_effect_type(_player, "spellcasting")
 	_player.fervor_size = 4
 	_player.is_burned_out = false
 	_player.known_spells   = PlayerProgression.get_known_spells()
@@ -173,11 +182,12 @@ func start_combat(player_data: CombatantData, enemy_data: CombatantData) -> void
 ## Called by BattleScene when the player presses Strike.
 ## net_advantage : positive = Advantage dice, negative = Disadvantage dice.
 ## target_pool   : which defense pool the attack pressures ("stance" | "resolve" | "stamina").
-func player_chose_strike(net_advantage: int = 0, target_pool: String = "stance") -> void:
+## brutal_trade  : if true, VT −5 and Flat +5 (requires dom_brutal L1).
+func player_chose_strike(net_advantage: int = 0, target_pool: String = "stance", brutal_trade: bool = false) -> void:
 	if not _waiting_for_player:
 		return
 	_waiting_for_player = false
-	_resolve_round(net_advantage, target_pool)
+	_resolve_round(net_advantage, target_pool, brutal_trade)
 
 
 ## Called by BattleScene when the player selects a cantrip spell.
@@ -201,6 +211,11 @@ func player_chose_spell(spell: SpellData) -> void:
 		return
 	_waiting_for_player = false
 	_resolve_round_spell(spell)
+
+
+## Called by RoundHUD (via BattleScene) when the player resolves a Meat for the Grinder prompt.
+func player_chose_degrade_wound(use_charge: bool) -> void:
+	_massive_decision_resolved.emit(use_charge)
 
 
 ## Debug only — override Fervor state at runtime.
@@ -237,15 +252,27 @@ func _begin_round() -> void:
 
 
 # Coroutine: physical Strike — resolves one full round then loops back.
-func _resolve_round(net_advantage: int = 0, target_pool: String = "stance") -> void:
+func _resolve_round(net_advantage: int = 0, target_pool: String = "stance", brutal_trade: bool = false) -> void:
 	phase_changed.emit("Resolving…")
 	log_message.emit("Both combatants declare Strike.")
 
+	if brutal_trade:
+		log_message.emit("  [color=yellow]Brutal Trade: VT −5, Flat +5.[/color]")
+
 	# ── Roll both attack pools ─────────────────────────────────────────────
+	var keep_grade := _physical_keep_grade(_player) + _node_weapon_bonus_sum(_player, "weapon_keep")
+	var brutal_flat := 5 if brutal_trade else 0
+
+	var earthshatter_size := 0
+	if target_pool == "stance" and _node_effect_max(_player, "earthshatter") > 0:
+		earthshatter_size = _stat_size(_player, "dominion")
+		log_message.emit("  [color=cyan]Earthshatter![/color] Post-keep Dominion d%d added." % earthshatter_size)
+
 	var p_atk := RollEngine.resolve(
-		_effective_tier(_player), _stat_size(_player, "dominion"), _training_keep_grade(_player),
-		_attack_flat(_player),
-		net_advantage + _pool_bonus(_player)
+		_effective_tier(_player), _stat_size(_player, "dominion"), keep_grade,
+		_attack_flat(_player) + brutal_flat,
+		net_advantage + _pool_bonus(_player),
+		0, 0, 0, earthshatter_size
 	)
 	var e_atk := RollEngine.resolve(
 		_effective_tier(_enemy), _stat_size(_enemy, "dominion"), _training_keep_grade(_enemy),
@@ -253,14 +280,17 @@ func _resolve_round(net_advantage: int = 0, target_pool: String = "stance") -> v
 	)
 
 	log_message.emit(_fmt_attack(_player.data.combatant_name, p_atk))
+	if (p_atk.post_keep_bonus_roll as int) > 0:
+		log_message.emit("  [color=cyan]Earthshatter roll: %d[/color]" % (p_atk.post_keep_bonus_roll as int))
 	log_message.emit(_fmt_attack(_enemy.data.combatant_name, e_atk))
 
 	# ── VT check ──────────────────────────────────────────────────────────
 	# VT is a static enemy property. Only the player's roll is compared to it.
 	var encounter_vt: int = _enemy.data.velocity_threshold
-	var p_fast := RollEngine.is_fast(p_atk.total as int, encounter_vt)
+	var effective_vt := encounter_vt - 5 if brutal_trade else encounter_vt
+	var p_fast := RollEngine.is_fast(p_atk.total as int, effective_vt)
 
-	log_message.emit(_fmt_speed(_player.data.combatant_name, p_atk.total as int, encounter_vt, p_fast))
+	log_message.emit(_fmt_speed(_player.data.combatant_name, p_atk.total as int, effective_vt, p_fast))
 
 	# ── Determine resolution order ─────────────────────────────────────────
 	var player_first: bool = p_fast
@@ -271,7 +301,7 @@ func _resolve_round(net_advantage: int = 0, target_pool: String = "stance") -> v
 		phase_changed.emit("Slow Phase — Enemy acts first")
 
 	# ── First attacker ─────────────────────────────────────────────────────
-	_resolve_attack(player_first, p_atk if player_first else e_atk, target_pool)
+	await _resolve_attack(player_first, p_atk if player_first else e_atk, target_pool)
 
 	if _player.is_defeated or _enemy.is_defeated:
 		_end_combat()
@@ -280,7 +310,7 @@ func _resolve_round(net_advantage: int = 0, target_pool: String = "stance") -> v
 	# ── Second attacker ────────────────────────────────────────────────────
 	var second_is_player := not player_first
 	phase_changed.emit("Slow Phase" if p_fast else "Fast Phase (2nd)")
-	_resolve_attack(second_is_player, p_atk if second_is_player else e_atk, target_pool)
+	await _resolve_attack(second_is_player, p_atk if second_is_player else e_atk, target_pool)
 
 	if _player.is_defeated or _enemy.is_defeated:
 		_end_combat()
@@ -321,14 +351,14 @@ func _resolve_round_cantrip(spell: SpellData) -> void:
 		log_message.emit("%s is Slow — %s acts first." % [_player.data.combatant_name, _enemy.data.combatant_name])
 		phase_changed.emit("Slow Phase — Enemy acts first")
 
-	_resolve_attack(player_first, p_atk if player_first else e_atk, spell.target_pool)
+	await _resolve_attack(player_first, p_atk if player_first else e_atk, spell.target_pool)
 	if _player.is_defeated or _enemy.is_defeated:
 		_end_combat()
 		return
 
 	var second_is_player := not player_first
 	phase_changed.emit("Slow Phase" if p_fast else "Fast Phase (2nd)")
-	_resolve_attack(second_is_player, p_atk if second_is_player else e_atk, spell.target_pool)
+	await _resolve_attack(second_is_player, p_atk if second_is_player else e_atk, spell.target_pool)
 	if _player.is_defeated or _enemy.is_defeated:
 		_end_combat()
 		return
@@ -363,13 +393,18 @@ func _resolve_round_spell(spell: SpellData) -> void:
 	# Collect school bonus effects for spells matching any of this spell's tags.
 	var spell_pool_bonus := 0
 	var spell_keep_bonus := 0
-	for n in _player.unlocked_nodes:
-		for be in n.bonus_effects:
-			if spell.tags.has(be.tag):
-				if be.bonus_type == "pool":
-					spell_pool_bonus += be.value
-				elif be.bonus_type == "keep":
-					spell_keep_bonus += be.value
+	for node in _player.node_levels.keys():
+		var nd: NodeData = node as NodeData
+		if nd == null:
+			continue
+		var lvl: int = _player.node_levels[node]
+		for i in range(mini(lvl, nd.levels_data.size())):
+			for be in nd.levels_data[i].bonus_effects:
+				if spell.tags.has(be.tag):
+					if be.bonus_type == "pool":
+						spell_pool_bonus += be.value
+					elif be.bonus_type == "keep":
+						spell_keep_bonus += be.value
 	if spell_pool_bonus > 0 or spell_keep_bonus > 0:
 		var parts: Array = []
 		if spell_pool_bonus > 0:
@@ -404,14 +439,14 @@ func _resolve_round_spell(spell: SpellData) -> void:
 		log_message.emit("%s is Slow — %s acts first." % [_player.data.combatant_name, _enemy.data.combatant_name])
 		phase_changed.emit("Slow Phase — Enemy acts first")
 
-	_resolve_attack(player_first, p_atk if player_first else e_atk, spell.target_pool)
+	await _resolve_attack(player_first, p_atk if player_first else e_atk, spell.target_pool)
 	if _player.is_defeated or _enemy.is_defeated:
 		_end_combat()
 		return
 
 	var second_is_player := not player_first
 	phase_changed.emit("Slow Phase" if p_fast else "Fast Phase (2nd)")
-	_resolve_attack(second_is_player, p_atk if second_is_player else e_atk, spell.target_pool)
+	await _resolve_attack(second_is_player, p_atk if second_is_player else e_atk, spell.target_pool)
 	if _player.is_defeated or _enemy.is_defeated:
 		_end_combat()
 		return
@@ -474,6 +509,14 @@ func _resolve_attack(attacker_is_player: bool, attack_result: Dictionary, target
 			attack_result.total as int, current_guard, defensive_size
 		)
 		var wounds := 2 if massive else 1
+		# Meat for the Grinder: player can spend a charge to degrade Massive → 1 Wound.
+		if wounds == 2 and not attacker_is_player and _player.stamina_degrade_charges > 0:
+			player_massive_incoming.emit(_player.stamina_degrade_charges)
+			var use_charge: bool = await _massive_decision_resolved
+			if use_charge:
+				_player.stamina_degrade_charges -= 1
+				wounds = 1
+				log_message.emit("  [color=lime]Meat for the Grinder! Massive Wound degraded to 1 Wound.[/color]")
 		defender.current_wounds += wounds
 
 		if massive:
@@ -534,6 +577,31 @@ func _tier_wound_bonus(tier: int) -> int:
 	return (1 if tier >= 2 else 0) + (1 if tier >= 4 else 0)
 
 
+## Sums max_wounds bonuses from Wounds Training nodes (effect_type="training_wounds").
+func _wounds_node_bonus(state: CombatantState) -> int:
+	return _node_effect_sum(state, "training_wounds")
+
+
+## Returns the effective physical keep grade: max of training_keep or physical_keep nodes.
+func _physical_keep_grade(state: CombatantState) -> int:
+	return maxi(_training_keep_grade(state), _node_effect_max(state, "physical_keep"))
+
+
+## Returns the max uses_per_combat across all purchased meat_grinder NodeLevelData entries.
+func _meat_grinder_charges(state: CombatantState) -> int:
+	var best := 0
+	for node in state.node_levels.keys():
+		var nd: NodeData = node as NodeData
+		if nd == null:
+			continue
+		var lvl: int = state.node_levels[node]
+		for i in range(mini(lvl, nd.levels_data.size())):
+			var ld: NodeLevelData = nd.levels_data[i]
+			if ld.effect_type == "meat_grinder":
+				best = maxi(best, ld.uses_per_combat)
+	return best
+
+
 ## Returns the die size for the given defense pool on a combatant.
 ## Stance = Negation, Resolve = Ingenuity, Stamina = Dominion (defensive expression).
 func _get_pool_size(state: CombatantState, pool: String) -> int:
@@ -552,10 +620,10 @@ func _effective_tier(state: CombatantState) -> int:
 	return mini(base, w.potency) if w else base
 
 
-## Flat bonus applied to attack rolls from equipped weapon (Forging).
+## Flat bonus applied to attack rolls: weapon Forging + matching weapon_flat node bonuses.
 func _attack_flat(state: CombatantState) -> int:
 	var w: EquipmentData = state.weapon_override if state.weapon_override else state.data.equipped_weapon
-	return w.flat_attack_bonus if w else 0
+	return (w.flat_attack_bonus if w else 0) + _node_weapon_bonus_sum(state, "weapon_flat")
 
 
 ## Flat bonus applied to defense rolls from equipped weapon (Warding).
@@ -570,8 +638,76 @@ func _pool_bonus(state: CombatantState) -> int:
 	return w.pool_bonus if w else 0
 
 
+## Returns the max effect_value across all purchased NodeLevelData entries matching the given key.
+func _node_effect_max(state: CombatantState, key: String) -> int:
+	var best := 0
+	for node in state.node_levels.keys():
+		var nd: NodeData = node as NodeData
+		if nd == null:
+			continue
+		var lvl: int = state.node_levels[node]
+		for i in range(mini(lvl, nd.levels_data.size())):
+			var ld: NodeLevelData = nd.levels_data[i]
+			if ld.effect_type == key:
+				best = maxi(best, ld.effect_value)
+	return best
+
+
+## Returns the sum of effect_value across all purchased NodeLevelData entries matching the given key.
+func _node_effect_sum(state: CombatantState, key: String) -> int:
+	var total := 0
+	for node in state.node_levels.keys():
+		var nd: NodeData = node as NodeData
+		if nd == null:
+			continue
+		var lvl: int = state.node_levels[node]
+		for i in range(mini(lvl, nd.levels_data.size())):
+			var ld: NodeLevelData = nd.levels_data[i]
+			if ld.effect_type == key:
+				total += ld.effect_value
+	return total
+
+
+## Returns the sum of effect_value for entries matching key where all weapon_tags match the equipped weapon.
+func _node_weapon_bonus_sum(state: CombatantState, key: String) -> int:
+	var total := 0
+	var weapon: EquipmentData = state.weapon_override if state.weapon_override else state.data.equipped_weapon
+	for node in state.node_levels.keys():
+		var nd: NodeData = node as NodeData
+		if nd == null:
+			continue
+		var lvl: int = state.node_levels[node]
+		for i in range(mini(lvl, nd.levels_data.size())):
+			var ld: NodeLevelData = nd.levels_data[i]
+			if ld.effect_type != key:
+				continue
+			if ld.weapon_tags.is_empty():
+				total += ld.effect_value
+			elif weapon != null:
+				var all_match := true
+				for tag in ld.weapon_tags:
+					if not weapon.tags.has(tag):
+						all_match = false
+						break
+				if all_match:
+					total += ld.effect_value
+	return total
+
+
+## Returns true if any purchased NodeLevelData entry has the given effect_type.
+func _has_effect_type(state: CombatantState, key: String) -> bool:
+	for node in state.node_levels.keys():
+		var nd: NodeData = node as NodeData
+		if nd == null:
+			continue
+		var lvl: int = state.node_levels[node]
+		for i in range(mini(lvl, nd.levels_data.size())):
+			if nd.levels_data[i].effect_type == key:
+				return true
+	return false
+
+
 ## Returns the effective die size for a stat, upgraded by any unlocked Core nodes.
-## Core nodes with effect_type="stat_size_<stat>" raise the base upward.
 func _stat_size(state: CombatantState, stat: String) -> int:
 	var base: int
 	match stat:
@@ -579,21 +715,13 @@ func _stat_size(state: CombatantState, stat: String) -> int:
 		"negation":  base = state.data.negation_size
 		"ingenuity": base = state.data.ingenuity_size
 		_: base = 6
-	var effect_key := "stat_size_" + stat
-	for node in state.unlocked_nodes:
-		if node.effect_type == effect_key:
-			base = maxi(base, node.effect_value)
-	return base
+	return maxi(base, _node_effect_max(state, "stat_size_" + stat))
 
 
 ## Returns the effective keep grade for a combatant: highest Training node value,
 ## or data.keep_grade as fallback when no Training node is present.
 func _training_keep_grade(state: CombatantState) -> int:
-	var best: int = state.data.keep_grade
-	for node in state.unlocked_nodes:
-		if node.effect_type == "training_keep":
-			best = maxi(best, node.effect_value)
-	return best
+	return maxi(state.data.keep_grade, _node_effect_max(state, "training_keep"))
 
 
 ## Steps Fervor up by `steps` track positions. Triggers Burnout if escalation

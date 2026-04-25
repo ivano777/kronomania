@@ -1,0 +1,43 @@
+[gd_resource type="Resource" script_class="NodeData" format=3 uid="uid://domcore00001"]
+
+[ext_resource type="Script" path="res://resources/NodeData.gd" id="1_ndscr"]
+[ext_resource type="Script" path="res://resources/NodeLevelData.gd" id="2_ldscr"]
+
+[sub_resource type="Resource" id="Level_1"]
+script = ExtResource("2_ldscr")
+level_index = 1
+cost = 2
+required_tier = 1
+prerequisites = []
+level_effect_description = "Your brute strength awakens. Dominion die size increases to d6."
+effect_type = "stat_size_dominion"
+effect_value = 6
+
+[sub_resource type="Resource" id="Level_2"]
+script = ExtResource("2_ldscr")
+level_index = 2
+cost = 2
+required_tier = 1
+prerequisites = [{"node_id": "dom_core", "required_level": 1}]
+level_effect_description = "Overwhelming force. Dominion die size increases to d8."
+effect_type = "stat_size_dominion"
+effect_value = 8
+
+[sub_resource type="Resource" id="Level_3"]
+script = ExtResource("2_ldscr")
+level_index = 3
+cost = 2
+required_tier = 2
+prerequisites = [{"node_id": "dom_core", "required_level": 2}]
+level_effect_description = "Titanic power. Dominion die size increases to d10."
+effect_type = "stat_size_dominion"
+effect_value = 10
+
+[resource]
+script = ExtResource("1_ndscr")
+node_id = "dom_core"
+display_name = "Dominion Core"
+category = "Core"
+base_description = "Raw physical force. Increases your Dominion die size."
+max_levels = 3
+levels_data = [SubResource("Level_1"), SubResource("Level_2"), SubResource("Level_3")]

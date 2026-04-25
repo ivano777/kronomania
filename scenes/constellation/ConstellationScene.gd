@@ -39,7 +39,7 @@ func _make_card(node: NodeData) -> PanelContainer:
 	var header_row := HBoxContainer.new()
 
 	var name_lbl := Label.new()
-	name_lbl.text = node.node_name
+	name_lbl.text = node.display_name
 	name_lbl.add_theme_font_size_override("font_size", 13)
 	name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
@@ -55,7 +55,7 @@ func _make_card(node: NodeData) -> PanelContainer:
 	pip_lbl.add_theme_font_size_override("font_size", 13)
 
 	var desc_lbl := Label.new()
-	desc_lbl.text = node.description if node.description != "" else "(No description)"
+	desc_lbl.text = node.base_description if node.base_description != "" else "(No description)"
 	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	desc_lbl.custom_minimum_size = Vector2(0, 36)
 	desc_lbl.add_theme_font_size_override("font_size", 11)
@@ -107,23 +107,28 @@ func _refresh() -> void:
 		var card: PanelContainer = _node_cards[node]
 		var level_lbl: Label = _node_level_labels[node]
 		var pip_lbl: Label = _node_pip_labels[node]
-		var unlocked := PlayerProgression.is_unlocked(nd)
-		var tier_locked := tier < nd.required_tier
-		var level := 1 if unlocked else 0
+		var lvl := PlayerProgression.get_level(nd)
+		var max_lvl := nd.max_levels
+		var at_max := lvl >= max_lvl
+		var tier_locked := false
+		if not at_max and nd.levels_data.size() > lvl:
+			tier_locked = tier < (nd.levels_data[lvl] as NodeLevelData).required_tier
 
-		level_lbl.text = "L%d/1" % level
-		pip_lbl.text = "●" if unlocked else "○"
+		level_lbl.text = "L%d/%d" % [lvl, max_lvl]
+		pip_lbl.text = "●".repeat(lvl) + "○".repeat(max_lvl - lvl)
 
-		if unlocked:
+		if at_max:
 			btn.text = "Max Level"
 			btn.disabled = true
 			card.modulate = Color.WHITE
 		elif tier_locked:
-			btn.text = "Requires Tier %d" % nd.required_tier
+			var req_tier: int = (nd.levels_data[lvl] as NodeLevelData).required_tier
+			btn.text = "Requires Tier %d" % req_tier
 			btn.disabled = true
 			card.modulate = Color(1, 1, 1, 0.4)
-		elif PlayerProgression.can_unlock(nd):
-			var cost := 2 if nd.category == "Core" else 1
+		elif PlayerProgression.can_upgrade(nd):
+			var ld: NodeLevelData = nd.levels_data[lvl]
+			var cost := ld.cost
 			btn.text = "Upgrade (%d slot%s)" % [cost, "s" if cost > 1 else ""]
 			btn.disabled = false
 			card.modulate = Color.WHITE
@@ -140,7 +145,7 @@ func _max_wounds(tier: int) -> int:
 
 
 func _on_unlock(node: NodeData) -> void:
-	PlayerProgression.unlock(node)
+	PlayerProgression.upgrade(node)
 	_refresh()
 
 

@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="NodeData" format=3 uid="uid://dommeatgrind1"]
+
+[ext_resource type="Script" path="res://resources/NodeData.gd" id="1_ndscr"]
+[ext_resource type="Script" path="res://resources/NodeLevelData.gd" id="2_ldscr"]
+
+[sub_resource type="Resource" id="Level_1"]
+script = ExtResource("2_ldscr")
+level_index = 1
+cost = 1
+required_tier = 2
+prerequisites = [{"node_id": "dom_wounds", "required_level": 2}]
+level_effect_description = "Meat for the Grinder: once per combat, degrade an incoming Massive Wound to a single Wound."
+effect_type = "meat_grinder"
+uses_per_combat = 1
+
+[sub_resource type="Resource" id="Level_2"]
+script = ExtResource("2_ldscr")
+level_index = 2
+cost = 1
+required_tier = 3
+prerequisites = [{"node_id": "dom_meat_grinder", "required_level": 1}]
+level_effect_description = "Meat for the Grinder: twice per combat, degrade an incoming Massive Wound to a single Wound."
+effect_type = "meat_grinder"
+uses_per_combat = 2
+
+[resource]
+script = ExtResource("1_ndscr")
+node_id = "dom_meat_grinder"
+display_name = "Meat for the Grinder"
+category = "Ability"
+base_description = "Absorb punishment that would fell lesser fighters. Spend charges to degrade Massive Wounds."
+max_levels = 2
+levels_data = [SubResource("Level_1"), SubResource("Level_2")]
