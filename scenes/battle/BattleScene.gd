@@ -2,9 +2,9 @@
 # Wires CombatManager signals to HUD nodes and kicks off combat.
 extends Control
 
-# ── Combatant data (loaded from .tres resources) ──────────────────────────────
+# ── Combatant data ────────────────────────────────────────────────────────────
 const PLAYER_DATA := preload("res://resources/data/player_default.tres")
-const ENEMY_DATA  := preload("res://resources/data/enemy_grunt.tres")
+var _enemy_data: CombatantData  # set from DungeonManager in _ready()
 
 # ── Debug scenes (remove path + add_child call to strip at release) ───────────
 const _DBG_WEAPON_SEL   := "res://scenes/debug/DebugWeaponSelector.tscn"
@@ -23,18 +23,23 @@ const _DBG_FERVOR_DISP  := "res://scenes/debug/DebugFervorDisplay.tscn"
 
 
 func _ready() -> void:
+	_enemy_data = DungeonManager.current_enemy()
+	if _enemy_data == null:
+		get_tree().change_scene_to_file("res://scenes/hub/HubScene.tscn")
+		return
+
 	_defeat_panel.hide()
 
 	# Set up visuals.
 	_player_visual.setup(PLAYER_DATA, true)
-	_enemy_visual.setup(ENEMY_DATA, false)
+	_enemy_visual.setup(_enemy_data, false)
 
 	# Set up HUDs with initial data. Player HUD shows the Fervor row.
 	_player_hud.setup(PLAYER_DATA, true)
-	_enemy_hud.setup(ENEMY_DATA, false)
+	_enemy_hud.setup(_enemy_data, false)
 
 	if _debug_equip:
-		_debug_equip.setup(PLAYER_DATA, ENEMY_DATA)
+		_debug_equip.setup(PLAYER_DATA, _enemy_data)
 
 	# Connect RoundHUD action buttons/selections.
 	_round_hud.strike_pressed.connect(_on_strike_pressed)
@@ -84,7 +89,7 @@ func _ready() -> void:
 		add_child((load(_DBG_FERVOR_DISP) as PackedScene).instantiate())
 
 	# Start combat.
-	CombatManager.start_combat(PLAYER_DATA, ENEMY_DATA)
+	CombatManager.start_combat(PLAYER_DATA, _enemy_data)
 
 
 # ── Signal handlers ───────────────────────────────────────────────────────────
@@ -118,8 +123,15 @@ func _on_guard_changed(is_player: bool, pool: String, guard_value: int) -> void:
 func _on_combat_ended(winner_name: String) -> void:
 	_round_hud.disable_strike()
 	_round_hud.disable_magic()
+	if winner_name == _enemy_data.combatant_name:
+		DungeonManager.on_defeat()
+	else:
+		DungeonManager.on_victory()
 	_result_label.text = "Winner: %s" % winner_name
 	_defeat_panel.show()
+	await get_tree().create_timer(1.5).timeout
+	_teardown_signals()
+	get_tree().change_scene_to_file("res://scenes/hub/HubScene.tscn")
 
 
 func _on_player_action_required() -> void:
@@ -157,7 +169,7 @@ func _on_spell_selected(spell: SpellData) -> void:
 
 func _on_restart_pressed() -> void:
 	_teardown_signals()
-	get_tree().reload_current_scene()
+	get_tree().change_scene_to_file("res://scenes/hub/HubScene.tscn")
 
 
 func _on_constellation_pressed() -> void:

@@ -261,12 +261,12 @@ Create under `resources/data/nodes/dominion/`:
 - [ ] *Deferred: Brutal L2 (Cleave) multi-enemy overflow — requires Group 5 enemy roster and multi-target resolution.*
 
 ### Group 5 — Full game loop
-- [ ] **Hub scene** — safe zone; access to character sheet, rest, loadout.
-- [ ] **Character sheet UI** — stats, wounds, constellation summary.
-- [ ] **Rest / recovery** — Long Rest (remove Burnout + reset Fervor), Recovery Scene (remove Burnout only).
-- [ ] **Enemy roster** — author 3+ enemy types per `docs/game-rules/appendices/enemy-guidelines.md`; vary VT, stat sizes, and action sets.
-- [ ] **Reward loop** — XP gain, item drops, point allocation after duel.
-- [ ] **Dungeon / encounter flow** — sequence of duels, progression between them.
+- [x] **Hub scene** (`scenes/hub/HubScene.gd/.tscn`) — main entry point; shows Tier, HP, Fervor, stats, run status; Long Rest / Recovery / Constellation / Continue / Start New Run buttons.
+- [x] **Character sheet UI** — integrated into Hub (Tier, HP, Dominion/Negation/Ingenuity die sizes, run progress, known spell counts).
+- [x] **Rest / recovery** — `PlayerProgression.apply_long_rest()` (reset Fervor to d4 + clear Burnout) and `apply_recovery()` (clear Burnout only). Fervor now persists via `saved_fervor_size` / `saved_is_burned_out` fields on PlayerProgression; written by `CombatManager._end_combat()`, read by `start_combat()`.
+- [x] **Enemy roster** — Grunt (existing Minion) + `enemy_soldier.tres` (Standard: d6/d6, VT 12, 3 wounds) + `enemy_knight.tres` (Elite: d8/d8, VT 15, 4 wounds, keep 1).
+- [x] **Reward loop** — `DungeonManager.on_victory()` calls `PlayerProgression.grant_points(1)` per kill. Starting `available_points = 3`.
+- [x] **Dungeon / encounter flow** — `DungeonManager` autoload: `start_run()`, `current_enemy()`, `on_victory()` / `on_defeat()`, `has_next_enemy()`. Hard-coded 3-enemy sequence: Grunt → Soldier → Knight. BattleScene reads current enemy from DungeonManager; auto-navigates to Hub after 1.5 s result display.
 
 ### Group 6 — Polish
 - [ ] **Art pass** — replace placeholder colored rects with actual sprites / animations.

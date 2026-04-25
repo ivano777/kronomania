@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="CombatantData" format=3]
+
+[ext_resource type="Script" uid="uid://t8js5de36gq8" path="res://resources/CombatantData.gd" id="1_cdscr"]
+[ext_resource type="Resource" uid="uid://b7k4ry9mj2cph" path="res://resources/data/weapons/iron_sword.tres" id="2_weapon"]
+
+[resource]
+script = ExtResource("1_cdscr")
+combatant_name = "Soldier"
+tier = 1
+dominion_size = 6
+negation_size = 6
+ingenuity_size = 4
+keep_grade = 0
+velocity_threshold = 12
+max_wounds = 3
+equipped_weapon = ExtResource("2_weapon")

@@ -151,8 +151,8 @@ func start_combat(player_data: CombatantData, enemy_data: CombatantData) -> void
 	wounds_changed.emit(true, _player.current_wounds, _player.max_wounds)
 	_player.has_minor_studies = _has_effect_type(_player, "minor_studies")
 	_player.has_spellcasting  = _has_effect_type(_player, "spellcasting")
-	_player.fervor_size = 4
-	_player.is_burned_out = false
+	_player.fervor_size = PlayerProgression.saved_fervor_size
+	_player.is_burned_out = PlayerProgression.saved_is_burned_out
 	_player.known_spells   = PlayerProgression.get_known_spells()
 	_player.known_cantrips = PlayerProgression.get_known_cantrips()
 	_enemy = CombatantState.new()
@@ -566,6 +566,8 @@ func _end_combat() -> void:
 		log_message.emit("")
 		log_message.emit("[color=lime][b]VICTORY — %s wins![/b][/color]" % winner)
 
+	PlayerProgression.saved_fervor_size = _player.fervor_size
+	PlayerProgression.saved_is_burned_out = _player.is_burned_out
 	phase_changed.emit("Combat Over")
 	combat_ended.emit(winner)
 

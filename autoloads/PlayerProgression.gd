@@ -36,8 +36,8 @@ const ALL_NODES: Array = [
 
 ## node_levels: NodeData → int (0 = not yet purchased, 1..max_levels = current level).
 var node_levels: Dictionary = {}
-## Starting budget; reward integration (Group 5) will add points after each duel.
-var available_points: int = 99
+## Starting budget; +1 granted per combat victory (Group 5 reward loop).
+var available_points: int = 3
 
 ## Slot-budget counters for the current tier (reset on tier advance).
 ## Core nodes cost 2 combat slots; Training / Ability cost 1; Flavor costs 1 from the Flavor budget.
@@ -45,6 +45,10 @@ var tier_combat_spent: int = 0
 var tier_flavor_spent: int = 0
 
 var _tier: int = 1
+
+## Fervor state persisted across combats (Group 5). Long Rest resets to 4; Recovery clears burnout only.
+var saved_fervor_size: int = 4
+var saved_is_burned_out: bool = false
 
 
 ## Returns the current level of a node (0 = not purchased).
@@ -101,7 +105,22 @@ func reset() -> void:
 	_tier = 1
 	tier_combat_spent = 0
 	tier_flavor_spent = 0
-	available_points = 5
+	available_points = 3
+	saved_fervor_size = 4
+	saved_is_burned_out = false
+
+
+func apply_long_rest() -> void:
+	saved_fervor_size = 4
+	saved_is_burned_out = false
+
+
+func apply_recovery() -> void:
+	saved_is_burned_out = false
+
+
+func grant_points(amount: int) -> void:
+	available_points += amount
 
 
 func get_category_count(category: String) -> int:
