@@ -123,6 +123,14 @@ func grant_points(amount: int) -> void:
 	available_points += amount
 
 
+func debug_set_points(n: int) -> void:
+	available_points = maxi(0, n)
+
+
+func debug_set_tier(t: int) -> void:
+	_tier = clampi(t, 1, 4)
+
+
 func get_category_count(category: String) -> int:
 	var count := 0
 	for node in node_levels.keys():

@@ -1,6 +1,7 @@
 extends Control
 
 const _PLAYER_DATA: CombatantData = preload("res://resources/data/player_default.tres")
+const _DBG_PROGRESSION := "res://scenes/debug/DebugProgressionControl.tscn"
 
 @onready var _points_label: Label = $Main/Header/PointsLabel
 @onready var _tier_hp_label: Label = $Main/Header/TierHPLabel
@@ -21,6 +22,8 @@ func _ready() -> void:
 	_tab_container.set_tab_title(1, "Background / Traits")
 	_populate_columns()
 	_refresh()
+	if ResourceLoader.exists(_DBG_PROGRESSION):
+		add_child((load(_DBG_PROGRESSION) as PackedScene).instantiate())
 
 
 func _populate_columns() -> void:
