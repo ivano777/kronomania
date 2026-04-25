@@ -168,44 +168,34 @@ Implements the new "5 Combat + 2 Flavor" tier advancement rule, passive wound bo
 Three sequential implementation phases.
 
 **Phase A — `PlayerProgression.gd` tier calculation refactor**
-- [ ] Add two runtime counters: `_tier_combat_spent: int` and `_tier_flavor_spent: int`, tracking slots spent in the **current** tier (reset to 0 on tier advance).
-- [ ] Rewrite `can_unlock(node)`:
-  - If node.category in ["Core", "Training", "Ability"]: check `_tier_combat_spent < 5`.
-  - If node.category == "Flavor": check `_tier_flavor_spent < 2`.
+- [x] Add two runtime counters: `tier_combat_spent: int` and `tier_flavor_spent: int`, tracking slots spent in the **current** tier (reset to 0 on tier advance). Public vars; readable by ConstellationScene for budget display.
+- [x] Rewrite `can_unlock(node)`:
+  - Core nodes cost 2 combat slots (`_slot_cost()`); Training / Ability cost 1. Check: `tier_combat_spent + _slot_cost(node) <= 5`.
+  - Flavor: `tier_flavor_spent < 2`.
   - Existing prerequisite and `required_tier` checks remain.
-- [ ] Rewrite `unlock(node)`: increment the matching counter. If `_tier_combat_spent >= 5 AND _tier_flavor_spent >= 2` and `_tier < 4`, advance `_tier` by 1 and reset both counters to 0.
-- [ ] `get_tier()` returns the stored `_tier` value rather than computing breadth dynamically.
-- [ ] `get_category_count()` is retained as-is for any UI display needs.
-- [ ] `available_points` plumbing is retained unchanged (Group 5 reward loop depends on it).
-- [ ] No `.tres` file changes required.
+- [x] Rewrite `unlock(node)`: increment the matching counter by `_slot_cost(node)`. If both spent (≥5 combat + ≥2 flavor) and `_tier < 4`, advance `_tier` by 1 and reset both counters to 0.
+- [x] `get_tier()` returns the stored `_tier` value rather than computing breadth dynamically.
+- [x] `get_category_count()` is retained as-is for any UI display needs.
+- [x] `available_points` plumbing is retained unchanged (Group 5 reward loop depends on it).
+- [x] No `.tres` file changes required.
 
 **Phase B — Passive Max Wounds injection in `CombatManager.gd`**
-- [ ] Add private helper `_tier_wound_bonus(tier: int) -> int`:
+- [x] Add private helper `_tier_wound_bonus(tier: int) -> int`:
   - Returns `(1 if tier >= 2 else 0) + (1 if tier >= 4 else 0)`.
-- [ ] At `start_combat()`, compute `_player.max_wounds = data.max_wounds + equipment_bonus + _tier_wound_bonus(_player_tier)`.
+- [x] At `start_combat()`, `_player.max_wounds += _tier_wound_bonus(_player.tier_override)` immediately after `CombatantState.init()` sets the base value.
   - `_player_tier` = `PlayerProgression.get_tier()` read once at combat init.
   - Enemy `max_wounds` is unaffected; enemy tier is not player-progression-driven.
   - Base `.tres` files (e.g. `player_default.tres`) are **never mutated**.
-- [ ] Emit `wounds_changed` signal after updating `max_wounds` so the HUD reflects the new cap immediately.
+- [x] Emit `wounds_changed` signal after updating `max_wounds` so the HUD reflects the new cap immediately.
 
-**Phase C — `ConstellationScene` UI restructure (triangle + multi-level cards — single combined pass)**
-- [ ] Replace 4-column grid layout with a triangular canvas.
-  - Each node card's screen position is derived from its vertex affiliation (Dominion / Negation / Ingenuity) and distance from center.
-  - Core nodes sit at the three vertices.
-  - Edge nodes (hybrid paths between two stats) interpolate between two vertex positions.
-  - Training and Ability nodes fill the interior, grouped by dominant stat.
-- [ ] Node cards must be authored as **composable components** with built-in multi-level support from the start (level pips `●●○`, level counter, Upgrade button). This avoids a second rewrite when Group 4.8 data ships.
-- [ ] "Unlock" button becomes "Upgrade"; disabled when `level >= max_level` or prerequisites unmet.
-- [ ] Connection lines light up progressively as source node level meets the dependent node's required level.
-- [ ] Add a central non-interactive **Tier + HP display widget** overlaid at the triangle center:
-  - Reads `PlayerProgression.get_tier()` and player wounds on scene open.
-  - Refreshes on `PlayerProgression.unlock()` (connect a local callback).
-  - No game-state ownership — display only.
-- [ ] Add a **"Background / Traits"** tab hosting all Flavor-category nodes:
-  - Implemented as a separate tab (TabContainer or equivalent) entirely distinct from the triangle canvas.
-  - Flavor nodes are not visible on the triangle.
-- [ ] Locked-by-tier nodes remain visually dimmed (from Group 4.6 Phase A); no logic change required.
-- [ ] Run `/refresh-index` only if any new `@export` field is added to `NodeData` during this work.
+**Phase C — `ConstellationScene` UI restructure (multi-level cards + tab separation)**
+- [x] Node cards rewritten as composable components: level pips (`○` / `●`), `L0/1` level counter, "Upgrade" button (was "Unlock"), slot cost shown in button label ("Upgrade (2 slots)" for Core).
+- [x] "Upgrade" button disabled when `level >= max_level` or prerequisites / tier / budget gate. All current nodes are max_level = 1.
+- [x] Tier + HP display widget added to header (`TierHPLabel`): reads `PlayerProgression.get_tier()` and player base max wounds + tier bonus. Refreshes on every `_refresh()` call.
+- [x] Budget display label (`BudgetLabel`) replaces old breadth-based ProgressLabel. Shows `"Combat: X/5 · Flavor: Y/2  (fill both to reach Tier N)"`.
+- [x] **"Background / Traits"** tab added via `TabContainer`: Flavor nodes moved there, not visible on the Skills tab.
+- [x] Locked-by-tier nodes remain visually dimmed (from Group 4.6 Phase A); no logic change required.
+- [ ] **Deferred to Group 4.8** — geometric triangle canvas with vertex-affiliation positioning; connection lines. Requires `node_id` and affiliation data from the NodeData schema refactor.
 
 ### Group 4.8 — Dominion Physical Tree (Multi-Level Node Refactor)
 

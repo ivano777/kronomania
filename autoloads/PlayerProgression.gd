@@ -29,18 +29,31 @@ var unlocked_nodes: Array[NodeData] = []
 ## Starting budget; reward integration (Group 5) will add points after each duel.
 var available_points: int = 99
 
+## Slot-budget counters for the current tier (reset on tier advance).
+## Core nodes cost 2 combat slots; Training / Ability cost 1; Flavor costs 1 from the Flavor budget.
+var tier_combat_spent: int = 0
+var tier_flavor_spent: int = 0
+
+var _tier: int = 1
+
+
+func _slot_cost(node: NodeData) -> int:
+	return 2 if node.category == "Core" else 1
+
 
 func can_unlock(node: NodeData) -> bool:
 	if is_unlocked(node):
 		return false
 	if available_points < node.unlock_cost:
 		return false
-	if get_tier() < node.required_tier:
+	if _tier < node.required_tier:
 		return false
 	for prereq in node.prerequisites:
 		if not is_unlocked(prereq):
 			return false
-	return true
+	if node.category == "Flavor":
+		return tier_flavor_spent < 2
+	return tier_combat_spent + _slot_cost(node) <= 5
 
 
 func unlock(node: NodeData) -> void:
@@ -48,11 +61,22 @@ func unlock(node: NodeData) -> void:
 		return
 	unlocked_nodes.append(node)
 	available_points -= node.unlock_cost
+	if node.category == "Flavor":
+		tier_flavor_spent += 1
+	else:
+		tier_combat_spent += _slot_cost(node)
+	if tier_combat_spent >= 5 and tier_flavor_spent >= 2 and _tier < 4:
+		_tier += 1
+		tier_combat_spent = 0
+		tier_flavor_spent = 0
 
 
 ## Resets progression to the initial state (debug use).
 func reset() -> void:
 	unlocked_nodes.clear()
+	_tier = 1
+	tier_combat_spent = 0
+	tier_flavor_spent = 0
 	available_points = 5
 
 
@@ -88,12 +112,6 @@ func get_known_cantrips() -> Array:
 	return result
 
 
-## Returns current Tier based on breadth: min nodes per category + 1, capped at 4.
-## T2 = 1 per cat, T3 = 2 per cat, T4 = 3 per cat (rules: progression/tiers.md).
+## Returns current Tier (slot-budget model: 5 combat + 2 Flavor per tier; Core costs 2 slots).
 func get_tier() -> int:
-	var min_count := 999
-	for cat in ["Core", "Training", "Ability", "Flavor"]:
-		min_count = mini(min_count, get_category_count(cat))
-	if min_count == 999:
-		return 1
-	return mini(min_count + 1, 4)
+	return _tier

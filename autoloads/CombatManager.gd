@@ -138,6 +138,8 @@ func start_combat(player_data: CombatantData, enemy_data: CombatantData) -> void
 	_player.init(player_data)
 	_player.unlocked_nodes = PlayerProgression.unlocked_nodes.duplicate()
 	_player.tier_override = PlayerProgression.get_tier()
+	_player.max_wounds += _tier_wound_bonus(_player.tier_override)
+	wounds_changed.emit(true, _player.current_wounds, _player.max_wounds)
 	_player.has_minor_studies = _player.unlocked_nodes.any(func(n: NodeData): return n.effect_type == "minor_studies")
 	_player.has_spellcasting  = _player.unlocked_nodes.any(func(n: NodeData): return n.effect_type == "spellcasting")
 	_player.fervor_size = 4
@@ -526,6 +528,11 @@ func _end_combat() -> void:
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
+## Passive Max Wounds bonus from Tier: +1 at Tier 2, +1 again at Tier 4 (cumulative +2).
+func _tier_wound_bonus(tier: int) -> int:
+	return (1 if tier >= 2 else 0) + (1 if tier >= 4 else 0)
+
 
 ## Returns the die size for the given defense pool on a combatant.
 ## Stance = Negation, Resolve = Ingenuity, Stamina = Dominion (defensive expression).

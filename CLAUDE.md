@@ -211,5 +211,7 @@ The rules live in `docs/game-rules/`. The implementation must match them exactly
 | Burnout | Blocks true spells; cantrips unaffected; clears at next combat start (Group 5 adds persistence) |
 | Stat sizes | Base from `CombatantData`; upgraded by Core nodes (mechanic wired in Phase A of spell school feature) |
 | Spell schools | Fire Magic I–IV + Arcane I–III; `SpellBonusEffect` pool/keep bonuses applied at spell resolution (implemented) |
+| Tier advancement | Slot-budget model: **5 combat slots + 2 Flavor slots** per tier; spending both advances the tier and resets counters. **Core nodes cost 2 combat slots** (Training / Ability cost 1; Flavor costs 1 from the Flavor budget). `PlayerProgression.tier_combat_spent` / `tier_flavor_spent` are public vars. |
+| Passive wounds | +1 Max Wounds at Tier 2, +1 at Tier 4 (cumulative +2). Applied at `start_combat()` via `_tier_wound_bonus(tier)`; base `.tres` files never mutated. |
 
-Next unimplemented feature: Group 5 — full game loop (hub scene, rest/recovery, reward loop, enemy roster).
+Next unimplemented feature: Group 4.8 — Dominion Physical Tree (multi-level node schema refactor + Dominion tree data + combat hooks).

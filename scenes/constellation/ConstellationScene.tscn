@@ -31,60 +31,64 @@ theme_override_font_sizes/font_size = 22
 [node name="Spacer" type="Control" parent="Main/Header"]
 size_flags_horizontal = 3
 
+[node name="TierHPLabel" type="Label" parent="Main/Header"]
+text = "Tier ? · HP ?"
+
 [node name="PointsLabel" type="Label" parent="Main/Header"]
 text = "Points: ?"
 
-[node name="TierLabel" type="Label" parent="Main/Header"]
-text = "Tier ?"
-
-[node name="ProgressLabel" type="Label" parent="Main"]
+[node name="BudgetLabel" type="Label" parent="Main"]
 text = ""
 
 [node name="Separator" type="HSeparator" parent="Main"]
 
-[node name="ColumnsScroll" type="ScrollContainer" parent="Main"]
+[node name="TabContainer" type="TabContainer" parent="Main"]
 size_flags_vertical = 3
+
+[node name="Skills" type="ScrollContainer" parent="Main/TabContainer"]
 horizontal_scroll_mode = 0
 
-[node name="Columns" type="HBoxContainer" parent="Main/ColumnsScroll"]
+[node name="Columns" type="HBoxContainer" parent="Main/TabContainer/Skills"]
 size_flags_horizontal = 3
 size_flags_vertical = 0
 add_theme_constant_override("separation") = 12
 
-[node name="CoreColumn" type="VBoxContainer" parent="Main/ColumnsScroll/Columns"]
+[node name="CoreColumn" type="VBoxContainer" parent="Main/TabContainer/Skills/Columns"]
 size_flags_horizontal = 3
 custom_minimum_size = Vector2(180, 0)
 add_theme_constant_override("separation") = 6
 
-[node name="CoreHeader" type="Label" parent="Main/ColumnsScroll/Columns/CoreColumn"]
+[node name="CoreHeader" type="Label" parent="Main/TabContainer/Skills/Columns/CoreColumn"]
 text = "Core"
 theme_override_font_sizes/font_size = 15
 
-[node name="TrainingColumn" type="VBoxContainer" parent="Main/ColumnsScroll/Columns"]
+[node name="TrainingColumn" type="VBoxContainer" parent="Main/TabContainer/Skills/Columns"]
 size_flags_horizontal = 3
 custom_minimum_size = Vector2(180, 0)
 add_theme_constant_override("separation") = 6
 
-[node name="TrainingHeader" type="Label" parent="Main/ColumnsScroll/Columns/TrainingColumn"]
+[node name="TrainingHeader" type="Label" parent="Main/TabContainer/Skills/Columns/TrainingColumn"]
 text = "Training"
 theme_override_font_sizes/font_size = 15
 
-[node name="AbilityColumn" type="VBoxContainer" parent="Main/ColumnsScroll/Columns"]
+[node name="AbilityColumn" type="VBoxContainer" parent="Main/TabContainer/Skills/Columns"]
 size_flags_horizontal = 3
 custom_minimum_size = Vector2(180, 0)
 add_theme_constant_override("separation") = 6
 
-[node name="AbilityHeader" type="Label" parent="Main/ColumnsScroll/Columns/AbilityColumn"]
+[node name="AbilityHeader" type="Label" parent="Main/TabContainer/Skills/Columns/AbilityColumn"]
 text = "Ability"
 theme_override_font_sizes/font_size = 15
 
-[node name="FlavorColumn" type="VBoxContainer" parent="Main/ColumnsScroll/Columns"]
+[node name="Traits" type="ScrollContainer" parent="Main/TabContainer"]
+horizontal_scroll_mode = 0
+
+[node name="TraitsBox" type="VBoxContainer" parent="Main/TabContainer/Traits"]
 size_flags_horizontal = 3
-custom_minimum_size = Vector2(180, 0)
 add_theme_constant_override("separation") = 6
 
-[node name="FlavorHeader" type="Label" parent="Main/ColumnsScroll/Columns/FlavorColumn"]
-text = "Flavor"
+[node name="TraitsHeader" type="Label" parent="Main/TabContainer/Traits/TraitsBox"]
+text = "Background / Traits"
 theme_override_font_sizes/font_size = 15
 
 [node name="Separator2" type="HSeparator" parent="Main"]
