@@ -133,7 +133,7 @@ Ordered by dependency. Items within a group can be parallelized.
   `NodeData` gains `@export var spell: SpellData`. `PlayerProgression.get_known_spells()` / `get_known_cantrips()`. `RollEngine.resolve()` gains `aspect_stat_size` and `aspect_count` params; returns `ingenuity_maxed_count`.
   *Deferred: multiple real Fervor dice, Fervor persistence across combats (Group 5), cantrip count formula.*
 
-### Group 4.5 — Spell school system (next)
+### Group 4.5 — Spell school system
 
 Two sequential phases; Phase A is prerequisite for Phase B.
 
@@ -153,29 +153,17 @@ Two sequential phases; Phase A is prerequisite for Phase B.
 - [x] `CombatManager`: apply `bonus_effects` at spell resolution (tag-matched pool/keep bonuses).
 - [x] Constellation UI: unchanged (tree visual deferred to Group 6).
 
-### Group 4.6 — Constellation Tier Gating + Per-Tier Slot Budget
+### Group 4.6 — Constellation Tier Gating
 
-Two sequential phases.
-
-**Phase A — Node tier gate**
 - [x] Add `required_tier: int` to `NodeData` (`resources/NodeData.gd`); default 1.
 - [x] Author `required_tier` values on all existing `.tres` node files: Core I / Training I / tier-1 Ability nodes → 1; Core II / Training II / Fire Magic II / Arcane II → 2; Fire Magic III / Arcane III → 3; Fire Magic IV → 4.
 - [x] `PlayerProgression.can_unlock()`: add check `get_tier() >= node.required_tier`.
 - [x] Constellation UI: show locked-by-tier nodes as visually dimmed with a tier badge.
 - [x] Run `/refresh-index` after `NodeData` schema change.
 
-**Phase B — Per-tier slot budget**
-- [ ] Confirm slot budget values with user before implementing (proposed: T1: 3 slots, T2: 2 slots, T3: 2 slots, T4: 1 slot).
-- [ ] `PlayerProgression`: replace or supplement `available_points` with `tier_slots_remaining: int` that resets per tier from the budget; spending a node costs 1 slot.
-- [ ] `can_unlock()`: also check `tier_slots_remaining > 0`.
-- [ ] Constellation UI: show "X picks remaining this tier" counter.
-- [ ] Tie slot grants into Group 5 reward loop (slot granted on tier advancement from XP/reward flow).
-
-*Deferred: mutually exclusive node choices within a tier (requires `exclusive_group` on NodeData — Group 6+).*
-
 ### Group 4.7 — Progression Rules Redesign
 
-Implements the new "5 Combat + 2 Flavor" tier advancement rule, passive wound bonuses, and the Triangle constellation UI. Depends on Group 4.6 Phase A (`required_tier` on `NodeData`) being complete first. Group 4.6 Phase B (per-tier slot budget) is **superseded** by this group and should not be implemented.
+Implements the new "5 Combat + 2 Flavor" tier advancement rule, passive wound bonuses, and the Triangle constellation UI. Depends on Group 4.6 (`required_tier` on `NodeData`) being complete first.
 
 Three sequential implementation phases.
 
@@ -236,10 +224,7 @@ Per-level data is consolidated into a single `NodeLevelData` sub-resource. `Node
 - [ ] Migrate ALL existing `.tres` node files to the new schema: populate `levels_data` with one `NodeLevelData` entry each (all current nodes have `max_levels = 1`); move `effect_type`, `effect_value`, `unlock_cost`, `spells`, and `bonus_effects` values into that entry.
 - [ ] Run `/refresh-index` after schema changes.
 
-**Phase B — `ConstellationScene.gd` multi-level node cards**
-*(Merged into Group 4.7 Phase C — multi-level card support is built in that single combined UI pass. No separate implementation needed here.)*
-
-**Phase C — Author Dominion tree data (11 `.tres` files)**
+**Phase B — Author Dominion tree data (11 `.tres` files)**
 
 Create under `resources/data/nodes/dominion/`:
 
@@ -262,7 +247,7 @@ Create under `resources/data/nodes/dominion/`:
 - [ ] Add all 11 Dominion nodes to `PlayerProgression.ALL_NODES`.
 - [ ] Run `/refresh-index` after adding new `.tres` files.
 
-**Phase D — Combat hook architecture (new mechanics)**
+**Phase C — Combat hook architecture (new mechanics)**
 - [ ] **Passive modifiers** (Core Dominion size, Martial Arts keep grade, Titan's Grip Forging I on 2H, Brutal L3 keep +1 on 2H): extend `CombatManager` helpers to read `node_levels` and sum `effect_value` from `NodeLevelData` entries up to the node's current level — mirrors existing `_stat_size()` / `_training_keep_grade()` pattern.
 - [ ] **Wounds node max_wounds integration**: add `_wounds_node_bonus(state: CombatantState) -> int` helper (scan `node_levels` for `dom_wounds`, sum `effect_value` across all purchased `NodeLevelData` entries). Extend the `start_combat()` formula: `_player.max_wounds = data.max_wounds + equipment_bonus + _tier_wound_bonus(_player_tier) + _wounds_node_bonus(_player)`. Each `NodeLevelData` entry in `dom_wounds.tres` must carry `effect_type="training_wounds"` and `effect_value=1`.
 - [ ] **Martial Arts physical_keep**: add `_physical_keep_grade(state: CombatantState) -> int` helper scanning for `effect_type="physical_keep"` in `NodeLevelData` entries; pass result as the keep grade for physical attack rolls only (distinct from `_training_keep_grade()` which applies to all rolls). The `dom_martial_arts.tres` `NodeLevelData` entries must use `effect_type="physical_keep"`.

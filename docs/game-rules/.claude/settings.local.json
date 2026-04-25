@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-Command *)",
+      "Bash(C:/Program Files/Godot/Godot_v4.6.2-stable_win64_console.exe *)",
+      "Bash(python scripts/gen_project_index.py)"
+    ]
+  },
+  "disabledMcpjsonServers": [
+    "code-review-graph"
+  ]
+}
