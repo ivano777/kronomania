@@ -108,6 +108,7 @@ Tracks what is implemented and what remains. Updated after each feature ships.
 - `docs-alignment-auditor` agent (`.claude/agents/docs-alignment-auditor.md`) — reads all docs and code, reports misalignments with severity and proposed fixes.
 - Headless validation: `"$GODOT" --headless --path "<project>" --quit-after 5`.
 - `CLAUDE.md` — engine setup, Autonomous Feature Loop workflow, architecture, rules summary.
+- **Global Debug Toggle** (`autoloads/DebugManager.gd`) — F12 toggles all debug UI widgets on/off at runtime. Hidden by default; a `[ DEBUG ]` label (22% opacity, bottom-right corner) confirms the toggle state. All six debug widgets (`DebugEquipmentDisplay`, `DebugFervorDisplay`, `DebugWeaponSelector`, `DebugAdvantageControl`, `DebugPoolSelector`, `DebugProgressionControl`) subscribe via `debug_mode_changed` signal.
 
 ---
 

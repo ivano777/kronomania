@@ -8,6 +8,8 @@ func _ready() -> void:
 	$ResolveButton.pressed.connect(func(): _select("resolve"))
 	$StaminaButton.pressed.connect(func(): _select("stamina"))
 	_select("stance")
+	visible = DebugManager.enabled
+	DebugManager.debug_mode_changed.connect(func(en: bool) -> void: visible = en)
 
 
 func get_target_pool() -> String:

@@ -17,6 +17,8 @@ func _ready() -> void:
 	_escalate.pressed.connect(_on_escalate)
 	_burnout_btn.pressed.connect(_on_toggle_burnout)
 	CombatManager.fervor_changed.connect(_on_fervor_changed)
+	visible = DebugManager.enabled
+	DebugManager.debug_mode_changed.connect(func(en: bool) -> void: visible = en)
 
 
 func _on_toggle() -> void:

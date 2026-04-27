@@ -1,6 +1,11 @@
 extends VBoxContainer
 
 
+func _ready() -> void:
+	visible = DebugManager.enabled
+	DebugManager.debug_mode_changed.connect(func(en: bool) -> void: visible = en)
+
+
 func setup(player_data: CombatantData, enemy_data: CombatantData) -> void:
 	_show($PlayerEquip, player_data)
 	_show($EnemyEquip, enemy_data)

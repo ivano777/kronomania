@@ -18,6 +18,8 @@ const PRESETS := [
 func _ready() -> void:
 	_panel.hide()
 	_toggle.pressed.connect(_on_toggle)
+	visible = DebugManager.enabled
+	DebugManager.debug_mode_changed.connect(func(en: bool) -> void: visible = en)
 	for preset in PRESETS:
 		var name: String  = preset[0]
 		var pot:  int     = preset[1]

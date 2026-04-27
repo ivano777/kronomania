@@ -29,6 +29,8 @@ func _ready() -> void:
 	_budget_reset.pressed.connect(_on_budget_reset)
 	_reset_all.pressed.connect(_on_reset_all)
 	_sync()
+	visible = DebugManager.enabled
+	DebugManager.debug_mode_changed.connect(func(en: bool) -> void: visible = en)
 
 
 func _on_toggle() -> void:

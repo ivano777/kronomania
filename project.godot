@@ -22,6 +22,7 @@ RollEngine="*res://autoloads/RollEngine.gd"
 CombatManager="*res://autoloads/CombatManager.gd"
 PlayerProgression="*res://autoloads/PlayerProgression.gd"
 DungeonManager="*res://autoloads/DungeonManager.gd"
+DebugManager="*res://autoloads/DebugManager.gd"
 
 [physics]
 

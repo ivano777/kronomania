@@ -9,6 +9,8 @@ func _ready() -> void:
 	$MinusButton.pressed.connect(_on_minus)
 	$PlusButton.pressed.connect(_on_plus)
 	_refresh()
+	visible = DebugManager.enabled
+	DebugManager.debug_mode_changed.connect(func(en: bool) -> void: visible = en)
 
 
 func get_net_advantage() -> int:
