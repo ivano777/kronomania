@@ -43,14 +43,12 @@ layout_mode = 2
 size_flags_horizontal = 3
 
 [node name="EnemySide" type="VBoxContainer" parent="GameLayout" unique_id=1438999933]
-custom_minimum_size = Vector2(200, 0)
 layout_mode = 2
+size_flags_horizontal = 3
 
-[node name="EnemyHUD" parent="GameLayout/EnemySide" unique_id=787879007 instance=ExtResource("2_chud")]
+[node name="EnemiesContainer" type="HBoxContainer" parent="GameLayout/EnemySide" unique_id=111222333]
 layout_mode = 2
-
-[node name="EnemyVisual" parent="GameLayout/EnemySide" unique_id=1524144416 instance=ExtResource("4_comb")]
-layout_mode = 2
+size_flags_horizontal = 3
 size_flags_vertical = 3
 
 [node name="DefeatPanel" type="Panel" parent="." unique_id=595927372]

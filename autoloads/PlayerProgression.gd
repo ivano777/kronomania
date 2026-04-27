@@ -72,6 +72,8 @@ var _tier: int = 1
 ## Fervor state persisted across combats (Group 5). Long Rest resets to 4; Recovery clears burnout only.
 var saved_fervor_size: int = 4
 var saved_is_burned_out: bool = false
+## Wounds carried into the next chained encounter. Always written by CombatManager._end_combat().
+var saved_wounds: int = 0
 
 
 ## Returns the current level of a node (0 = not purchased).

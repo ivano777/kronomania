@@ -1,9 +1,12 @@
-# CombatManager — combat state machine for a 1v1 duel.
+# CombatManager — combat state machine for 1vN duels.
 #
 # Flow per round:
 #   _begin_round  →  (player presses Strike / Cantrip / Spell)  →  _resolve_round_*
-#   _resolve_round_* rolls both attacks, checks VT, resolves Fast then Slow,
-#   applies wounds, checks defeat, then loops back to _begin_round.
+#   _resolve_round_* rolls the player attack once, then resolves three phases:
+#     Phase 1 — enemies the player is SLOW against attack first (per-enemy VT check).
+#     Phase 2 — player attacks the chosen target.
+#     Phase 3 — enemies the player is FAST against attack last.
+#   After each phase, defeat conditions are checked and the loop restarts.
 #
 # All game-state signals are emitted here; UI nodes listen and update.
 extends Node
@@ -31,12 +34,14 @@ signal phase_changed(phase_name: String)
 
 ## Emitted after wounds are applied.
 ## is_player: true = player was hit; false = enemy was hit.
-signal wounds_changed(is_player: bool, current: int, max_wounds: int)
+## enemy_index: index into the enemy array (-1 when is_player is true).
+signal wounds_changed(is_player: bool, enemy_index: int, current: int, max_wounds: int)
 
 ## Emitted after a defender's guard pool changes (roll, consumption, or reset).
 ## is_player: true = player's guard; false = enemy's guard.
+## enemy_index: index into the enemy array (-1 when is_player is true).
 ## pool: "stance" | "resolve" | "stamina"
-signal guard_changed(is_player: bool, pool: String, guard_value: int)
+signal guard_changed(is_player: bool, enemy_index: int, pool: String, guard_value: int)
 
 ## Emitted once combat ends.
 signal combat_ended(winner_name: String)
@@ -132,7 +137,7 @@ class CombatantState:
 
 
 var _player: CombatantState
-var _enemy:  CombatantState
+var _enemies: Array  # Array[CombatantState]
 var _round:  int = 0
 
 ## True only while awaiting the player's action input.
@@ -142,7 +147,8 @@ var _waiting_for_player: bool = false
 # ── Public API ────────────────────────────────────────────────────────────────
 
 ## Call from BattleScene._ready() to initialise and begin combat.
-func start_combat(player_data: CombatantData, enemy_data: CombatantData) -> void:
+## enemies_data: Array[CombatantData] — one entry per enemy (parallel if >1).
+func start_combat(player_data: CombatantData, enemies_data: Array) -> void:
 	_player = CombatantState.new()
 	_player.init(player_data)
 	if PlayerProgression.equipped_weapon != null:
@@ -155,30 +161,42 @@ func start_combat(player_data: CombatantData, enemy_data: CombatantData) -> void
 	_player.max_wounds += _wounds_node_bonus(_player)
 	_player.stamina_degrade_charges = _meat_grinder_charges(_player)
 	_player.space_domination_active = _has_effect_type(_player, "space_domination")
-	wounds_changed.emit(true, _player.current_wounds, _player.max_wounds)
+	if DungeonManager.was_last_fight_chained():
+		_player.current_wounds = mini(PlayerProgression.saved_wounds, _player.max_wounds)
+	wounds_changed.emit(true, -1, _player.current_wounds, _player.max_wounds)
 	_player.has_minor_studies = _has_effect_type(_player, "minor_studies")
 	_player.has_spellcasting  = _has_effect_type(_player, "spellcasting")
 	_player.fervor_size = PlayerProgression.saved_fervor_size
 	_player.is_burned_out = PlayerProgression.saved_is_burned_out
 	_player.known_spells   = PlayerProgression.get_known_spells()
 	_player.known_cantrips = PlayerProgression.get_known_cantrips()
-	_enemy = CombatantState.new()
-	_enemy.init(enemy_data)
+
+	_enemies.clear()
+	for i in enemies_data.size():
+		var ed: CombatantData = enemies_data[i] as CombatantData
+		var state := CombatantState.new()
+		state.init(ed)
+		_enemies.append(state)
+		wounds_changed.emit(false, i, 0, state.max_wounds)
+
 	_round = 0
 	_waiting_for_player = false
 
 	log_message.emit("[b]Combat begins![/b]")
-	log_message.emit(
-		"Encounter VT: %d\n  %s: off d%d | Stance d%d / Resolve d%d / Stamina d%d\n  %s: off d%d | Stance d%d / Resolve d%d / Stamina d%d" % [
-			enemy_data.velocity_threshold,
-			player_data.combatant_name,
-			_stat_size(_player, "dominion"), _stat_size(_player, "negation"),
-			_stat_size(_player, "ingenuity"), _stat_size(_player, "dominion"),
-			enemy_data.combatant_name,
-			_stat_size(_enemy, "dominion"), _stat_size(_enemy, "negation"),
-			_stat_size(_enemy, "ingenuity"), _stat_size(_enemy, "dominion"),
+	var player_line := "  %s: off d%d | Stance d%d / Resolve d%d / Stamina d%d" % [
+		player_data.combatant_name,
+		_stat_size(_player, "dominion"), _stat_size(_player, "negation"),
+		_stat_size(_player, "ingenuity"), _stat_size(_player, "dominion"),
+	]
+	var enemy_lines := ""
+	for i in _enemies.size():
+		var e: CombatantState = _enemies[i]
+		enemy_lines += "\n  %s [VT %d]: off d%d | Stance d%d / Resolve d%d / Stamina d%d" % [
+			e.data.combatant_name, e.data.velocity_threshold,
+			_stat_size(e, "dominion"), _stat_size(e, "negation"),
+			_stat_size(e, "ingenuity"), _stat_size(e, "dominion"),
 		]
-	)
+	log_message.emit(player_line + enemy_lines)
 
 	# Emit initial Fervor state so HUD is initialised before round 1.
 	fervor_changed.emit(true, _player.fervor_size, _stat_size(_player, "ingenuity"), _player.is_burned_out)
@@ -187,28 +205,29 @@ func start_combat(player_data: CombatantData, enemy_data: CombatantData) -> void
 
 
 ## Called by BattleScene when the player presses Strike.
-## net_advantage : positive = Advantage dice, negative = Disadvantage dice.
-## target_pool   : which defense pool the attack pressures ("stance" | "resolve" | "stamina").
-## brutal_trade  : if true, VT −5 and Flat +5 (requires dom_brutal L1).
-func player_chose_strike(net_advantage: int = 0, target_pool: String = "stance", brutal_trade: bool = false) -> void:
+## net_advantage  : positive = Advantage dice, negative = Disadvantage dice.
+## target_pool    : which defense pool the attack pressures ("stance" | "resolve" | "stamina").
+## brutal_trade   : if true, VT −5 and Flat +5 (requires dom_brutal L1).
+## target_index   : which enemy to attack (index into _enemies array).
+func player_chose_strike(net_advantage: int = 0, target_pool: String = "stance", brutal_trade: bool = false, target_index: int = 0) -> void:
 	if not _waiting_for_player:
 		return
 	_waiting_for_player = false
-	_resolve_round(net_advantage, target_pool, brutal_trade)
+	_resolve_round(net_advantage, target_pool, brutal_trade, target_index)
 
 
 ## Called by BattleScene when the player selects a cantrip spell.
 ## Ingenuity-based attack; no Fervor cost; available during Burnout.
-func player_chose_cantrip(spell: SpellData) -> void:
+func player_chose_cantrip(spell: SpellData, target_index: int = 0) -> void:
 	if not _waiting_for_player:
 		return
 	_waiting_for_player = false
-	_resolve_round_cantrip(spell)
+	_resolve_round_cantrip(spell, target_index)
 
 
 ## Called by BattleScene when the player selects a true spell.
 ## Ingenuity-based attack with a real Fervor die; blocked during Burnout.
-func player_chose_spell(spell: SpellData) -> void:
+func player_chose_spell(spell: SpellData, target_index: int = 0) -> void:
 	if not _waiting_for_player:
 		return
 	if _player.is_burned_out:
@@ -217,7 +236,7 @@ func player_chose_spell(spell: SpellData) -> void:
 		player_action_required.emit()
 		return
 	_waiting_for_player = false
-	_resolve_round_spell(spell)
+	_resolve_round_spell(spell, target_index)
 
 
 ## Called by RoundHUD (via BattleScene) when the player resolves a Meat for the Grinder prompt.
@@ -240,10 +259,12 @@ func _begin_round() -> void:
 
 	# All guard pools reset at the start of each new round (rules: defense-and-guard.md).
 	_player.reset_guard()
-	_enemy.reset_guard()
 	for pool in POOL_NAMES:
-		guard_changed.emit(true,  pool, 0)
-		guard_changed.emit(false, pool, 0)
+		guard_changed.emit(true, -1, pool, 0)
+	for i in _enemies.size():
+		_enemies[i].reset_guard()
+		for pool in POOL_NAMES:
+			guard_changed.emit(false, i, pool, 0)
 
 	round_started.emit(_round)
 	log_message.emit("")
@@ -259,14 +280,15 @@ func _begin_round() -> void:
 
 
 # Coroutine: physical Strike — resolves one full round then loops back.
-func _resolve_round(net_advantage: int = 0, target_pool: String = "stance", brutal_trade: bool = false) -> void:
+func _resolve_round(net_advantage: int = 0, target_pool: String = "stance", brutal_trade: bool = false, target_index: int = 0) -> void:
 	phase_changed.emit("Resolving…")
-	log_message.emit("Both combatants declare Strike.")
+	var target: CombatantState = _enemies[target_index]
+	log_message.emit("Both combatants declare Strike. Targeting: %s." % target.data.combatant_name)
 
 	if brutal_trade:
 		log_message.emit("  [color=yellow]Brutal Trade: VT −5, Flat +5.[/color]")
 
-	# ── Roll both attack pools ─────────────────────────────────────────────
+	# ── Roll player attack pool ────────────────────────────────────────────
 	var keep_grade := _physical_keep_grade(_player) + _node_weapon_bonus_sum(_player, "weapon_keep")
 	var brutal_flat := 5 if brutal_trade else 0
 
@@ -281,47 +303,56 @@ func _resolve_round(net_advantage: int = 0, target_pool: String = "stance", brut
 		net_advantage + _pool_bonus(_player),
 		0, 0, 0, earthshatter_size
 	)
-	var e_atk := RollEngine.resolve(
-		_effective_tier(_enemy), _stat_size(_enemy, "dominion"), _training_keep_grade(_enemy),
-		_attack_flat(_enemy)
-	)
-
 	log_message.emit(_fmt_attack(_player.data.combatant_name, p_atk))
 	if (p_atk.post_keep_bonus_roll as int) > 0:
 		log_message.emit("  [color=cyan]Earthshatter roll: %d[/color]" % (p_atk.post_keep_bonus_roll as int))
-	log_message.emit(_fmt_attack(_enemy.data.combatant_name, e_atk))
 
-	# ── VT check ──────────────────────────────────────────────────────────
-	# VT is a static enemy property. Only the player's roll is compared to it.
-	var encounter_vt: int = _enemy.data.velocity_threshold
-	var effective_vt := encounter_vt - 5 if brutal_trade else encounter_vt
-	var p_fast := RollEngine.is_fast(p_atk.total as int, effective_vt)
+	var p_total: int = p_atk.total as int
+	var target_vt: int = target.data.velocity_threshold - (5 if brutal_trade else 0)
+	log_message.emit(_fmt_speed(_player.data.combatant_name, p_total, target_vt,
+		RollEngine.is_fast(p_total, target_vt)))
 
-	log_message.emit(_fmt_speed(_player.data.combatant_name, p_atk.total as int, effective_vt, p_fast))
+	# ── Phase 1: Slow enemies attack first ────────────────────────────────
+	for i in _enemies.size():
+		var e: CombatantState = _enemies[i]
+		if e.is_defeated:
+			continue
+		var e_vt: int = e.data.velocity_threshold - (5 if brutal_trade and i == target_index else 0)
+		if not RollEngine.is_fast(p_total, e_vt):
+			var e_atk := RollEngine.resolve(
+				_effective_tier(e), _stat_size(e, "dominion"), _training_keep_grade(e), _attack_flat(e)
+			)
+			log_message.emit(_fmt_attack(e.data.combatant_name, e_atk))
+			var e_pool := target_pool if i == target_index else "stance"
+			await _resolve_attack(false, i, e_atk, e_pool)
+			if _player.is_defeated:
+				_end_combat()
+				return
 
-	# ── Determine resolution order ─────────────────────────────────────────
-	var player_first: bool = p_fast
-	if p_fast:
-		phase_changed.emit("Fast Phase — Player acts first")
-	else:
-		log_message.emit("%s is Slow — %s acts first." % [_player.data.combatant_name, _enemy.data.combatant_name])
-		phase_changed.emit("Slow Phase — Enemy acts first")
+	# ── Phase 2: Player attacks chosen target ──────────────────────────────
+	if not target.is_defeated:
+		await _resolve_attack(true, target_index, p_atk, target_pool)
 
-	# ── First attacker ─────────────────────────────────────────────────────
-	await _resolve_attack(player_first, p_atk if player_first else e_atk, target_pool)
-
-	if _player.is_defeated or _enemy.is_defeated:
+	if _all_enemies_defeated():
 		_end_combat()
 		return
 
-	# ── Second attacker ────────────────────────────────────────────────────
-	var second_is_player := not player_first
-	phase_changed.emit("Slow Phase" if p_fast else "Fast Phase (2nd)")
-	await _resolve_attack(second_is_player, p_atk if second_is_player else e_atk, target_pool)
-
-	if _player.is_defeated or _enemy.is_defeated:
-		_end_combat()
-		return
+	# ── Phase 3: Fast enemies attack last ─────────────────────────────────
+	for i in _enemies.size():
+		var e: CombatantState = _enemies[i]
+		if e.is_defeated:
+			continue
+		var e_vt: int = e.data.velocity_threshold - (5 if brutal_trade and i == target_index else 0)
+		if RollEngine.is_fast(p_total, e_vt):
+			var e_atk := RollEngine.resolve(
+				_effective_tier(e), _stat_size(e, "dominion"), _training_keep_grade(e), _attack_flat(e)
+			)
+			log_message.emit(_fmt_attack(e.data.combatant_name, e_atk))
+			var e_pool := target_pool if i == target_index else "stance"
+			await _resolve_attack(false, i, e_atk, e_pool)
+			if _player.is_defeated:
+				_end_combat()
+				return
 
 	# ── Next round ─────────────────────────────────────────────────────────
 	await get_tree().create_timer(0.8).timeout
@@ -329,46 +360,63 @@ func _resolve_round(net_advantage: int = 0, target_pool: String = "stance", brut
 
 
 # Coroutine: Cantrip — Ingenuity-based attack, no Fervor die, available during Burnout.
-func _resolve_round_cantrip(spell: SpellData) -> void:
+func _resolve_round_cantrip(spell: SpellData, target_index: int = 0) -> void:
 	phase_changed.emit("Resolving…")
-	log_message.emit("%s channels %s (Ingenuity d%d, no Fervor)." % [
-		_player.data.combatant_name, spell.spell_name, _stat_size(_player, "ingenuity")
+	var target: CombatantState = _enemies[target_index]
+	log_message.emit("%s channels %s (Ingenuity d%d, no Fervor). Targeting: %s." % [
+		_player.data.combatant_name, spell.spell_name, _stat_size(_player, "ingenuity"),
+		target.data.combatant_name
 	])
 
 	var p_atk := RollEngine.resolve(
 		_effective_tier(_player), _stat_size(_player, "ingenuity"), _training_keep_grade(_player),
 		spell.flat_bonus, _pool_bonus(_player)
 	)
-	var e_atk := RollEngine.resolve(
-		_effective_tier(_enemy), _stat_size(_enemy, "dominion"), _training_keep_grade(_enemy),
-		_attack_flat(_enemy)
-	)
-
 	log_message.emit(_fmt_attack(_player.data.combatant_name, p_atk) + " [cantrip]")
-	log_message.emit(_fmt_attack(_enemy.data.combatant_name, e_atk))
 
-	var encounter_vt: int = _enemy.data.velocity_threshold
-	var p_fast := RollEngine.is_fast(p_atk.total as int, encounter_vt)
-	log_message.emit(_fmt_speed(_player.data.combatant_name, p_atk.total as int, encounter_vt, p_fast))
+	var p_total: int = p_atk.total as int
+	var target_vt: int = target.data.velocity_threshold
+	log_message.emit(_fmt_speed(_player.data.combatant_name, p_total, target_vt, RollEngine.is_fast(p_total, target_vt)))
 
-	var player_first: bool = p_fast
-	if p_fast:
-		phase_changed.emit("Fast Phase — Player acts first")
-	else:
-		log_message.emit("%s is Slow — %s acts first." % [_player.data.combatant_name, _enemy.data.combatant_name])
-		phase_changed.emit("Slow Phase — Enemy acts first")
+	# ── Phase 1: Slow enemies attack first ────────────────────────────────
+	for i in _enemies.size():
+		var e: CombatantState = _enemies[i]
+		if e.is_defeated:
+			continue
+		if not RollEngine.is_fast(p_total, e.data.velocity_threshold):
+			var e_atk := RollEngine.resolve(
+				_effective_tier(e), _stat_size(e, "dominion"), _training_keep_grade(e), _attack_flat(e)
+			)
+			log_message.emit(_fmt_attack(e.data.combatant_name, e_atk))
+			var e_pool := spell.target_pool if i == target_index else "stance"
+			await _resolve_attack(false, i, e_atk, e_pool)
+			if _player.is_defeated:
+				_end_combat()
+				return
 
-	await _resolve_attack(player_first, p_atk if player_first else e_atk, spell.target_pool)
-	if _player.is_defeated or _enemy.is_defeated:
+	# ── Phase 2: Player attacks chosen target ──────────────────────────────
+	if not target.is_defeated:
+		await _resolve_attack(true, target_index, p_atk, spell.target_pool)
+
+	if _all_enemies_defeated():
 		_end_combat()
 		return
 
-	var second_is_player := not player_first
-	phase_changed.emit("Slow Phase" if p_fast else "Fast Phase (2nd)")
-	await _resolve_attack(second_is_player, p_atk if second_is_player else e_atk, spell.target_pool)
-	if _player.is_defeated or _enemy.is_defeated:
-		_end_combat()
-		return
+	# ── Phase 3: Fast enemies attack last ─────────────────────────────────
+	for i in _enemies.size():
+		var e: CombatantState = _enemies[i]
+		if e.is_defeated:
+			continue
+		if RollEngine.is_fast(p_total, e.data.velocity_threshold):
+			var e_atk := RollEngine.resolve(
+				_effective_tier(e), _stat_size(e, "dominion"), _training_keep_grade(e), _attack_flat(e)
+			)
+			log_message.emit(_fmt_attack(e.data.combatant_name, e_atk))
+			var e_pool := spell.target_pool if i == target_index else "stance"
+			await _resolve_attack(false, i, e_atk, e_pool)
+			if _player.is_defeated:
+				_end_combat()
+				return
 
 	await get_tree().create_timer(0.8).timeout
 	_begin_round()
@@ -376,8 +424,9 @@ func _resolve_round_cantrip(spell: SpellData) -> void:
 
 # Coroutine: True Spell — Ingenuity (+ optional aspect dice) + real Fervor die.
 # Escalation = count of Ingenuity-tagged dice that maxed + 1 if Fervor die maxed.
-func _resolve_round_spell(spell: SpellData) -> void:
+func _resolve_round_spell(spell: SpellData, target_index: int = 0) -> void:
 	phase_changed.emit("Resolving…")
+	var target: CombatantState = _enemies[target_index]
 
 	var aspect_stat_size: int = 0
 	if spell.aspect_stat == "dominion":
@@ -393,8 +442,9 @@ func _resolve_round_spell(spell: SpellData) -> void:
 		]
 	else:
 		aspect_label = " [Ingenuity d%d]" % _stat_size(_player, "ingenuity")
-	log_message.emit("%s casts %s%s + Fervor d%d." % [
-		_player.data.combatant_name, spell.spell_name, aspect_label, _player.fervor_size
+	log_message.emit("%s casts %s%s + Fervor d%d. Targeting: %s." % [
+		_player.data.combatant_name, spell.spell_name, aspect_label, _player.fervor_size,
+		target.data.combatant_name
 	])
 
 	# Collect school bonus effects for spells matching any of this spell's tags.
@@ -427,39 +477,54 @@ func _resolve_round_spell(spell: SpellData) -> void:
 		spell.flat_bonus, _pool_bonus(_player), _player.fervor_size,
 		aspect_stat_size, spell.aspect_dice
 	)
-	var e_atk := RollEngine.resolve(
-		_effective_tier(_enemy), _stat_size(_enemy, "dominion"), _training_keep_grade(_enemy),
-		_attack_flat(_enemy)
-	)
-
 	log_message.emit(_fmt_spell_attack(_player.data.combatant_name, p_atk))
-	log_message.emit(_fmt_attack(_enemy.data.combatant_name, e_atk))
 
-	var encounter_vt: int = _enemy.data.velocity_threshold
-	var p_fast := RollEngine.is_fast(p_atk.total as int, encounter_vt)
-	log_message.emit(_fmt_speed(_player.data.combatant_name, p_atk.total as int, encounter_vt, p_fast))
+	var p_total: int = p_atk.total as int
+	var target_vt: int = target.data.velocity_threshold
+	log_message.emit(_fmt_speed(_player.data.combatant_name, p_total, target_vt, RollEngine.is_fast(p_total, target_vt)))
 
-	var player_first: bool = p_fast
-	if p_fast:
-		phase_changed.emit("Fast Phase — Player acts first")
-	else:
-		log_message.emit("%s is Slow — %s acts first." % [_player.data.combatant_name, _enemy.data.combatant_name])
-		phase_changed.emit("Slow Phase — Enemy acts first")
+	# ── Phase 1: Slow enemies attack first ────────────────────────────────
+	for i in _enemies.size():
+		var e: CombatantState = _enemies[i]
+		if e.is_defeated:
+			continue
+		if not RollEngine.is_fast(p_total, e.data.velocity_threshold):
+			var e_atk := RollEngine.resolve(
+				_effective_tier(e), _stat_size(e, "dominion"), _training_keep_grade(e), _attack_flat(e)
+			)
+			log_message.emit(_fmt_attack(e.data.combatant_name, e_atk))
+			var e_pool := spell.target_pool if i == target_index else "stance"
+			await _resolve_attack(false, i, e_atk, e_pool)
+			if _player.is_defeated:
+				_end_combat()
+				return
 
-	await _resolve_attack(player_first, p_atk if player_first else e_atk, spell.target_pool)
-	if _player.is_defeated or _enemy.is_defeated:
+	# ── Phase 2: Player attacks chosen target ──────────────────────────────
+	if not target.is_defeated:
+		await _resolve_attack(true, target_index, p_atk, spell.target_pool)
+
+	if _all_enemies_defeated():
 		_end_combat()
 		return
 
-	var second_is_player := not player_first
-	phase_changed.emit("Slow Phase" if p_fast else "Fast Phase (2nd)")
-	await _resolve_attack(second_is_player, p_atk if second_is_player else e_atk, spell.target_pool)
-	if _player.is_defeated or _enemy.is_defeated:
-		_end_combat()
-		return
+	# ── Phase 3: Fast enemies attack last ─────────────────────────────────
+	for i in _enemies.size():
+		var e: CombatantState = _enemies[i]
+		if e.is_defeated:
+			continue
+		if RollEngine.is_fast(p_total, e.data.velocity_threshold):
+			var e_atk := RollEngine.resolve(
+				_effective_tier(e), _stat_size(e, "dominion"), _training_keep_grade(e), _attack_flat(e)
+			)
+			log_message.emit(_fmt_attack(e.data.combatant_name, e_atk))
+			var e_pool := spell.target_pool if i == target_index else "stance"
+			await _resolve_attack(false, i, e_atk, e_pool)
+			if _player.is_defeated:
+				_end_combat()
+				return
 
 	# Post-resolution: Fervor escalation (rules: magic/fervor.md).
-	# Steps = count of Ingenuity-tagged dice that rolled max + 1 if Fervor die rolled max.
+	# Steps = count of Ingenuity-tagged dice that rolled max + 1 if Fervor die maxed.
 	var fervor_maxed: bool = p_atk.fervor_maxed as bool
 	var escalation_steps: int = (p_atk.primary_dice_maxed_count as int) + (1 if fervor_maxed else 0)
 	if escalation_steps > 0:
@@ -471,12 +536,14 @@ func _resolve_round_spell(spell: SpellData) -> void:
 
 # Resolves a single attack against the specified defense pool.
 # attacker_is_player : who is swinging
+# enemy_index        : index of the enemy involved (attacker if !attacker_is_player, defender if attacker_is_player)
 # attack_result      : Dictionary from RollEngine.resolve()
 # target_pool        : which pool the defender uses ("stance" | "resolve" | "stamina")
-func _resolve_attack(attacker_is_player: bool, attack_result: Dictionary, target_pool: String = "stance") -> void:
-	var attacker: CombatantState = _player if attacker_is_player else _enemy
-	var defender: CombatantState = _enemy  if attacker_is_player else _player
+func _resolve_attack(attacker_is_player: bool, enemy_index: int, attack_result: Dictionary, target_pool: String = "stance") -> void:
+	var attacker: CombatantState = _player if attacker_is_player else _enemies[enemy_index]
+	var defender: CombatantState = _enemies[enemy_index] if attacker_is_player else _player
 	var defender_is_player := not attacker_is_player
+	var defender_ei := enemy_index if attacker_is_player else -1
 	var pool_label := target_pool.capitalize()
 	var defensive_size: int = _get_pool_size(defender, target_pool)
 
@@ -505,7 +572,7 @@ func _resolve_attack(attacker_is_player: bool, attack_result: Dictionary, target
 		var guard_val: int = def_result.total as int
 		defender.set_guard_val(target_pool, guard_val)
 		defender.set_pool_rolled(target_pool, true)
-		guard_changed.emit(defender_is_player, target_pool, guard_val)
+		guard_changed.emit(defender_is_player, defender_ei, target_pool, guard_val)
 		log_message.emit(_fmt_defense(defender.data.combatant_name, def_result, pool_label))
 	else:
 		var existing: int = defender.get_guard(target_pool)
@@ -549,7 +616,7 @@ func _resolve_attack(attacker_is_player: bool, attack_result: Dictionary, target
 				]
 			)
 
-		wounds_changed.emit(defender_is_player, defender.current_wounds, defender.max_wounds)
+		wounds_changed.emit(defender_is_player, defender_ei, defender.current_wounds, defender.max_wounds)
 
 		if defender.current_wounds >= defender.max_wounds:
 			defender.is_defeated = true
@@ -565,13 +632,19 @@ func _resolve_attack(attacker_is_player: bool, attack_result: Dictionary, target
 		)
 
 	# Publish final guard value after consumption.
-	guard_changed.emit(defender_is_player, target_pool, defender.get_guard(target_pool))
+	guard_changed.emit(defender_is_player, defender_ei, target_pool, defender.get_guard(target_pool))
 
 
 func _end_combat() -> void:
 	var winner: String
 	if _player.is_defeated:
-		winner = _enemy.data.combatant_name
+		winner = ""
+		for e in _enemies:
+			if not e.is_defeated:
+				winner = e.data.combatant_name
+				break
+		if winner == "":
+			winner = _enemies[0].data.combatant_name if _enemies.size() > 0 else "Enemy"
 		log_message.emit("")
 		log_message.emit("[color=red][b]DEFEAT — %s wins.[/b][/color]" % winner)
 	else:
@@ -581,8 +654,17 @@ func _end_combat() -> void:
 
 	PlayerProgression.saved_fervor_size = _player.fervor_size
 	PlayerProgression.saved_is_burned_out = _player.is_burned_out
+	PlayerProgression.saved_wounds = _player.current_wounds
 	phase_changed.emit("Combat Over")
 	combat_ended.emit(winner)
+
+
+## Returns true when every enemy in this encounter has been defeated.
+func _all_enemies_defeated() -> bool:
+	for e in _enemies:
+		if not e.is_defeated:
+			return false
+	return true
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

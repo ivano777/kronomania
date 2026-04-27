@@ -1,24 +1,16 @@
 # DungeonManager — tracks a dungeon run: enemy sequence, victory/defeat, point rewards.
-# A run is a linear sequence of enemies. Call start_run() to begin; the Hub scene
-# reads has_next_enemy() to decide whether to show Continue vs. Start New Run.
+# Each encounter is an Array[CombatantData]; parallel encounters have more than one entry.
 extends Node
 
-const ENEMY_ROSTER: Array = [
-	preload("res://resources/data/enemy_grunt.tres"),
-	preload("res://resources/data/enemies/enemy_soldier.tres"),
-	preload("res://resources/data/enemy_grunt.tres"),       # wave — entry 1
-	preload("res://resources/data/enemy_grunt.tres"),       # wave — entry 2
-	preload("res://resources/data/enemies/enemy_knight.tres"),
+const ENCOUNTERS: Array = [
+	[preload("res://resources/data/enemy_grunt.tres")],                         # 0 — solo Grunt
+	[preload("res://resources/data/enemies/enemy_soldier.tres")],               # 1 — solo Soldier
+	[preload("res://resources/data/enemy_grunt.tres"),                          # 2 — parallel Grunts
+	 preload("res://resources/data/enemy_grunt.tres")],
+	[preload("res://resources/data/enemies/enemy_knight.tres")],                # 3 — solo Knight
 ]
 
-# Parallel to ENEMY_ROSTER. true = after winning THIS fight, chain to next immediately.
-const ENEMY_CHAIN: Array = [
-	false,  # Grunt    → Hub
-	false,  # Soldier  → Hub
-	true,   # Grunt #1 → chain to Grunt #2
-	false,  # Grunt #2 → Hub
-	false,  # Knight   → Hub (run over)
-]
+const ENCOUNTER_CHAIN: Array = [false, false, false, false]
 
 const POINTS_PER_VICTORY: int = 1
 
@@ -29,26 +21,26 @@ var _last_chain: bool = false
 
 
 func start_run() -> void:
-	assert(ENEMY_CHAIN.size() == ENEMY_ROSTER.size(),
-		"DungeonManager: ENEMY_CHAIN and ENEMY_ROSTER must be the same length.")
+	assert(ENCOUNTER_CHAIN.size() == ENCOUNTERS.size(),
+		"DungeonManager: ENCOUNTER_CHAIN and ENCOUNTERS must be the same length.")
 	_current_index = 0
 	run_active = true
 	last_result = ""
 	_last_chain = false
 
 
-func current_enemy() -> CombatantData:
-	if run_active and _current_index < ENEMY_ROSTER.size():
-		return ENEMY_ROSTER[_current_index]
-	return null
+func current_enemies() -> Array:
+	if run_active and _current_index < ENCOUNTERS.size():
+		return ENCOUNTERS[_current_index]
+	return []
 
 
 func on_victory() -> void:
 	PlayerProgression.grant_points(POINTS_PER_VICTORY)
 	last_result = "victory"
-	_last_chain = ENEMY_CHAIN[_current_index]
+	_last_chain = ENCOUNTER_CHAIN[_current_index]
 	_current_index += 1
-	if _current_index >= ENEMY_ROSTER.size():
+	if _current_index >= ENCOUNTERS.size():
 		run_active = false
 
 
@@ -62,7 +54,7 @@ func on_defeat() -> void:
 
 
 func has_next_enemy() -> bool:
-	return run_active and _current_index < ENEMY_ROSTER.size()
+	return run_active and _current_index < ENCOUNTERS.size()
 
 
 func is_run_complete() -> bool:
@@ -74,7 +66,7 @@ func enemies_cleared() -> int:
 
 
 func enemies_total() -> int:
-	return ENEMY_ROSTER.size()
+	return ENCOUNTERS.size()
 
 
 func serialize() -> Dictionary:
