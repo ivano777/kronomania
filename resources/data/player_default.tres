@@ -2,11 +2,11 @@
 
 [ext_resource type="Script" uid="uid://t8js5de36gq8" path="res://resources/CombatantData.gd" id="1_cdscr"]
 [ext_resource type="Resource" uid="uid://b7k4ry9mj2cph" path="res://resources/data/weapons/iron_sword.tres" id="2_weapon"]
-[ext_resource type="Resource" uid="uid://dk3hf5t7g2xnq" path="res://resources/data/nodes/training_keep_1.tres" id="3_node"]
 
 [resource]
 script = ExtResource("1_cdscr")
 combatant_name = "Player"
 dominion_size = 4
+negation_size = 4
+ingenuity_size = 4
 equipped_weapon = ExtResource("2_weapon")
-starting_nodes = [ExtResource("3_node")]
