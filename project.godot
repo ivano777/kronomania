@@ -23,6 +23,11 @@ CombatManager="*res://autoloads/CombatManager.gd"
 PlayerProgression="*res://autoloads/PlayerProgression.gd"
 DungeonManager="*res://autoloads/DungeonManager.gd"
 DebugManager="*res://autoloads/DebugManager.gd"
+SaveManager="*res://autoloads/SaveManager.gd"
+
+[gui]
+
+theme/custom="res://theme/dark_fantasy.tres"
 
 [physics]
 

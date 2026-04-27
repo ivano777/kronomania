@@ -45,40 +45,20 @@ text = ""
 [node name="TabContainer" type="TabContainer" parent="Main"]
 size_flags_vertical = 3
 
-[node name="Skills" type="ScrollContainer" parent="Main/TabContainer"]
-horizontal_scroll_mode = 0
+[node name="Skills" type="Control" parent="Main/TabContainer"]
+anchor_right = 1.0
+anchor_bottom = 1.0
 
-[node name="Columns" type="HBoxContainer" parent="Main/TabContainer/Skills"]
-size_flags_horizontal = 3
-size_flags_vertical = 0
-add_theme_constant_override("separation") = 12
+[node name="LineLayer" type="Control" parent="Main/TabContainer/Skills"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+z_index = 0
+mouse_filter = 2
 
-[node name="CoreColumn" type="VBoxContainer" parent="Main/TabContainer/Skills/Columns"]
-size_flags_horizontal = 3
-custom_minimum_size = Vector2(180, 0)
-add_theme_constant_override("separation") = 6
-
-[node name="CoreHeader" type="Label" parent="Main/TabContainer/Skills/Columns/CoreColumn"]
-text = "Core"
-theme_override_font_sizes/font_size = 15
-
-[node name="TrainingColumn" type="VBoxContainer" parent="Main/TabContainer/Skills/Columns"]
-size_flags_horizontal = 3
-custom_minimum_size = Vector2(180, 0)
-add_theme_constant_override("separation") = 6
-
-[node name="TrainingHeader" type="Label" parent="Main/TabContainer/Skills/Columns/TrainingColumn"]
-text = "Training"
-theme_override_font_sizes/font_size = 15
-
-[node name="AbilityColumn" type="VBoxContainer" parent="Main/TabContainer/Skills/Columns"]
-size_flags_horizontal = 3
-custom_minimum_size = Vector2(180, 0)
-add_theme_constant_override("separation") = 6
-
-[node name="AbilityHeader" type="Label" parent="Main/TabContainer/Skills/Columns/AbilityColumn"]
-text = "Ability"
-theme_override_font_sizes/font_size = 15
+[node name="CardLayer" type="Control" parent="Main/TabContainer/Skills"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+z_index = 1
 
 [node name="Traits" type="ScrollContainer" parent="Main/TabContainer"]
 horizontal_scroll_mode = 0
@@ -96,5 +76,5 @@ theme_override_font_sizes/font_size = 15
 [node name="Footer" type="HBoxContainer" parent="Main"]
 
 [node name="BackButton" type="Button" parent="Main/Footer"]
-text = "Back to Battle"
+text = "Back to Hub"
 size_flags_horizontal = 3

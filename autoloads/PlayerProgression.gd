@@ -199,6 +199,46 @@ func get_tier() -> int:
 	return _tier
 
 
+func serialize() -> Dictionary:
+	var levels := {}
+	for node in node_levels.keys():
+		levels[(node as NodeData).node_id] = node_levels[node]
+	return {
+		"tier":                _tier,
+		"available_points":    available_points,
+		"tier_combat_spent":   tier_combat_spent,
+		"tier_flavor_spent":   tier_flavor_spent,
+		"node_levels":         levels,
+		"saved_fervor_size":   saved_fervor_size,
+		"saved_is_burned_out": saved_is_burned_out,
+		"equipped_weapon":     equipped_weapon.item_name if equipped_weapon != null else "",
+	}
+
+
+func deserialize(data: Dictionary) -> void:
+	_tier                = int(data.get("tier", 1))
+	available_points     = int(data.get("available_points", 3))
+	tier_combat_spent    = int(data.get("tier_combat_spent", 0))
+	tier_flavor_spent    = int(data.get("tier_flavor_spent", 0))
+	saved_fervor_size    = int(data.get("saved_fervor_size", 4))
+	saved_is_burned_out  = bool(data.get("saved_is_burned_out", false))
+	node_levels.clear()
+	var saved: Dictionary = data.get("node_levels", {})
+	for node in ALL_NODES:
+		var nd := node as NodeData
+		if nd.node_id in saved:
+			var lvl := int(saved[nd.node_id])
+			if lvl > 0:
+				node_levels[node] = lvl
+	var wname: String = str(data.get("equipped_weapon", ""))
+	equipped_weapon = null
+	if wname != "":
+		for w in AVAILABLE_WEAPONS:
+			if (w as EquipmentData).item_name == wname:
+				equipped_weapon = w
+				break
+
+
 func _node_by_id(id: String) -> NodeData:
 	for node in ALL_NODES:
 		if (node as NodeData).node_id == id:

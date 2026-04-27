@@ -55,3 +55,17 @@ func enemies_cleared() -> int:
 
 func enemies_total() -> int:
 	return ENEMY_ROSTER.size()
+
+
+func serialize() -> Dictionary:
+	return {
+		"run_active":  run_active,
+		"enemy_index": _current_index,
+		"last_result": last_result,
+	}
+
+
+func deserialize(data: Dictionary) -> void:
+	run_active     = bool(data.get("run_active", false))
+	_current_index = int(data.get("enemy_index", 0))
+	last_result    = str(data.get("last_result", ""))

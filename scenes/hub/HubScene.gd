@@ -10,6 +10,7 @@ var _fervor_label: Label
 var _stats_label: Label
 var _equip_label: Label
 var _weapon_btns: Array[Button] = []
+var _slot_labels: Array[Label] = []
 var _run_label: Label
 var _continue_btn: Button
 var _start_run_btn: Button
@@ -62,6 +63,32 @@ func _ready() -> void:
 
 	vbox.add_child(HSeparator.new())
 
+	var saves_header := Label.new()
+	saves_header.text = "Saves"
+	vbox.add_child(saves_header)
+
+	for i in range(1, 4):
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
+		vbox.add_child(row)
+
+		var slot_lbl := Label.new()
+		slot_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(slot_lbl)
+		_slot_labels.append(slot_lbl)
+
+		var save_btn := Button.new()
+		save_btn.text = "Save"
+		save_btn.pressed.connect(_on_save_slot.bind(i))
+		row.add_child(save_btn)
+
+		var load_btn := Button.new()
+		load_btn.text = "Load"
+		load_btn.pressed.connect(_on_load_slot.bind(i))
+		row.add_child(load_btn)
+
+	vbox.add_child(HSeparator.new())
+
 	_run_label = Label.new()
 	vbox.add_child(_run_label)
 
@@ -93,6 +120,9 @@ func _ready() -> void:
 	_start_run_btn.text = "Start New Run"
 	_start_run_btn.pressed.connect(_on_start_run)
 	vbox.add_child(_start_run_btn)
+
+	if SaveManager.active_slot > 0 and DungeonManager.last_result != "":
+		SaveManager.save(SaveManager.active_slot)
 
 	_refresh()
 
@@ -145,6 +175,31 @@ func _refresh() -> void:
 
 	_continue_btn.visible = DungeonManager.has_next_enemy()
 	_start_run_btn.visible = not DungeonManager.run_active
+
+	_refresh_slots()
+
+
+func _refresh_slots() -> void:
+	for i in range(_slot_labels.size()):
+		var slot := i + 1
+		var meta := SaveManager.get_slot_meta(slot)
+		if meta.get("exists", false):
+			var ts: String = str(meta.get("timestamp", ""))
+			var date_part := ts.substr(0, 10) if ts.length() >= 10 else ts
+			_slot_labels[i].text = "SLOT %d — Tier %d · Pts %d · %s" \
+				% [slot, int(meta.get("tier", 1)), int(meta.get("points", 0)), date_part]
+		else:
+			_slot_labels[i].text = "SLOT %d — EMPTY" % slot
+
+
+func _on_save_slot(slot: int) -> void:
+	SaveManager.save(slot)
+	_refresh_slots()
+
+
+func _on_load_slot(slot: int) -> void:
+	SaveManager.load(slot)
+	_refresh()
 
 
 func _on_equip_weapon(w: EquipmentData) -> void:

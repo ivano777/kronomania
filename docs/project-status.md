@@ -28,7 +28,9 @@ Tracks what is implemented and what remains. Updated after each feature ships.
   Signals: `fervor_changed(is_player, fervor_size, fervor_cap, is_burned_out)`, `player_magic_available(can_cantrip, can_cast_spell)`, `player_massive_incoming(charges_left)`.
 - **PlayerProgression** (`autoloads/PlayerProgression.gd`) — singleton owning Constellation state across scenes.
   `ALL_NODES` catalog (50 nodes), `node_levels: Dictionary` (NodeData → int), `available_points`, `tier_combat_spent`, `tier_flavor_spent`, `equipped_weapon: EquipmentData`, `AVAILABLE_WEAPONS` array.
-  Methods: `can_upgrade`, `upgrade`, `get_level(node)`, `get_node_level_by_id(id)`, `get_category_count`, `get_tier`, `get_known_spells()`, `get_known_cantrips()`, `apply_long_rest()`, `apply_recovery()`, `grant_points(n)`, `set_weapon(w)`.
+  Methods: `can_upgrade`, `upgrade`, `get_level(node)`, `get_node_level_by_id(id)`, `get_category_count`, `get_tier`, `get_known_spells()`, `get_known_cantrips()`, `apply_long_rest()`, `apply_recovery()`, `grant_points(n)`, `set_weapon(w)`, `serialize() -> Dictionary`, `deserialize(data: Dictionary)`.
+- **SaveManager** (`autoloads/SaveManager.gd`) — 3-slot JSON save/load at `user://saves/slot_{n}.json`.
+  `active_slot: int` (0 = unset). Methods: `save(slot)`, `load(slot)`, `get_slot_meta(slot) -> Dictionary` (exists, tier, points, timestamp), `delete_slot(slot)`. Calls `PlayerProgression.serialize/deserialize` and `DungeonManager.serialize/deserialize`.
 
 ### Combat mechanics
 - **Roll / Keep** — Tier-based pool, grade-based keep (0→1, 1→2, 2→3).
@@ -43,16 +45,12 @@ Tracks what is implemented and what remains. Updated after each feature ships.
 - **Equipment effects** — Potency (Tier cap), Forging (flat attack +), Warding (flat guard +), Fortitude (max wounds +), Surge/Drain (pool ±). Applied via helpers in `CombatManager`; logged in combat narrative when non-zero. Tags stored for future skill prerequisites.
 
 ### Data
-- `resources/data/player_default.tres` — Tier 1, d6 off/def, max wounds 3; equipped with Iron Sword. `starting_nodes` still present but overridden by `PlayerProgression` at combat init.
+- `resources/data/player_default.tres` — Tier 1, dominion_size=4 (d4 base; upgraded via dom_core), negation_size=4, ingenuity_size=4, max wounds 3; equipped with Iron Sword. `starting_nodes` present but overridden by `PlayerProgression` at combat init.
 - `resources/data/nodes/training_keep_1.tres` — Training, keep grade 1 (wired).
 - `resources/data/nodes/training_keep_2.tres` — Training, keep grade 2 (wired).
 - `resources/data/nodes/ability_minor_studies.tres` — Ability, effect_type="minor_studies", gates cantrip button; carries `spells=[cantrip_spark, arcane_touch]`.
 - `resources/data/nodes/ability_spellcasting.tres` — Ability, effect_type="spellcasting", gates true spell button; prerequisite: Minor Studies (wired).
-- `resources/data/nodes/ability_arcane_bolt.tres` — Ability, effect_type="spell", spell=arcane_bolt (stub; will be replaced by school nodes in Phase B).
-- `resources/data/nodes/ability_fireball.tres` — Ability, effect_type="spell", spell=fireball (stub; Phase B).
-- `resources/data/nodes/ability_charm.tres` — Ability, effect_type="spell", spell=charm (stub; Phase B).
-- `resources/data/nodes/ability_cantrip_spark.tres` — Ability, effect_type="spell", spell=cantrip_spark (stub; Phase B).
-- `resources/data/spells/arcane_bolt.tres`, `charm.tres`, `cantrip_spark.tres` — SpellData files (stub/orphaned; no longer in ALL_NODES).
+- `resources/data/spells/arcane_bolt.tres`, `charm.tres`, `cantrip_spark.tres` — SpellData files (orphaned; not in ALL_NODES; superseded by school node spells).
 - `resources/data/spells/fireball.tres` — SpellData, tags=["fire"], used by Fire Magic III.
 - `resources/data/spells/sparks.tres` — cantrip, fire tag, stance (Fire Magic I).
 - `resources/data/spells/arcane_touch.tres` — cantrip, arcane tag, resolve (Minor Studies).
@@ -72,7 +70,6 @@ Tracks what is implemented and what remains. Updated after each feature ships.
 - `resources/data/nodes/ability_sure_footed.tres` — Ability, flavor node.
 - `resources/data/nodes/flavor_warrior_oath.tres` — Flavor, flavor node.
 - `resources/data/enemy_grunt.tres` — Tier 1, d6 off / d4 def, keep grade 0, VT 10, max wounds 2; equipped with Crude Club.
-- `resources/data/player_default.tres` — dominion_size now d4 (upgraded to d6+ via dom_core).
 - `resources/data/weapons/iron_sword.tres` — Potency 1, Forging I (+1 flat attack), tags ["Sharp"].
 - `resources/data/weapons/crude_club.tres` — Potency 1, no bonuses, tags ["Blunt"].
 - `resources/data/weapons/greatsword.tres` — Potency 2, Forging I (+1 flat attack), tags ["Sharp", "TwoHanded"].
@@ -92,7 +89,7 @@ Tracks what is implemented and what remains. Updated after each feature ships.
 
 ### UI (prototype-quality)
 - **BattleScene** (`scenes/battle/`) — root scene wiring CombatManager signals to HUDs. "Constellation" button (top-right) navigates to ConstellationScene; `_teardown_signals()` helper for safe scene transitions. Auto-navigates to Hub 1.5 s after combat ends (win or defeat).
-- **ConstellationScene** (`scenes/constellation/`) — standalone skill tree. Skills tab (Core / Training / Ability columns) + Background/Traits tab (Flavor nodes). Multi-level node cards with level pips, "Upgrade (N slots)" buttons, tier + HP header, and combat/flavor budget label. Back button returns to BattleScene. Reads/writes `PlayerProgression`.
+- **ConstellationScene** (`scenes/constellation/`) — standalone skill tree. Skills tab: flat geometric canvas with DOM/ING/NEG vertex triangle, `Line2D` connection lines (gold=met, grey=unmet), vertex-click expand/collapse for sub-trees, compact node cards with level pips and tooltip descriptions. Background/Traits tab: Flavor nodes. Tier + HP header, combat/flavor budget label. Back button returns to Hub. Reads/writes `PlayerProgression`.
 - **CombatantHUD** — name, wound slots (grown dynamically to match max_wounds), guard value per combatant. Player HUD shows Fervor row (d-size / cap + BURNOUT indicator) and equipped weapon name.
 - **RoundHUD** — round label, phase label, Strike / Cantrip / Spell buttons (magic buttons appear only when known spells/cantrips exist), scrollable BBCode combat log. Spell/Cantrip buttons open an in-code popup listing known spells; single-spell auto-cast skips popup.
 - **Combatant** — placeholder visual (colored rect + name label).
@@ -258,7 +255,7 @@ Create under `resources/data/nodes/dominion/`:
   *Space Domination (Melee L2) → moved to Group 5.5. Brutal L2 Cleave → moved to Future (needs design decision).*
 
 ### Group 5 — Full game loop
-- [x] **Hub scene** (`scenes/hub/HubScene.gd/.tscn`) — main entry point; shows Tier, HP, Fervor, stats, run status; Long Rest / Recovery / Constellation / Continue / Start New Run buttons. Weapon selector row lets the player equip Iron Sword or Greatsword before a run; active weapon highlighted, persists via `PlayerProgression.equipped_weapon`. BattleScene and CombatantHUD read and display the equipped weapon.
+- [x] **Hub scene** (`scenes/hub/HubScene.gd/.tscn`) — main entry point; shows Tier, HP, Fervor, stats, run status; Long Rest / Recovery / Constellation / Continue / Start New Run buttons. Weapon selector row lets the player equip Iron Sword or Greatsword before a run; active weapon highlighted, persists via `PlayerProgression.equipped_weapon`. BattleScene and CombatantHUD read and display the equipped weapon. 3-slot save UI with Save/Load buttons; slot metadata (Tier, Points, date) shown; auto-saves on return from dungeon when `SaveManager.active_slot > 0`.
 - [x] **Character sheet UI** — integrated into Hub (Tier, HP, Dominion/Negation/Ingenuity die sizes, run progress, known spell counts).
 - [x] **Rest / recovery** — `PlayerProgression.apply_long_rest()` (reset Fervor to d4 + clear Burnout) and `apply_recovery()` (clear Burnout only). Fervor now persists via `saved_fervor_size` / `saved_is_burned_out` fields on PlayerProgression; written by `CombatManager._end_combat()`, read by `start_combat()`.
 - [x] **Enemy roster** — Grunt (existing Minion) + `enemy_soldier.tres` (Standard: d6/d6, VT 12, 3 wounds) + `enemy_knight.tres` (Elite: d8/d8, VT 15, 4 wounds, keep 1).
@@ -269,13 +266,14 @@ Create under `resources/data/nodes/dominion/`:
 
 Small, self-contained items that were deferred during Group 4.8 and have no remaining blockers.
 
-- [ ] **Space Domination** (Melee L2) — add `space_domination_active: bool` flag to `CombatantState`; when the player purchases `dom_melee` L2, grant Advantage on the player's next Stamina defense roll each combat; clear the flag once triggered. Wire in `CombatManager._begin_round()` / `_resolve_attack()`.
+- [x] **Space Domination** (Melee L2) — `space_domination_active: bool` on `CombatantState`; when `dom_melee` L2 is purchased, grants Advantage on the player's next Stamina guard roll each combat; flag cleared once triggered. Wired in `CombatManager._begin_round()` / `_resolve_attack()`.
 
 ### Group 6 — Polish
-- [ ] **Constellation triangle canvas** — replace the 4-column card layout with a geometric tree: vertex-affiliation positioning (Dominion / Negation / Ingenuity vertices), node cards placed by affiliation, connection lines between nodes. `node_id` and affiliation data are already in `NodeData`.
+- [x] **Save / load** — `SaveManager` autoload; 3 JSON slot files at `user://saves/slot_{n}.json`; Hub save/load UI; auto-save on return from dungeon. `PlayerProgression.serialize/deserialize`, `DungeonManager.serialize/deserialize`.
+- [x] **Constellation triangle canvas** — flat geometric canvas replacing 4-column layout; DOM/ING/NEG vertex positioning; `Line2D` connection lines (gold=met, grey=unmet); vertex-click expand/collapse for sub-trees; compact node cards with tooltip descriptions.
+- [x] **UI theme** — `res://theme/dark_fantasy.tres`; dark purple panels, styled button states, warm parchment text, gold accents. Applied globally via `project.godot gui/theme/custom`.
 - [ ] **Art pass** — replace placeholder colored rects with actual sprites / animations.
 - [ ] **Sound** — attack, guard break, wound, defeat SFX.
-- [ ] **Save / load** — persist character state between sessions.
 
 ### Future — Undesigned or blocked items
 
