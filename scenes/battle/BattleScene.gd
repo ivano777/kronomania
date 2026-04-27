@@ -19,7 +19,6 @@ var _dbg_fervor_disp = null
 @onready var _round_hud:     RoundHUD     = $GameLayout/CenterPanel/RoundHUD
 @onready var _defeat_panel:  Panel        = $DefeatPanel
 @onready var _result_label:  Label        = $DefeatPanel/PanelContent/ResultLabel
-@onready var _restart_btn:   Button       = $DefeatPanel/PanelContent/RestartButton
 @onready var _debug_equip                 = $DebugEquipmentDisplay if has_node("DebugEquipmentDisplay") else null
 
 
@@ -57,9 +56,6 @@ func _ready() -> void:
 		PlayerProgression.get_known_spells(),
 		PlayerProgression.get_known_cantrips()
 	)
-
-	# Connect restart button.
-	_restart_btn.pressed.connect(_on_restart_pressed)
 
 	# Constellation navigation button (top-right corner, always accessible).
 	var c_btn := Button.new()
@@ -171,11 +167,6 @@ func _on_cantrip_selected(spell: SpellData) -> void:
 
 func _on_spell_selected(spell: SpellData) -> void:
 	CombatManager.player_chose_spell(spell)
-
-
-func _on_restart_pressed() -> void:
-	_teardown_signals()
-	get_tree().change_scene_to_file("res://scenes/hub/HubScene.tscn")
 
 
 func _on_constellation_pressed() -> void:

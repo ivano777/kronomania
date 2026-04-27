@@ -7,7 +7,6 @@ const _DBG_PROGRESSION := "res://scenes/debug/DebugProgressionControl.tscn"
 @onready var _tier_hp_label: Label = $Main/Header/TierHPLabel
 @onready var _budget_label: Label = $Main/BudgetLabel
 @onready var _back_btn: Button = $Main/Footer/BackButton
-@onready var _reset_btn: Button = $Main/Footer/ResetButton
 @onready var _tab_container: TabContainer = $Main/TabContainer
 
 var _node_buttons: Dictionary = {}      # NodeData -> Button
@@ -18,7 +17,6 @@ var _node_pip_labels: Dictionary = {}   # NodeData -> Label
 
 func _ready() -> void:
 	_back_btn.pressed.connect(_on_back_pressed)
-	_reset_btn.pressed.connect(_on_reset_pressed)
 	_tab_container.set_tab_title(1, "Background / Traits")
 	_populate_columns()
 	_refresh()
@@ -149,11 +147,6 @@ func _max_wounds(tier: int) -> int:
 
 func _on_unlock(node: NodeData) -> void:
 	PlayerProgression.upgrade(node)
-	_refresh()
-
-
-func _on_reset_pressed() -> void:
-	PlayerProgression.reset()
 	_refresh()
 
 

@@ -20,15 +20,15 @@ Tracks what is implemented and what remains. Updated after each feature ships.
   Referenced by `CombatantData.equipped_weapon`. All effects applied at combat init or roll time; `null` = no weapon (no penalty).
   *Deferred: Inefficiency rule (Potency → 1, Flat → 0 without training) — requires Group 3 nodes.*
 - **CombatManager** (`autoloads/CombatManager.gd`) — 1v1 combat state machine.
-  `CombatantState` fields: `data`, `current_wounds`, `max_wounds`, `unlocked_nodes`, `tier_override`, `is_defeated`, `fervor_size` (d4 base), `is_burned_out`, `has_minor_studies`, `has_spellcasting`, `known_spells: Array`, `known_cantrips: Array`.
-  Helpers: `_effective_tier()`, `_training_keep_grade()`, `_attack_flat()`, `_guard_flat()`, `_escalate_fervor()`, `_stat_size(state, stat)` (reads base from `CombatantData`, upgraded by matching `stat_size_*` Core nodes).
-  At `start_combat()`, player's `unlocked_nodes`, `tier_override`, magic flags, and known spell lists are read from `PlayerProgression`. Initial `fervor_changed` signal emitted before first round.
+  `CombatantState` fields: `data`, `current_wounds`, `max_wounds`, `is_defeated`, `node_levels: Dictionary` (NodeData → int), `tier_override`, `weapon_override`, `stamina_degrade_charges`, per-pool guard state (`stance_guard`, `resolve_guard`, `stamina_guard` + matching `_rolled` booleans), magic state (`fervor_size`, `is_burned_out`, `has_minor_studies`, `has_spellcasting`, `known_spells`, `known_cantrips`).
+  Helpers: `_effective_tier()`, `_training_keep_grade()`, `_physical_keep_grade()`, `_attack_flat()`, `_guard_flat()`, `_escalate_fervor()`, `_stat_size(state, stat)`, `_node_effect_max()`, `_node_effect_sum()`, `_node_weapon_bonus_sum()`, `_wounds_node_bonus()`, `_meat_grinder_charges()`.
+  At `start_combat()`, player's `node_levels`, `tier_override`, magic flags, and known spell lists are read from `PlayerProgression`. Initial `fervor_changed` signal emitted before first round.
   Round loop: `_begin_round → player_chose_strike / _cantrip(spell) / _spell(spell) → _resolve_round_* → _resolve_attack × 2 → loop`.
   Escalation: `steps = ingenuity_maxed_count + (1 if fervor_maxed)` — multiple steps possible per cast.
-  Signals: `fervor_changed(is_player, fervor_size, fervor_cap, is_burned_out)`, `player_magic_available(can_cantrip, can_cast_spell)`.
+  Signals: `fervor_changed(is_player, fervor_size, fervor_cap, is_burned_out)`, `player_magic_available(can_cantrip, can_cast_spell)`, `player_massive_incoming(charges_left)`.
 - **PlayerProgression** (`autoloads/PlayerProgression.gd`) — singleton owning Constellation state across scenes.
-  `ALL_NODES` catalog, `unlocked_nodes: Array[NodeData]`, `available_points`.
-  Methods: `can_unlock`, `unlock`, `is_unlocked`, `get_category_count`, `get_tier` (breadth check), `get_known_spells()` (non-cantrip SpellData from unlocked spell nodes), `get_known_cantrips()` (cantrip SpellData).
+  `ALL_NODES` catalog (50 nodes), `node_levels: Dictionary` (NodeData → int), `available_points`, `tier_combat_spent`, `tier_flavor_spent`, `equipped_weapon: EquipmentData`, `AVAILABLE_WEAPONS` array.
+  Methods: `can_upgrade`, `upgrade`, `get_level(node)`, `get_node_level_by_id(id)`, `get_category_count`, `get_tier`, `get_known_spells()`, `get_known_cantrips()`, `apply_long_rest()`, `apply_recovery()`, `grant_points(n)`, `set_weapon(w)`.
 
 ### Combat mechanics
 - **Roll / Keep** — Tier-based pool, grade-based keep (0→1, 1→2, 2→3).
@@ -46,12 +46,6 @@ Tracks what is implemented and what remains. Updated after each feature ships.
 - `resources/data/player_default.tres` — Tier 1, d6 off/def, max wounds 3; equipped with Iron Sword. `starting_nodes` still present but overridden by `PlayerProgression` at combat init.
 - `resources/data/nodes/training_keep_1.tres` — Training, keep grade 1 (wired).
 - `resources/data/nodes/training_keep_2.tres` — Training, keep grade 2 (wired).
-- `resources/data/nodes/core_dominion_1.tres` — Core, Dominion d8 (stat-size mechanic wired via `_stat_size()`).
-- `resources/data/nodes/core_dominion_2.tres` — Core, Dominion d10; prereq: Dominion I.
-- `resources/data/nodes/core_negation_1.tres` — Core, Negation d8.
-- `resources/data/nodes/core_negation_2.tres` — Core, Negation d10; prereq: Negation I.
-- `resources/data/nodes/core_ingenuity_1.tres` — Core, Ingenuity d8.
-- `resources/data/nodes/core_ingenuity_2.tres` — Core, Ingenuity d10; prereq: Ingenuity I.
 - `resources/data/nodes/ability_minor_studies.tres` — Ability, effect_type="minor_studies", gates cantrip button; carries `spells=[cantrip_spark, arcane_touch]`.
 - `resources/data/nodes/ability_spellcasting.tres` — Ability, effect_type="spellcasting", gates true spell button; prerequisite: Minor Studies (wired).
 - `resources/data/nodes/ability_arcane_bolt.tres` — Ability, effect_type="spell", spell=arcane_bolt (stub; will be replaced by school nodes in Phase B).
@@ -93,11 +87,13 @@ Tracks what is implemented and what remains. Updated after each feature ships.
 - `resources/data/nodes/dominion/dom_brutal.tres` — Ability, max_levels=3; brutal_trade L1, cleave L2 (deferred), weapon_keep+1 TwoHanded L3.
 - `resources/data/nodes/dominion/dom_meat_grinder.tres` — Ability, max_levels=2; meat_grinder 1/2 uses_per_combat.
 - `resources/data/nodes/dominion/dom_earthshatter.tres` — Ability, max_levels=1; earthshatter (post-keep Dominion die on Stance attacks).
+- `resources/data/nodes/negation/neg_core.tres` — Core, max_levels=3; stat_size_negation d6/d8/d10.
+- `resources/data/nodes/ingenuity/ing_core.tres` — Core, max_levels=3; stat_size_ingenuity d6/d8/d10.
 
 ### UI (prototype-quality)
-- **BattleScene** (`scenes/battle/`) — root scene wiring CombatManager signals to HUDs. "Constellation" button (top-right) navigates to ConstellationScene; extracts `_teardown_signals()` helper for safe scene transitions.
-- **ConstellationScene** (`scenes/constellation/`) — standalone skill tree. 4-column layout (Core / Training / Ability / Flavor), node cards with unlock buttons, point budget, tier badge and progress line. Back button returns to BattleScene. Reads/writes `PlayerProgression`.
-- **CombatantHUD** — name, wound slots, guard value per combatant. Player HUD shows Fervor row (d-size / cap + BURNOUT indicator).
+- **BattleScene** (`scenes/battle/`) — root scene wiring CombatManager signals to HUDs. "Constellation" button (top-right) navigates to ConstellationScene; `_teardown_signals()` helper for safe scene transitions. Auto-navigates to Hub 1.5 s after combat ends (win or defeat).
+- **ConstellationScene** (`scenes/constellation/`) — standalone skill tree. Skills tab (Core / Training / Ability columns) + Background/Traits tab (Flavor nodes). Multi-level node cards with level pips, "Upgrade (N slots)" buttons, tier + HP header, and combat/flavor budget label. Back button returns to BattleScene. Reads/writes `PlayerProgression`.
+- **CombatantHUD** — name, wound slots (grown dynamically to match max_wounds), guard value per combatant. Player HUD shows Fervor row (d-size / cap + BURNOUT indicator) and equipped weapon name.
 - **RoundHUD** — round label, phase label, Strike / Cantrip / Spell buttons (magic buttons appear only when known spells/cantrips exist), scrollable BBCode combat log. Spell/Cantrip buttons open an in-code popup listing known spells; single-spell auto-cast skips popup.
 - **Combatant** — placeholder visual (colored rect + name label).
 - **Combat narrative** — BBCode-formatted log with attack rolls, speed check, breach/wound outcomes, and Massive highlights.
@@ -153,7 +149,7 @@ Two sequential phases; Phase A is prerequisite for Phase B.
 
 **Phase A — Core stat nodes**
 - [x] `NodeData.prerequisite: NodeData` → `prerequisites: Array[NodeData]` (compound prereqs, all existing `.tres` migrated).
-- [x] Author remaining Core nodes: `core_dominion_2.tres` (d8→d10), `core_negation_1/2.tres`, `core_ingenuity_1/2.tres`.
+- [x] Author remaining Core nodes: `core_dominion_2.tres` (d8→d10), `core_negation_1/2.tres`, `core_ingenuity_1/2.tres` (later consolidated into multi-level `neg_core.tres` / `ing_core.tres` in Group 4.8).
 - [x] `CombatManager`: compute effective stat sizes from unlocked Core nodes at `start_combat()`; `_stat_size(state, stat)` helper replaces direct `state.data.*_size` reads.
 - [x] `PlayerProgression.can_unlock()`: check all entries in `prerequisites` array.
 
@@ -209,7 +205,7 @@ Three sequential implementation phases.
 - [x] Budget display label (`BudgetLabel`) replaces old breadth-based ProgressLabel. Shows `"Combat: X/5 · Flavor: Y/2  (fill both to reach Tier N)"`.
 - [x] **"Background / Traits"** tab added via `TabContainer`: Flavor nodes moved there, not visible on the Skills tab.
 - [x] Locked-by-tier nodes remain visually dimmed (from Group 4.6 Phase A); no logic change required.
-- [ ] **Deferred to Group 4.8** — geometric triangle canvas with vertex-affiliation positioning; connection lines. Requires `node_id` and affiliation data from the NodeData schema refactor.
+  *Triangle canvas (vertex-affiliation positioning + connection lines) → moved to Group 6 Polish.*
 
 ### Group 4.8 — Dominion Physical Tree (Multi-Level Node Refactor)
 
@@ -248,6 +244,7 @@ Create under `resources/data/nodes/dominion/`:
 
 - [x] Change base Dominion stat from d6 → d4 in `player_default.tres`. **Confirmed design decision.** Core Dominion L1 brings it to d6, L2 to d8, L3 to d10.
 - [x] Remove `resources/data/nodes/core_dominion_1.tres` and `core_dominion_2.tres` from `PlayerProgression.ALL_NODES` when adding `dom_core.tres`; delete both old `.tres` files to prevent duplicate stat-size bonuses.
+- [x] Migrate Negation and Ingenuity Core nodes to multi-level format (`neg_core.tres` / `ing_core.tres`, max_levels=3 each, under `resources/data/nodes/negation/` and `resources/data/nodes/ingenuity/`); remove old `core_negation_1/2.tres` and `core_ingenuity_1/2.tres` from `ALL_NODES`.
 - [x] Add all 11 Dominion nodes to `PlayerProgression.ALL_NODES`.
 - [x] Run `/refresh-index` after adding new `.tres` files.
 
@@ -258,18 +255,32 @@ Create under `resources/data/nodes/dominion/`:
 - [x] **Earthshatter** (post-Keep additive die): `post_keep_bonus_size` param added to `RollEngine.resolve()`; `CombatManager` passes Dominion die size when `dom_earthshatter` is at L1 and target_pool is "stance".
 - [x] **Brutal L1** (VT trade): `CheckButton` toggle in `RoundHUD` (visible when `dom_brutal >= 1`); `get_brutal_trade()` polled by BattleScene; `player_chose_strike(brutal_trade: bool)` + `_resolve_round(brutal_trade)` apply VT −5 / Flat +5.
 - [x] **Meat for the Grinder** (reactive charges): `stamina_degrade_charges` on `CombatantState`; `_resolve_attack()` converted to coroutine; `player_massive_incoming` signal + `_massive_decision_resolved` internal gate; RoundHUD `show_massive_prompt()` + `wound_degrade_chosen` signal; `player_chose_degrade_wound()` public method.
-- [ ] *Deferred: Melee L2 (Space Domination) — add a stateful flag on `CombatantState` that grants Advantage on the player's next Stamina defense roll this combat; persists until triggered, then clears. (Group 5 infrastructure.)*
-- [ ] *Deferred: Brutal L2 (Cleave) multi-enemy overflow — requires Group 5 enemy roster and multi-target resolution.*
+  *Space Domination (Melee L2) → moved to Group 5.5. Brutal L2 Cleave → moved to Future (needs design decision).*
 
 ### Group 5 — Full game loop
-- [x] **Hub scene** (`scenes/hub/HubScene.gd/.tscn`) — main entry point; shows Tier, HP, Fervor, stats, run status; Long Rest / Recovery / Constellation / Continue / Start New Run buttons.
+- [x] **Hub scene** (`scenes/hub/HubScene.gd/.tscn`) — main entry point; shows Tier, HP, Fervor, stats, run status; Long Rest / Recovery / Constellation / Continue / Start New Run buttons. Weapon selector row lets the player equip Iron Sword or Greatsword before a run; active weapon highlighted, persists via `PlayerProgression.equipped_weapon`. BattleScene and CombatantHUD read and display the equipped weapon.
 - [x] **Character sheet UI** — integrated into Hub (Tier, HP, Dominion/Negation/Ingenuity die sizes, run progress, known spell counts).
 - [x] **Rest / recovery** — `PlayerProgression.apply_long_rest()` (reset Fervor to d4 + clear Burnout) and `apply_recovery()` (clear Burnout only). Fervor now persists via `saved_fervor_size` / `saved_is_burned_out` fields on PlayerProgression; written by `CombatManager._end_combat()`, read by `start_combat()`.
 - [x] **Enemy roster** — Grunt (existing Minion) + `enemy_soldier.tres` (Standard: d6/d6, VT 12, 3 wounds) + `enemy_knight.tres` (Elite: d8/d8, VT 15, 4 wounds, keep 1).
 - [x] **Reward loop** — `DungeonManager.on_victory()` calls `PlayerProgression.grant_points(1)` per kill. Starting `available_points = 3`.
 - [x] **Dungeon / encounter flow** — `DungeonManager` autoload: `start_run()`, `current_enemy()`, `on_victory()` / `on_defeat()`, `has_next_enemy()`. Hard-coded 3-enemy sequence: Grunt → Soldier → Knight. BattleScene reads current enemy from DungeonManager; auto-navigates to Hub after 1.5 s result display.
 
+### Group 5.5 — Mechanics completion (deferred from 4.8)
+
+Small, self-contained items that were deferred during Group 4.8 and have no remaining blockers.
+
+- [ ] **Space Domination** (Melee L2) — add `space_domination_active: bool` flag to `CombatantState`; when the player purchases `dom_melee` L2, grant Advantage on the player's next Stamina defense roll each combat; clear the flag once triggered. Wire in `CombatManager._begin_round()` / `_resolve_attack()`.
+
 ### Group 6 — Polish
+- [ ] **Constellation triangle canvas** — replace the 4-column card layout with a geometric tree: vertex-affiliation positioning (Dominion / Negation / Ingenuity vertices), node cards placed by affiliation, connection lines between nodes. `node_id` and affiliation data are already in `NodeData`.
 - [ ] **Art pass** — replace placeholder colored rects with actual sprites / animations.
 - [ ] **Sound** — attack, guard break, wound, defeat SFX.
 - [ ] **Save / load** — persist character state between sessions.
+
+### Future — Undesigned or blocked items
+
+- **Brutal L2 Cleave** — multi-enemy overflow after a breach. Group 5 roster exists (3 enemies), but Cleave needs a design decision on overflow mechanics (does excess damage carry over? to which target? in what order?) before implementation.
+- **Negation and Ingenuity subtrees** — `neg_core.tres` and `ing_core.tres` exist as Core-only nodes. Training and ability nodes (analogues to the Dominion tree) are not yet designed or roadmapped.
+- **Cantrip count formula** — currently all known cantrips are always available; a future "known slots" cap is deferred.
+- **Inefficiency rule** — Potency → 1 / Flat → 0 without matching Training node. Deferred since Group 2.
+- **Cumulative Disadvantage** — second+ different pool targeted in the same turn should stack Disadvantage. Deferred since Group 1.

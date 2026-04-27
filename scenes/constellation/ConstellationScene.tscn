@@ -98,6 +98,3 @@ theme_override_font_sizes/font_size = 15
 [node name="BackButton" type="Button" parent="Main/Footer"]
 text = "Back to Battle"
 size_flags_horizontal = 3
-
-[node name="ResetButton" type="Button" parent="Main/Footer"]
-text = "Reset (Debug)"

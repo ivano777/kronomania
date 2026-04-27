@@ -72,7 +72,3 @@ anchor_bottom = 1.0
 layout_mode = 2
 text = "Combat Over"
 horizontal_alignment = 1
-
-[node name="RestartButton" type="Button" parent="DefeatPanel/PanelContent" unique_id=9048855]
-layout_mode = 2
-text = "Play Again"

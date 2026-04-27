@@ -68,11 +68,17 @@ func set_fervor(size: int, cap: int, is_burned_out: bool) -> void:
 
 
 func _refresh_wounds(current: int) -> void:
+	# Grow the slot pool if max_wounds exceeds the baked-in scene nodes.
+	while _slot_nodes.size() < _max_wounds:
+		var slot := ColorRect.new()
+		slot.custom_minimum_size = Vector2(22, 22)
+		_wound_slots.add_child(slot)
+		_slot_nodes.append(slot)
+
 	for i in _slot_nodes.size():
 		var slot := _slot_nodes[i]
 		if i < _max_wounds:
 			slot.visible = true
 			slot.color = COLOR_WOUND_FILLED if i < current else COLOR_WOUND_EMPTY
 		else:
-			# Slots beyond max_wounds are hidden (enemy may have fewer than 3).
 			slot.visible = false
