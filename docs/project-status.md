@@ -8,8 +8,8 @@ Tracks what is implemented and what remains. Updated after each feature ships.
 
 ### Core engine
 - **RollEngine** (`autoloads/RollEngine.gd`) — stateless dice resolver.
-  Build Pool → Roll → Keep → Flat → Outcome. Returns `Dictionary` with `dice`, `kept`, `total`, `pool_size`, `die_size`, `keep_count`, `flat`, `fervor_roll`, `fervor_maxed`, `ingenuity_maxed_count`.
-  Optional params: `fervor_size` (additive post-Keep Fervor die), `aspect_stat_size` + `aspect_count` (mixed-pool spells: aspect dice + Ingenuity-tagged dice combined before Keep). `ingenuity_maxed_count` = count of Ingenuity-tagged dice that rolled their max (pre-keep).
+  Build Pool → Roll → Keep → Flat → Outcome. Returns `Dictionary` with `dice`, `kept`, `total`, `pool_size`, `die_size`, `keep_count`, `flat`, `fervor_roll`, `fervor_maxed`, `primary_dice_maxed_count`, `post_keep_bonus_roll`.
+  Optional params: `fervor_size` (additive post-Keep Fervor die), `aspect_stat_size` + `aspect_count` (mixed-pool spells: aspect dice + Ingenuity-tagged dice combined before Keep). `primary_dice_maxed_count` = count of primary pool dice that rolled their max (pre-keep). `post_keep_bonus_roll` = result of the post-keep bonus die (Earthshatter).
   Helpers: `is_fast(total, vt)`, `is_massive(attack, guard, defensive_size)`.
 - **CombatantData** (`resources/CombatantData.gd`) — immutable combatant config as a `.tres` Resource.
   Fields: `combatant_name`, `tier`, `dominion_size`, `negation_size`, `ingenuity_size`, `keep_grade`, `velocity_threshold`, `max_wounds`, `equipped_weapon`, `starting_nodes`.
@@ -24,7 +24,7 @@ Tracks what is implemented and what remains. Updated after each feature ships.
   Helpers: `_effective_tier()`, `_training_keep_grade()`, `_physical_keep_grade()`, `_attack_flat()`, `_guard_flat()`, `_escalate_fervor()`, `_stat_size(state, stat)`, `_node_effect_max()`, `_node_effect_sum()`, `_node_weapon_bonus_sum()`, `_wounds_node_bonus()`, `_meat_grinder_charges()`.
   At `start_combat()`, player's `node_levels`, `tier_override`, magic flags, and known spell lists are read from `PlayerProgression`. Initial `fervor_changed` signal emitted before first round.
   Round loop: `_begin_round → player_chose_strike / _cantrip(spell) / _spell(spell) → _resolve_round_* → _resolve_attack × 2 → loop`.
-  Escalation: `steps = ingenuity_maxed_count + (1 if fervor_maxed)` — multiple steps possible per cast.
+  Escalation: `steps = primary_dice_maxed_count + (1 if fervor_maxed)` — multiple steps possible per cast.
   Signals: `fervor_changed(is_player, fervor_size, fervor_cap, is_burned_out)`, `player_magic_available(can_cantrip, can_cast_spell)`, `player_massive_incoming(charges_left)`.
 - **PlayerProgression** (`autoloads/PlayerProgression.gd`) — singleton owning Constellation state across scenes.
   `ALL_NODES` catalog (50 nodes), `node_levels: Dictionary` (NodeData → int), `available_points`, `tier_combat_spent`, `tier_flavor_spent`, `equipped_weapon: EquipmentData`, `AVAILABLE_WEAPONS` array.
@@ -134,7 +134,7 @@ Ordered by dependency. Items within a group can be parallelized.
   *Deferred: cantrip count formula (known slots).*
 - [x] **True spells** — `SpellData` resource with per-spell resolution: `aspect_stat`, `aspect_dice`, `target_pool`, `flat_bonus`. Mixed pools (aspect + Ingenuity dice). Escalation steps = Ingenuity-tagged dice that maxed + (1 if Fervor die maxed). Spell selection popup in RoundHUD. `player_chose_spell(spell: SpellData)`.
   Sample spells: Arcane Bolt (pure Ingenuity, stance), Fireball (Dominion×1 + Ingenuity, stance), Charm (pure Ingenuity, resolve), Cantrip Spark (cantrip, stance).
-  `NodeData` gains `@export var spell: SpellData`. `PlayerProgression.get_known_spells()` / `get_known_cantrips()`. `RollEngine.resolve()` gains `aspect_stat_size` and `aspect_count` params; returns `ingenuity_maxed_count`.
+  `NodeData` gains `@export var spell: SpellData`. `PlayerProgression.get_known_spells()` / `get_known_cantrips()`. `RollEngine.resolve()` gains `aspect_stat_size` and `aspect_count` params; returns `primary_dice_maxed_count`.
   *Deferred: multiple real Fervor dice, Fervor persistence across combats (Group 5), cantrip count formula.*
 
 ### Group 4.5 — Spell school system
@@ -263,7 +263,7 @@ Create under `resources/data/nodes/dominion/`:
 
 Small, self-contained items that were deferred during Group 4.8 and have no remaining blockers.
 
-- [x] **Space Domination** (Melee L2) — `space_domination_active: bool` on `CombatantState`; when `dom_melee` L2 is purchased, grants Advantage on the player's next Stamina guard roll each combat; flag cleared once triggered. Wired in `CombatManager._begin_round()` / `_resolve_attack()`.
+- [x] **Space Domination** (Melee L2) — `space_domination_active: bool` on `CombatantState`; when `dom_melee` L2 is purchased, grants Advantage on the player's next Stamina guard roll each combat; flag cleared once triggered. Wired in `CombatManager.start_combat()` / `_resolve_attack()`.
 
 ### Group 6 — Polish
 - [x] **Save / load** — `SaveManager` autoload; 3 JSON slot files at `user://saves/slot_{n}.json`; Hub save/load UI; auto-save on return from dungeon. `PlayerProgression.serialize/deserialize`, `DungeonManager.serialize/deserialize`.
