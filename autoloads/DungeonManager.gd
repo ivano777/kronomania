@@ -3,14 +3,19 @@
 extends Node
 
 const ENCOUNTERS: Array = [
-	[preload("res://resources/data/enemy_grunt.tres")],                         # 0 — solo Grunt
-	[preload("res://resources/data/enemies/enemy_soldier.tres")],               # 1 — solo Soldier
-	[preload("res://resources/data/enemy_grunt.tres"),                          # 2 — parallel Grunts
-	 preload("res://resources/data/enemy_grunt.tres")],
-	[preload("res://resources/data/enemies/enemy_knight.tres")],                # 3 — solo Knight
+	[preload("res://resources/data/enemy_grunt.tres")],                         # 0 — chain: Grunt #1
+	[preload("res://resources/data/enemy_grunt.tres")],                         # 1 — chain: Grunt #2
+	[preload("res://resources/data/enemies/enemy_soldier.tres")],               # 2 — chain: Soldier → Hub
+	[preload("res://resources/data/enemy_grunt.tres")],                         # 3 — chain: Grunt #1
+	[preload("res://resources/data/enemy_grunt.tres")],                         # 4 — chain: Grunt #2
+	[preload("res://resources/data/enemies/enemy_soldier.tres")],               # 5 — chain: Soldier → Hub
+	[preload("res://resources/data/enemy_grunt.tres"),                          # 6 — parallel: Grunt + Grunt + Soldier
+	 preload("res://resources/data/enemy_grunt.tres"),
+	 preload("res://resources/data/enemies/enemy_soldier.tres")],
+	[preload("res://resources/data/enemies/enemy_knight.tres")],                # 7 — solo Knight
 ]
 
-const ENCOUNTER_CHAIN: Array = [false, false, false, false]
+const ENCOUNTER_CHAIN: Array = [true, true, false, true, true, false, false, false]
 
 const POINTS_PER_VICTORY: int = 1
 
