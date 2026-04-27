@@ -81,6 +81,7 @@ class CombatantState:
 	var known_spells: Array   = []  # Array[SpellData] — non-cantrip spells, player only
 	var known_cantrips: Array = []  # Array[SpellData] — cantrip spells, player only
 	var stamina_degrade_charges: int = 0  # Meat for the Grinder: charges to degrade Massive Wounds
+	var space_domination_active: bool = false  # Melee L2: Advantage on first Stamina guard roll each combat
 
 	func init(d: CombatantData) -> void:
 		data = d
@@ -96,6 +97,7 @@ class CombatantState:
 		has_minor_studies = false
 		has_spellcasting = false
 		stamina_degrade_charges = 0
+		space_domination_active = false
 		reset_guard()
 
 	func reset_guard() -> void:
@@ -152,6 +154,7 @@ func start_combat(player_data: CombatantData, enemy_data: CombatantData) -> void
 	_player.max_wounds += _tier_wound_bonus(_player.tier_override)
 	_player.max_wounds += _wounds_node_bonus(_player)
 	_player.stamina_degrade_charges = _meat_grinder_charges(_player)
+	_player.space_domination_active = _has_effect_type(_player, "space_domination")
 	wounds_changed.emit(true, _player.current_wounds, _player.max_wounds)
 	_player.has_minor_studies = _has_effect_type(_player, "minor_studies")
 	_player.has_spellcasting  = _has_effect_type(_player, "spellcasting")
@@ -489,9 +492,15 @@ func _resolve_attack(attacker_is_player: bool, attack_result: Dictionary, target
 	# Each pool may only be rolled once per round (rules: defense-and-guard.md).
 	# If already rolled, reuse the existing Guard value.
 	if not defender.is_pool_rolled(target_pool):
+		var sd_adv := 0
+		if defender_is_player and target_pool == "stamina" and _player.space_domination_active:
+			sd_adv = 1
+			_player.space_domination_active = false
+			log_message.emit("  [color=cyan]Space Domination: Advantage on Stamina guard![/color]")
 		var def_result := RollEngine.resolve(
 				_effective_tier(defender), defensive_size,
-				_training_keep_grade(defender), _guard_flat(defender)
+				_training_keep_grade(defender), _guard_flat(defender),
+				sd_adv
 			)
 		var guard_val: int = def_result.total as int
 		defender.set_guard_val(target_pool, guard_val)
