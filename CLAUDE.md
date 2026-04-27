@@ -78,7 +78,7 @@ Ask the user to run `/ship`.
 ## Project structure
 
 ```
-autoloads/          # RollEngine (dice), CombatManager (combat SM), PlayerProgression (constellation), DungeonManager (run state)
+autoloads/          # RollEngine (dice), CombatManager (combat SM), PlayerProgression (constellation), DungeonManager (run state), SaveManager (save/load), DebugManager (debug toggle)
 resources/          # Resource class definitions (.gd) + data/ (.tres files) — see project-index.md
 scenes/hub/         # HubScene (main entry, rest/recovery, run navigation)
 scenes/battle/      # BattleScene (1v1 combat), CombatantHUD, RoundHUD, Combatant
@@ -98,27 +98,27 @@ docs/               # project-status.md (roadmap), project-index.md (generated c
 
 `CombatantData` is **immutable config** only. All runtime state lives inside `CombatManager.CombatantState`, an inner class instantiated per combat. Scene nodes hold no game state.
 
-`CombatantState` fields: `data` (CombatantData), `current_wounds`, `max_wounds`, `is_defeated`, `node_levels: Dictionary` (NodeData → int), `tier_override`, `weapon_override`, `stamina_degrade_charges` (Meat for the Grinder charges), plus per-pool guard state (`stance_guard`, `resolve_guard`, `stamina_guard`, and matching `_rolled` booleans), plus magic state (`fervor_size`, `is_burned_out`, `has_minor_studies`, `has_spellcasting`, `known_spells: Array`, `known_cantrips: Array`). Methods: `init()`, `reset_guard()`, `get_guard(pool)`, `set_guard_val(pool, value)`, `is_pool_rolled(pool)`, `set_pool_rolled(pool, value)`.
+`CombatantState` fields: `data` (CombatantData), `current_wounds`, `max_wounds`, `is_defeated`, `node_levels: Dictionary` (NodeData → int), `tier_override`, `weapon_override`, `stamina_degrade_charges` (Meat for the Grinder charges), `space_domination_active: bool`, plus per-pool guard state (`stance_guard`, `resolve_guard`, `stamina_guard`, and matching `_rolled` booleans), plus magic state (`fervor_size`, `is_burned_out`, `has_minor_studies`, `has_spellcasting`, `known_spells: Array`, `known_cantrips: Array`). Methods: `init()`, `reset_guard()`, `get_guard(pool)`, `set_guard_val(pool, value)`, `is_pool_rolled(pool)`, `set_pool_rolled(pool, value)`.
 
 ### Autoload singletons
 
 Signatures and signals are in `docs/project-index.md`. Architectural gotchas:
 - **`RollEngine`** — stateless. Returns `Dictionary`; always cast values with `as int` / `as Array` — the type inferencer cannot infer through `Dictionary`. `resolve()` accepts optional `fervor_size` (additive post-Keep Fervor die), `aspect_stat_size` and `aspect_count` (for mixed-pool spells), `post_keep_bonus_size` (additive post-Keep bonus die, e.g. Earthshatter). Returns `primary_dice_maxed_count` (Fervor escalation) and `post_keep_bonus_roll` (Earthshatter die result).
-- **`CombatManager`** — all output via signals; nothing returned. Disconnect all signals before `reload_current_scene()`. Signals: `fervor_changed(is_player, fervor_size, fervor_cap, is_burned_out)`, `player_magic_available(can_cantrip, can_cast_spell)`, `player_massive_incoming(charges_left)`. Public methods: `start_combat(player_data: CombatantData, enemy_data: CombatantData)`, `player_chose_strike(net_advantage, target_pool, brutal_trade)`, `player_chose_cantrip(spell: SpellData)`, `player_chose_spell(spell: SpellData)`, `player_chose_degrade_wound(use_charge: bool)`, `debug_set_fervor(size, burned_out)`.
-- **`PlayerProgression`** — constellation state; read by `CombatManager` at `start_combat()`. `ALL_NODES` catalog (now includes 11 Dominion nodes; old core_dominion_1/2 replaced by dom_core). `get_known_spells()` and `get_known_cantrips()` iterate all purchased `node_levels`, collect from `levels_data[0..level-1].spells`. `get_node_level_by_id(id)` looks up a node by string ID and returns its current level (0 if absent). **Fervor persistence** (Group 5): `saved_fervor_size` / `saved_is_burned_out` fields written by `CombatManager._end_combat()`, read by `start_combat()`. Methods: `apply_long_rest()` (reset fervor + clear burnout), `apply_recovery()` (clear burnout only), `grant_points(n)`.
-- **`DungeonManager`** — run state: `start_run()`, `current_enemy() → CombatantData`, `on_victory()` (grants 1 point + advances index), `on_defeat()`, `has_next_enemy()`, `is_run_complete()`. Hard-coded roster: Grunt → Soldier → Knight.
+- **`CombatManager`** — all output via signals; nothing returned. Disconnect all signals before `reload_current_scene()`. Signals: `fervor_changed(is_player, fervor_size, fervor_cap, is_burned_out)`, `player_magic_available(can_cantrip, can_cast_spell)`, `player_massive_incoming(charges_left)`. Public methods: `start_combat(player_data: CombatantData, enemies_data: Array)`, `player_chose_strike(net_advantage, target_pool, brutal_trade)`, `player_chose_cantrip(spell: SpellData)`, `player_chose_spell(spell: SpellData)`, `player_chose_degrade_wound(use_charge: bool)`, `debug_set_fervor(size, burned_out)`.
+- **`PlayerProgression`** — constellation state; read by `CombatManager` at `start_combat()`. `ALL_NODES` catalog (now includes 11 Dominion nodes; old core_dominion_1/2 replaced by dom_core). `get_known_spells()` and `get_known_cantrips()` iterate all purchased `node_levels`, collect from `levels_data[0..level-1].spells`. `get_node_level_by_id(id)` looks up a node by string ID and returns its current level (0 if absent). **Fervor persistence** (Group 5): `saved_fervor_size` / `saved_is_burned_out` / `saved_wounds` fields written by `CombatManager._end_combat()`, read by `start_combat()` (`saved_wounds` carries wounds between chained encounters). Methods: `reset()`, `apply_long_rest()` (reset fervor + clear burnout), `apply_recovery()` (clear burnout only), `grant_points(n)`, `set_weapon(w)`, `debug_set_points(n)`, `debug_set_tier(t)`.
+- **`DungeonManager`** — run state: `start_run()`, `current_enemies() → Array`, `on_victory()` (grants 1 point + advances index), `on_defeat()`, `has_next_enemy()`, `is_run_complete()`, `was_last_fight_chained()`, `enemies_cleared()`, `enemies_total()`. Hard-coded 8-encounter sequence: Grunt→Grunt→Soldier (chained, return to Hub after Soldier), Grunt→Grunt→Soldier (chained), Grunt+Grunt+Soldier (parallel), Knight (solo).
 
 ### Round loop (CombatManager)
 
 ```
 _begin_round()
-  → resets both guards to 0
+  → resets all three guard pools to 0 (stance, resolve, stamina) for player and all enemies
   → emits player_magic_available(can_cantrip, can_cast_spell)
   → emits player_action_required
   → (player presses Strike / Cantrip / Spell → BattleScene calls player_chose_strike / _cantrip / _spell)
   → _resolve_round / _resolve_round_cantrip / _resolve_round_spell
   → rolls both attacks, VT check, _resolve_attack() × 2
-  → [spell only] _escalate_fervor() if Fervor die maxed
+  → [spell only] _escalate_fervor(steps) where steps = primary_dice_maxed_count + (1 if fervor_maxed)
   → await 0.8s timer
   → _begin_round()  ← loops until defeat
 ```
@@ -149,7 +149,7 @@ Group 4 implements Fervor / Burnout / Cantrips / True Spells with per-spell `Spe
 ### Spell school system (implemented — Groups 4.5 A + B)
 
 **Phase A — Core stat nodes (implemented):**
-- Core nodes (`core_negation_1/2`, `core_ingenuity_1/2`, and now `dom_core` L1–L3 for Dominion) grant stat size upgrades via `effect_type="stat_size_<stat>"` and `effect_value`.
+- Core nodes (`dom_core` L1–L3, `neg_core` L1–L3, `ing_core` L1–L3) grant stat size upgrades via `effect_type="stat_size_<stat>"` and `effect_value`.
 - `CombatManager._stat_size(state, stat)` — reads base from `CombatantData`, returns highest `effect_value` across all purchased `NodeLevelData` entries for `"stat_size_<stat>"`.
 
 **Phase B — Spell schools (implemented):**
@@ -193,7 +193,7 @@ Group 4 implements Fervor / Burnout / Cantrips / True Spells with per-spell `Spe
 | `_resolve_round*` in CombatManager | Called without `await` from `player_chose_*` | Intentional coroutine pattern — runs cooperatively on main thread, yields at the timer |
 | `global_script_class_cache.cfg` | May be stale after adding a new `class_name` | Must be updated manually when Godot editor hasn't been opened — headless runner uses the cached index |
 | `EquipmentData` flat bonuses | Applied unconditionally regardless of training | Inefficiency rule (Potency → 1 without training) is deferred to Group 3 |
-| Per-pool guard state in `CombatantState` | Three separate guard/rolled pairs | Will become richer (cumulative Disadvantage) in Group 4; current structure is intentional |
+| Per-pool guard state in `CombatantState` | Three separate guard/rolled pairs | Intentional; cumulative Disadvantage on second+ pool pressure is deferred to a future group (see project-status.md Future section) |
 | `debug_set_player_weapon` on `CombatManager` | Public method with "debug" in name on a production autoload | Used by `DebugWeaponSelector`; safe because it's null-guarded at the call site |
 
 ## Game rules summary
@@ -226,4 +226,4 @@ The rules live in `docs/game-rules/`. The implementation must match them exactly
 | Meat for the Grinder | `stamina_degrade_charges` on `CombatantState` (from `dom_meat_grinder`). When Massive Wound would hit player, `player_massive_incoming` emitted; RoundHUD shows prompt; player can spend charge → 1 Wound instead of 2. |
 | Wounds Training | `dom_wounds` NodeLevelData entries (effect_type="training_wounds", effect_value=1 each) summed by `_wounds_node_bonus()` at `start_combat()`. |
 
-Next unimplemented feature: Group 6 — Polish (art pass, sound, save/load).
+Next unimplemented items: Group 6 remainder — Art pass (replace placeholder visuals with sprites/animations) and Sound (SFX for attack, guard break, wound, defeat).

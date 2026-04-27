@@ -46,11 +46,9 @@ Tracks what is implemented and what remains. Updated after each feature ships.
 
 ### Data
 - `resources/data/player_default.tres` — Tier 1, dominion_size=4 (d4 base; upgraded via dom_core), negation_size=4, ingenuity_size=4, max wounds 3; equipped with Iron Sword. `starting_nodes` present but overridden by `PlayerProgression` at combat init.
-- `resources/data/nodes/training_keep_1.tres` — Training, keep grade 1 (wired).
-- `resources/data/nodes/training_keep_2.tres` — Training, keep grade 2 (wired).
 - `resources/data/nodes/ability_minor_studies.tres` — Ability, effect_type="minor_studies", gates cantrip button; carries `spells=[cantrip_spark, arcane_touch]`.
 - `resources/data/nodes/ability_spellcasting.tres` — Ability, effect_type="spellcasting", gates true spell button; prerequisite: Minor Studies (wired).
-- `resources/data/spells/arcane_bolt.tres`, `charm.tres`, `cantrip_spark.tres` — SpellData files (orphaned; not in ALL_NODES; superseded by school node spells).
+- `resources/data/spells/cantrip_spark.tres` — SpellData (orphaned; not in ALL_NODES; superseded by school node spells).
 - `resources/data/spells/fireball.tres` — SpellData, tags=["fire"], used by Fire Magic III.
 - `resources/data/spells/sparks.tres` — cantrip, fire tag, stance (Fire Magic I).
 - `resources/data/spells/arcane_touch.tres` — cantrip, arcane tag, resolve (Minor Studies).
@@ -67,10 +65,9 @@ Tracks what is implemented and what remains. Updated after each feature ships.
 - `resources/data/nodes/arcane_1.tres` — Ability, spells=[arcane_missile], prereq=spellcasting.
 - `resources/data/nodes/arcane_2.tres` — Ability, spells=[mind_spike], prereq=arcane_1.
 - `resources/data/nodes/arcane_3.tres` — Ability, spells=[void_bolt], prereq=arcane_2.
-- `resources/data/nodes/ability_sure_footed.tres` — Ability, flavor node.
 - `resources/data/nodes/flavor_warrior_oath.tres` — Flavor, flavor node.
-- `resources/data/enemy_grunt.tres` — Tier 1, d6 off / d4 def, keep grade 0, VT 10, max wounds 2; equipped with Crude Club.
-- `resources/data/weapons/iron_sword.tres` — Potency 1, Forging I (+1 flat attack), tags ["Sharp"].
+- `resources/data/enemy_grunt.tres` — Tier 1, d4 off / d4 def, keep grade 0, VT 10, max wounds 2; equipped with Crude Club.
+- `resources/data/weapons/iron_sword.tres` — Potency 2, Forging I (+1 flat attack), tags ["Sharp"].
 - `resources/data/weapons/crude_club.tres` — Potency 1, no bonuses, tags ["Blunt"].
 - `resources/data/weapons/greatsword.tres` — Potency 2, Forging I (+1 flat attack), tags ["Sharp", "TwoHanded"].
 - `resources/data/nodes/dominion/dom_core.tres` — Core, max_levels=3; stat_size_dominion d6/d8/d10.
@@ -123,10 +120,10 @@ Ordered by dependency. Items within a group can be parallelized.
 
 ### Group 3 — Progression / Constellation
 - [x] **Node resource** — `NodeData` (`resources/NodeData.gd`): `node_name`, `category`, `effect_type`, `effect_value`. Sample nodes: `training_keep_1.tres`, `training_keep_2.tres`.
-- [x] **Keep grade from Training nodes** — `CombatantData.starting_nodes: Array[NodeData]` loaded into `CombatantState.unlocked_nodes`. `CombatManager._training_keep_grade()` scans for `"training_keep"` nodes; `keep_grade` remains as fallback. Debug widget `DebugNodeSelector` lets you swap grades mid-combat.
+- [x] **Keep grade from Training nodes** — `CombatantData.starting_nodes: Array[NodeData]` loaded into `CombatantState.unlocked_nodes`. `CombatManager._training_keep_grade()` scans for `"training_keep"` nodes; `keep_grade` remains as fallback. Debug widget `DebugProgressionControl` lets you inspect and modify progression state at runtime.
 - [x] **Constellation scene** — `ConstellationScene` (`scenes/constellation/`). 4-column node grid, point-spend unlock, tier badge. `PlayerProgression` autoload persists state across scenes.
 - [x] **Tier advancement** — `PlayerProgression.get_tier()` breadth check (min nodes per category + 1). `CombatantState.tier_override` propagates tier into `_effective_tier()` at combat start.
-- [x] **Node prerequisites** — `NodeData.prerequisite: NodeData` (optional). `PlayerProgression.can_unlock()` blocks purchase if the prerequisite is not yet unlocked. `training_keep_2.tres` requires `training_keep_1.tres`.
+- [x] **Node prerequisites** — `NodeData.prerequisite: NodeData` (optional). `PlayerProgression.can_unlock()` blocks purchase if the prerequisite is not yet unlocked. `training_keep_2.tres` requires `training_keep_1.tres`. _(superseded by Group 4.8: `NodeLevelData.prerequisites: Array[Dictionary]` and `can_upgrade()`)_
   *Deferred: point gains from rewards (Group 5 reward loop), stat size effects for Core/Ability nodes.*
 
 ### Group 4 — Magic system
@@ -260,7 +257,7 @@ Create under `resources/data/nodes/dominion/`:
 - [x] **Rest / recovery** — `PlayerProgression.apply_long_rest()` (reset Fervor to d4 + clear Burnout) and `apply_recovery()` (clear Burnout only). Fervor now persists via `saved_fervor_size` / `saved_is_burned_out` fields on PlayerProgression; written by `CombatManager._end_combat()`, read by `start_combat()`.
 - [x] **Enemy roster** — Grunt (existing Minion) + `enemy_soldier.tres` (Standard: d6/d6, VT 12, 3 wounds) + `enemy_knight.tres` (Elite: d8/d8, VT 15, 4 wounds, keep 1).
 - [x] **Reward loop** — `DungeonManager.on_victory()` calls `PlayerProgression.grant_points(1)` per kill. Starting `available_points = 3`.
-- [x] **Dungeon / encounter flow** — `DungeonManager` autoload: `start_run()`, `current_enemy()`, `on_victory()` / `on_defeat()`, `has_next_enemy()`. Hard-coded 3-enemy sequence: Grunt → Soldier → Knight. BattleScene reads current enemy from DungeonManager; auto-navigates to Hub after 1.5 s result display.
+- [x] **Dungeon / encounter flow** — `DungeonManager` autoload: `start_run()`, `current_enemies()`, `on_victory()` / `on_defeat()`, `has_next_enemy()`, `was_last_fight_chained()`. Hard-coded 8-encounter sequence: Grunt→Grunt→Soldier (chained), Grunt→Grunt→Soldier (chained), Grunt+Grunt+Soldier (parallel), Knight (solo). BattleScene reads current enemies from DungeonManager; auto-navigates to Hub after 1.5 s result display.
 
 ### Group 5.5 — Mechanics completion (deferred from 4.8)
 
