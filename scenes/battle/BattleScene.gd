@@ -38,6 +38,10 @@ func _ready() -> void:
 	# Set up HUDs with initial data. Player HUD shows the Fervor row.
 	_player_hud.setup(PLAYER_DATA, true)
 	_enemy_hud.setup(_enemy_data, false)
+	var _eff_weapon: EquipmentData = PlayerProgression.equipped_weapon \
+		if PlayerProgression.equipped_weapon != null else PLAYER_DATA.equipped_weapon
+	_player_hud.set_weapon_display(_eff_weapon)
+	_enemy_hud.set_weapon_display(_enemy_data.equipped_weapon)
 
 	if _debug_equip:
 		_debug_equip.setup(PLAYER_DATA, _enemy_data)

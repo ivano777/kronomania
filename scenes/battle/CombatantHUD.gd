@@ -16,12 +16,15 @@ const COLOR_WOUND_HIDDEN := Color(0.0, 0.0, 0.0, 0.0)
 
 var _slot_nodes: Array[ColorRect] = []
 var _max_wounds: int = 3
+var _weapon_label: Label
 
 
 func _ready() -> void:
 	for child in _wound_slots.get_children():
 		if child is ColorRect:
 			_slot_nodes.append(child as ColorRect)
+	_weapon_label = Label.new()
+	add_child(_weapon_label)
 
 
 # Call once after instantiation to bind combatant data.
@@ -48,6 +51,14 @@ func set_guard(pool: String, value: int) -> void:
 		"stance":  _stance_value.text  = str(value)
 		"resolve": _resolve_value.text = str(value)
 		"stamina": _stamina_value.text = str(value)
+
+
+func set_weapon_display(weapon: EquipmentData) -> void:
+	if weapon == null:
+		_weapon_label.text = ""
+		return
+	var tags := ", ".join(Array(weapon.tags)) if weapon.tags.size() > 0 else "—"
+	_weapon_label.text = "%s  [%s]" % [weapon.item_name, tags]
 
 
 # Update the Fervor row. Only meaningful for the player HUD.

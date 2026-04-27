@@ -49,6 +49,14 @@ const ALL_NODES: Array = [
 	preload("res://resources/data/nodes/flavors/flavor_duel_veteran.tres"),
 ]
 
+const AVAILABLE_WEAPONS: Array = [
+	preload("res://resources/data/weapons/iron_sword.tres"),
+	preload("res://resources/data/weapons/greatsword.tres"),
+]
+
+## Currently equipped weapon. null = fall back to player_default.tres equipped_weapon.
+var equipped_weapon: EquipmentData = null
+
 ## node_levels: NodeData → int (0 = not yet purchased, 1..max_levels = current level).
 var node_levels: Dictionary = {}
 ## Starting budget; +1 granted per combat victory (Group 5 reward loop).
@@ -124,6 +132,7 @@ func reset() -> void:
 	available_points = 3
 	saved_fervor_size = 4
 	saved_is_burned_out = false
+	equipped_weapon = null
 
 
 func apply_long_rest() -> void:
@@ -133,6 +142,10 @@ func apply_long_rest() -> void:
 
 func apply_recovery() -> void:
 	saved_is_burned_out = false
+
+
+func set_weapon(w: EquipmentData) -> void:
+	equipped_weapon = w
 
 
 func grant_points(amount: int) -> void:

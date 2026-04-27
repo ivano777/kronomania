@@ -143,6 +143,10 @@ var _waiting_for_player: bool = false
 func start_combat(player_data: CombatantData, enemy_data: CombatantData) -> void:
 	_player = CombatantState.new()
 	_player.init(player_data)
+	if PlayerProgression.equipped_weapon != null:
+		var old_fort: int = player_data.equipped_weapon.max_wounds_bonus if player_data.equipped_weapon else 0
+		_player.max_wounds += PlayerProgression.equipped_weapon.max_wounds_bonus - old_fort
+		_player.weapon_override = PlayerProgression.equipped_weapon
 	_player.node_levels = PlayerProgression.node_levels.duplicate()
 	_player.tier_override = PlayerProgression.get_tier()
 	_player.max_wounds += _tier_wound_bonus(_player.tier_override)

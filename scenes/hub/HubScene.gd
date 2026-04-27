@@ -8,6 +8,8 @@ const _PLAYER_DATA := preload("res://resources/data/player_default.tres")
 var _tier_label: Label
 var _fervor_label: Label
 var _stats_label: Label
+var _equip_label: Label
+var _weapon_btns: Array[Button] = []
 var _run_label: Label
 var _continue_btn: Button
 var _start_run_btn: Button
@@ -41,6 +43,22 @@ func _ready() -> void:
 
 	_stats_label = Label.new()
 	vbox.add_child(_stats_label)
+
+	var equip_header := Label.new()
+	equip_header.text = "Equipment"
+	vbox.add_child(equip_header)
+
+	_equip_label = Label.new()
+	vbox.add_child(_equip_label)
+
+	var weapon_row := HBoxContainer.new()
+	vbox.add_child(weapon_row)
+	for w in PlayerProgression.AVAILABLE_WEAPONS:
+		var btn := Button.new()
+		btn.text = (w as EquipmentData).item_name
+		btn.pressed.connect(_on_equip_weapon.bind(w))
+		weapon_row.add_child(btn)
+		_weapon_btns.append(btn)
 
 	vbox.add_child(HSeparator.new())
 
@@ -101,6 +119,18 @@ func _refresh() -> void:
 	var ing := _effective_stat_size("ingenuity")
 	_stats_label.text = "Dominion: d%d  |  Negation: d%d  |  Ingenuity: d%d" % [dom, neg, ing]
 
+	var eff_weapon: EquipmentData = PlayerProgression.equipped_weapon \
+		if PlayerProgression.equipped_weapon != null \
+		else _PLAYER_DATA.equipped_weapon
+	if eff_weapon:
+		var tags := ", ".join(Array(eff_weapon.tags)) if eff_weapon.tags.size() > 0 else "—"
+		_equip_label.text = "%s  |  Potency %d  |  Atk +%d  |  [%s]" \
+			% [eff_weapon.item_name, eff_weapon.potency, eff_weapon.flat_attack_bonus, tags]
+	else:
+		_equip_label.text = "No weapon"
+	for i in _weapon_btns.size():
+		_weapon_btns[i].disabled = (PlayerProgression.AVAILABLE_WEAPONS[i] == eff_weapon)
+
 	var run_text: String
 	if DungeonManager.run_active:
 		run_text = "Run in progress  (%d / %d cleared)" \
@@ -115,6 +145,11 @@ func _refresh() -> void:
 
 	_continue_btn.visible = DungeonManager.has_next_enemy()
 	_start_run_btn.visible = not DungeonManager.run_active
+
+
+func _on_equip_weapon(w: EquipmentData) -> void:
+	PlayerProgression.set_weapon(w)
+	_refresh()
 
 
 func _on_long_rest() -> void:
@@ -161,7 +196,9 @@ func _effective_stat_size(stat: String) -> int:
 func _max_wounds() -> int:
 	var tier  := PlayerProgression.get_tier()
 	var base  := _PLAYER_DATA.max_wounds
-	var equip := _PLAYER_DATA.equipped_weapon.max_wounds_bonus if _PLAYER_DATA.equipped_weapon else 0
+	var eff_w: EquipmentData = PlayerProgression.equipped_weapon \
+		if PlayerProgression.equipped_weapon != null else _PLAYER_DATA.equipped_weapon
+	var equip := eff_w.max_wounds_bonus if eff_w else 0
 	var bonus := 0
 	for node in PlayerProgression.node_levels.keys():
 		var lvl: int = PlayerProgression.node_levels[node]
