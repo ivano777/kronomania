@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="NodeData" format=3 uid="uid://flv_wanderer05"]
+
+[ext_resource type="Script" path="res://resources/NodeData.gd" id="1_ndscr"]
+[ext_resource type="Script" path="res://resources/NodeLevelData.gd" id="2_ldscr"]
+
+[sub_resource type="Resource" id="Level_1"]
+script = ExtResource("2_ldscr")
+level_index = 1
+cost = 1
+required_tier = 1
+level_effect_description = "Years of drifting have honed your instincts past any academy's teaching."
+
+[resource]
+script = ExtResource("1_ndscr")
+node_id = "wanderer"
+display_name = "Wanderer's Road"
+category = "Flavor"
+base_description = "Years of drifting have honed your instincts past any academy's teaching."
+max_levels = 1
+levels_data = [SubResource("Level_1")]

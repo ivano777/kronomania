@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="NodeData" format=3 uid="uid://flv_blood_debt02"]
+
+[ext_resource type="Script" path="res://resources/NodeData.gd" id="1_ndscr"]
+[ext_resource type="Script" path="res://resources/NodeLevelData.gd" id="2_ldscr"]
+
+[sub_resource type="Resource" id="Level_1"]
+script = ExtResource("2_ldscr")
+level_index = 1
+cost = 1
+required_tier = 1
+level_effect_description = "An unpaid oath drives you into the arena again and again."
+
+[resource]
+script = ExtResource("1_ndscr")
+node_id = "blood_debt"
+display_name = "Blood Debt"
+category = "Flavor"
+base_description = "An unpaid oath drives you into the arena again and again."
+max_levels = 1
+levels_data = [SubResource("Level_1")]
