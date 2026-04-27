@@ -8,8 +8,10 @@ const _DBG_PROGRESSION := "res://scenes/debug/DebugProgressionControl.tscn"
 @onready var _budget_label: Label = $Main/BudgetLabel
 @onready var _back_btn: Button = $Main/Footer/BackButton
 @onready var _tab_container: TabContainer = $Main/TabContainer
-@onready var _line_layer: Control = $Main/TabContainer/Skills/LineLayer
-@onready var _card_layer: Control = $Main/TabContainer/Skills/CardLayer
+@onready var _skills_panel: Control = $Main/TabContainer/Skills
+@onready var _canvas: Control     = $Main/TabContainer/Skills/Canvas
+@onready var _line_layer: Control = $Main/TabContainer/Skills/Canvas/LineLayer
+@onready var _card_layer: Control = $Main/TabContainer/Skills/Canvas/CardLayer
 
 var _node_buttons: Dictionary = {}
 var _node_cards: Dictionary = {}
@@ -19,6 +21,11 @@ var _node_by_id_map: Dictionary = {}
 var _heart_label: Label
 var _expanded_vertex: String = ""
 
+var _zoom: float = 1.0
+var _pan_offset: Vector2 = Vector2.ZERO
+var _is_panning: bool = false
+var _pan_last_mouse: Vector2 = Vector2.ZERO
+
 const DOM_VERTEX := Vector2(450, 60)
 const ING_VERTEX := Vector2(100, 620)
 const NEG_VERTEX := Vector2(800, 620)
@@ -26,7 +33,7 @@ const CENTROID   := Vector2(450, 433)
 const CARD_SIZE  := Vector2(108, 56)
 
 const _ALWAYS_VISIBLE: Dictionary = {
-	"dom_core": true, "ing_core": true, "neg_core": true, "sure_footed": true
+	"dom_core": true, "ing_core": true, "neg_core": true
 }
 const _DOMINION_SUBTREE: Dictionary = {
 	"dom_wounds": true, "dom_martial_arts": true, "dom_melee": true,
@@ -41,29 +48,31 @@ const _INGENUITY_SUBTREE: Dictionary = {
 	"arcane_1": true, "arcane_2": true, "arcane_3": true
 }
 const _NODE_POSITIONS: Dictionary = {
-	"dom_core":         Vector2(396, 70),
-	"ing_core":         Vector2(46, 590),
+	# Always-visible triangle vertices + centre
+	"dom_core":         Vector2(396,  70),
+	"ing_core":         Vector2( 46, 590),
 	"neg_core":         Vector2(746, 590),
-	"sure_footed":      Vector2(396, 388),
-	"dom_wounds":       Vector2(290, 175),
-	"dom_martial_arts": Vector2(540, 175),
-	"dom_melee":        Vector2(465, 270),
-	"dom_ranged":       Vector2(610, 252),
-	"dom_dual_wield":   Vector2(395, 350),
-	"dom_titans_grip":  Vector2(545, 338),
-	"dom_disarm":       Vector2(480, 305),
-	"dom_brutal":       Vector2(605, 428),
-	"dom_meat_grinder": Vector2(300, 408),
-	"dom_earthshatter": Vector2(658, 522),
-	"minor_studies":    Vector2(163, 482),
-	"spellcasting":     Vector2(253, 405),
-	"fire_magic_1":     Vector2(144, 392),
-	"fire_magic_2":     Vector2(196, 308),
-	"fire_magic_3":     Vector2(246, 228),
-	"fire_magic_4":     Vector2(286, 150),
-	"arcane_1":         Vector2(336, 372),
-	"arcane_2":         Vector2(384, 294),
-	"arcane_3":         Vector2(424, 216),
+	# DOM subtree — expands UPWARD (negative Y) from dom_core
+	"dom_wounds":       Vector2(220,  -50),
+	"dom_martial_arts": Vector2(580,  -50),
+	"dom_meat_grinder": Vector2( 70, -170),
+	"dom_melee":        Vector2(460, -170),
+	"dom_ranged":       Vector2(710, -170),
+	"dom_dual_wield":   Vector2(310, -300),
+	"dom_disarm":       Vector2(460, -300),
+	"dom_titans_grip":  Vector2(610, -300),
+	"dom_brutal":       Vector2(610, -430),
+	"dom_earthshatter": Vector2(610, -560),
+	# ING subtree — expands LEFTWARD (negative X) from ing_core, two-row grid
+	"minor_studies":    Vector2(-110, 620),
+	"fire_magic_1":     Vector2(-260, 590),
+	"spellcasting":     Vector2(-260, 670),
+	"fire_magic_2":     Vector2(-420, 590),
+	"arcane_1":         Vector2(-420, 670),
+	"fire_magic_3":     Vector2(-580, 590),
+	"arcane_2":         Vector2(-580, 670),
+	"fire_magic_4":     Vector2(-740, 590),
+	"arcane_3":         Vector2(-740, 670),
 }
 
 const _VERTEX_NAMES: Dictionary = {
@@ -250,8 +259,8 @@ func _draw_connection_lines() -> void:
 			var p_card: PanelContainer = _node_cards.get(parent_nd)
 			if p_card == null or not p_card.visible:
 				continue
-			var from := _NODE_POSITIONS[pid] + CARD_SIZE * 0.5
-			var to   := _NODE_POSITIONS[nd.node_id] + CARD_SIZE * 0.5
+			var from: Vector2 = _NODE_POSITIONS[pid] + CARD_SIZE * 0.5
+			var to: Vector2   = _NODE_POSITIONS[nd.node_id] + CARD_SIZE * 0.5
 			var req_lvl: int = int(prereq.get("required_level", 1))
 			var met := PlayerProgression.get_node_level_by_id(pid) >= req_lvl
 			_add_line(from, to, Color(0.85, 0.70, 0.20) if met else Color(0.30, 0.30, 0.30))
@@ -284,12 +293,81 @@ func _on_vertex_gui_input(event: InputEvent, vertex: String) -> void:
 func _on_vertex_toggle(vertex: String) -> void:
 	_expanded_vertex = "" if _expanded_vertex == vertex else vertex
 	_refresh()
+	_center_after_toggle()
+
+
+func _center_after_toggle() -> void:
+	var ids: Array = []
+	match _expanded_vertex:
+		"dominion":
+			ids = ["dom_core"] + _DOMINION_SUBTREE.keys()
+		"ingenuity":
+			ids = ["ing_core"] + _INGENUITY_SUBTREE.keys()
+		_:
+			ids = _ALWAYS_VISIBLE.keys()
+	_center_on_nodes(ids)
+
+
+func _center_on_nodes(node_ids: Array) -> void:
+	var min_p := Vector2(INF, INF)
+	var max_p := Vector2(-INF, -INF)
+	for nid in node_ids:
+		if nid not in _NODE_POSITIONS:
+			continue
+		var p: Vector2 = _NODE_POSITIONS[nid]
+		min_p = min_p.min(p)
+		max_p = max_p.max(p + CARD_SIZE)
+	if min_p.x == INF:
+		return
+	min_p -= Vector2(30, 30)
+	max_p += Vector2(30, 30)
+	var panel_size := _skills_panel.size
+	var content_size := max_p - min_p
+	_zoom = clamp(minf(panel_size.x / content_size.x, panel_size.y / content_size.y), 0.25, 1.5)
+	_canvas.scale = Vector2(_zoom, _zoom)
+	var content_center := (min_p + max_p) * 0.5 * _zoom
+	_pan_offset = panel_size * 0.5 - content_center
+	_canvas.position = _pan_offset
 
 
 func _max_wounds(tier: int) -> int:
 	var base := _PLAYER_DATA.max_wounds
 	var equip := _PLAYER_DATA.equipped_weapon.max_wounds_bonus if _PLAYER_DATA.equipped_weapon else 0
 	return base + equip + (1 if tier >= 2 else 0) + (1 if tier >= 4 else 0)
+
+
+func _input(event: InputEvent) -> void:
+	if _tab_container.current_tab != 0:
+		return
+	if not _skills_panel.get_global_rect().has_point(get_global_mouse_position()):
+		return
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if mb.button_index == MOUSE_BUTTON_WHEEL_UP and mb.pressed:
+			_do_zoom(1.15)
+			get_viewport().set_input_as_handled()
+		elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN and mb.pressed:
+			_do_zoom(1.0 / 1.15)
+			get_viewport().set_input_as_handled()
+		elif mb.button_index == MOUSE_BUTTON_MIDDLE:
+			_is_panning = mb.pressed
+			_pan_last_mouse = get_global_mouse_position()
+			get_viewport().set_input_as_handled()
+	elif event is InputEventMouseMotion and _is_panning:
+		var delta := get_global_mouse_position() - _pan_last_mouse
+		_pan_last_mouse = get_global_mouse_position()
+		_pan_offset += delta
+		_canvas.position = _pan_offset
+		get_viewport().set_input_as_handled()
+
+
+func _do_zoom(factor: float) -> void:
+	var old_zoom := _zoom
+	_zoom = clamp(_zoom * factor, 0.25, 3.0)
+	var mouse_in_panel := get_global_mouse_position() - _skills_panel.global_position
+	_pan_offset = mouse_in_panel - (mouse_in_panel - _pan_offset) * (_zoom / old_zoom)
+	_canvas.position = _pan_offset
+	_canvas.scale = Vector2(_zoom, _zoom)
 
 
 func _on_unlock(node: NodeData) -> void:

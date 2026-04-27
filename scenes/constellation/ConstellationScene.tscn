@@ -48,16 +48,16 @@ size_flags_vertical = 3
 [node name="Skills" type="Control" parent="Main/TabContainer"]
 anchor_right = 1.0
 anchor_bottom = 1.0
+clip_contents = true
 
-[node name="LineLayer" type="Control" parent="Main/TabContainer/Skills"]
-anchor_right = 1.0
-anchor_bottom = 1.0
+[node name="Canvas" type="Control" parent="Main/TabContainer/Skills"]
+mouse_filter = 2
+
+[node name="LineLayer" type="Control" parent="Main/TabContainer/Skills/Canvas"]
 z_index = 0
 mouse_filter = 2
 
-[node name="CardLayer" type="Control" parent="Main/TabContainer/Skills"]
-anchor_right = 1.0
-anchor_bottom = 1.0
+[node name="CardLayer" type="Control" parent="Main/TabContainer/Skills/Canvas"]
 z_index = 1
 
 [node name="Traits" type="ScrollContainer" parent="Main/TabContainer"]

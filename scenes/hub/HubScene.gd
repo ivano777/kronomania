@@ -25,9 +25,15 @@ func _ready() -> void:
 	margin.add_theme_constant_override("margin_bottom", 24)
 	add_child(margin)
 
+	var scroll := ScrollContainer.new()
+	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	margin.add_child(scroll)
+
 	var vbox := VBoxContainer.new()
+	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vbox.add_theme_constant_override("separation", 14)
-	margin.add_child(vbox)
+	scroll.add_child(vbox)
 
 	var header := Label.new()
 	header.text = "◆  KRONOMANIA — HUB  ◆"

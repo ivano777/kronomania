@@ -57,20 +57,6 @@ func _ready() -> void:
 		PlayerProgression.get_known_cantrips()
 	)
 
-	# Constellation navigation button (top-right corner, always accessible).
-	var c_btn := Button.new()
-	c_btn.text = "Constellation"
-	c_btn.anchor_left   = 1.0
-	c_btn.anchor_right  = 1.0
-	c_btn.anchor_top    = 0.0
-	c_btn.anchor_bottom = 0.0
-	c_btn.offset_left   = -150.0
-	c_btn.offset_top    = 10.0
-	c_btn.offset_right  = -10.0
-	c_btn.offset_bottom = 44.0
-	c_btn.pressed.connect(_on_constellation_pressed)
-	add_child(c_btn)
-
 	# Connect CombatManager signals.
 	CombatManager.log_message.connect(_on_log)
 	CombatManager.round_started.connect(_on_round_started)
@@ -127,13 +113,25 @@ func _on_combat_ended(winner_name: String) -> void:
 	_round_hud.disable_magic()
 	if winner_name == _enemy_data.combatant_name:
 		DungeonManager.on_defeat()
+		_result_label.text = "Defeated by %s..." % winner_name
+		_defeat_panel.show()
+		await get_tree().create_timer(1.5).timeout
+		_teardown_signals()
+		get_tree().change_scene_to_file("res://scenes/hub/HubScene.tscn")
 	else:
 		DungeonManager.on_victory()
-	_result_label.text = "Winner: %s" % winner_name
-	_defeat_panel.show()
-	await get_tree().create_timer(1.5).timeout
-	_teardown_signals()
-	get_tree().change_scene_to_file("res://scenes/hub/HubScene.tscn")
+		if DungeonManager.was_last_fight_chained():
+			_result_label.text = "Another enemy approaches..."
+			_defeat_panel.show()
+			await get_tree().create_timer(0.8).timeout
+			_teardown_signals()
+			get_tree().change_scene_to_file("res://scenes/battle/BattleScene.tscn")
+		else:
+			_result_label.text = "Winner: %s" % winner_name
+			_defeat_panel.show()
+			await get_tree().create_timer(1.5).timeout
+			_teardown_signals()
+			get_tree().change_scene_to_file("res://scenes/hub/HubScene.tscn")
 
 
 func _on_player_action_required() -> void:
@@ -167,11 +165,6 @@ func _on_cantrip_selected(spell: SpellData) -> void:
 
 func _on_spell_selected(spell: SpellData) -> void:
 	CombatManager.player_chose_spell(spell)
-
-
-func _on_constellation_pressed() -> void:
-	_teardown_signals()
-	get_tree().change_scene_to_file("res://scenes/constellation/ConstellationScene.tscn")
 
 
 func _teardown_signals() -> void:

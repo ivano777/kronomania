@@ -6,7 +6,18 @@ extends Node
 const ENEMY_ROSTER: Array = [
 	preload("res://resources/data/enemy_grunt.tres"),
 	preload("res://resources/data/enemies/enemy_soldier.tres"),
+	preload("res://resources/data/enemy_grunt.tres"),       # wave — entry 1
+	preload("res://resources/data/enemy_grunt.tres"),       # wave — entry 2
 	preload("res://resources/data/enemies/enemy_knight.tres"),
+]
+
+# Parallel to ENEMY_ROSTER. true = after winning THIS fight, chain to next immediately.
+const ENEMY_CHAIN: Array = [
+	false,  # Grunt    → Hub
+	false,  # Soldier  → Hub
+	true,   # Grunt #1 → chain to Grunt #2
+	false,  # Grunt #2 → Hub
+	false,  # Knight   → Hub (run over)
 ]
 
 const POINTS_PER_VICTORY: int = 1
@@ -14,12 +25,16 @@ const POINTS_PER_VICTORY: int = 1
 var _current_index: int = 0
 var run_active: bool = false
 var last_result: String = ""  # "victory" | "defeat" | ""
+var _last_chain: bool = false
 
 
 func start_run() -> void:
+	assert(ENEMY_CHAIN.size() == ENEMY_ROSTER.size(),
+		"DungeonManager: ENEMY_CHAIN and ENEMY_ROSTER must be the same length.")
 	_current_index = 0
 	run_active = true
 	last_result = ""
+	_last_chain = false
 
 
 func current_enemy() -> CombatantData:
@@ -31,9 +46,14 @@ func current_enemy() -> CombatantData:
 func on_victory() -> void:
 	PlayerProgression.grant_points(POINTS_PER_VICTORY)
 	last_result = "victory"
+	_last_chain = ENEMY_CHAIN[_current_index]
 	_current_index += 1
 	if _current_index >= ENEMY_ROSTER.size():
 		run_active = false
+
+
+func was_last_fight_chained() -> bool:
+	return _last_chain
 
 
 func on_defeat() -> void:

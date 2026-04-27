@@ -19,7 +19,6 @@ const ALL_NODES: Array = [
 	preload("res://resources/data/nodes/ingenuity/ing_core.tres"),
 	preload("res://resources/data/nodes/ability_minor_studies.tres"),
 	preload("res://resources/data/nodes/ability_spellcasting.tres"),
-	preload("res://resources/data/nodes/ability_sure_footed.tres"),
 	preload("res://resources/data/nodes/fire_magic_1.tres"),
 	preload("res://resources/data/nodes/fire_magic_2.tres"),
 	preload("res://resources/data/nodes/fire_magic_3.tres"),
