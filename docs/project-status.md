@@ -269,7 +269,11 @@ Small, self-contained items that were deferred during Group 4.8 and have no rema
 - [x] **Save / load** — `SaveManager` autoload; 3 JSON slot files at `user://saves/slot_{n}.json`; Hub save/load UI; auto-save on return from dungeon. `PlayerProgression.serialize/deserialize`, `DungeonManager.serialize/deserialize`.
 - [x] **Constellation triangle canvas** — flat geometric canvas replacing 4-column layout; DOM/ING/NEG vertex positioning; `Line2D` connection lines (gold=met, grey=unmet); vertex-click expand/collapse for sub-trees; compact node cards with tooltip descriptions.
 - [x] **UI theme** — `res://theme/dark_fantasy.tres`; dark purple panels, styled button states, warm parchment text, gold accents. Applied globally via `project.godot gui/theme/custom`.
-- [ ] **Art pass** — replace placeholder colored rects with actual sprites / animations.
+- [ ] **Art architecture pass** — pixel-perfect rendering foundation before any assets are created.
+  - [ ] `project.godot`: base resolution 640×360, `stretch/mode=viewport`, `aspect=keep`, `default_texture_filter=0` (Nearest).
+  - [ ] `BattleScene.tscn/.gd`: root Control → Node2D; split into `WorldLayer` (Node2D, holds combatant sprites + `Marker2D` spawn anchors: PlayerAnchor bottom-right, EnemyAnchor1/2/3 top-left) and `UILayer` (CanvasLayer layer=1, holds all HUDs). Enemy spawning split: visuals → WorldLayer at anchor positions, HUDs → `EnemiesHUDContainer` in UILayer.
+  - [ ] `Combatant.tscn/.gd`: root Control → Node2D; add `AnimatedSprite2D` (invisible until `SpriteFrames` assigned); keep `ColorRect Body` as dev placeholder (auto-hidden when frames present); add public animation stub API — `play_idle()`, `play_attack_melee()`, `play_cast_spell()`, `play_hurt()`, `play_die()` (silent no-ops until art ships); `flip_h = is_player` in `setup()`.
+- [ ] **Art pass** — replace placeholder colored rects with actual sprites / animations. Depends on art architecture pass above.
 - [ ] **Sound** — attack, guard break, wound, defeat SFX.
 
 ### Future — Undesigned or blocked items
@@ -279,3 +283,4 @@ Small, self-contained items that were deferred during Group 4.8 and have no rema
 - **Cantrip count formula** — currently all known cantrips are always available; a future "known slots" cap is deferred.
 - **Inefficiency rule** — Potency → 1 / Flat → 0 without matching Training node. Deferred since Group 2.
 - **Cumulative Disadvantage** — second+ different pool targeted in the same turn should stack Disadvantage. Deferred since Group 1.
+- **Hybrid node proportional positioning** — nodes that depend on two different stat trees should be placed on the constellation canvas at a position proportional to their dependency tiers. Example: a node requiring Dominion Tier 3 and Negation Tier 1 sits 3× closer to the Dominion vertex than the Negation vertex (weighted barycentric interpolation between the two vertices using the required tier values as weights). Blocked on: Negation and Ingenuity subtrees being designed.

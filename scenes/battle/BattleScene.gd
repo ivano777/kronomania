@@ -1,26 +1,25 @@
 # BattleScene — root scene for 1vN combat.
 # Wires CombatManager signals to dynamically spawned HUD nodes.
-extends Control
+extends Node2D
 
 # ── Combatant data ────────────────────────────────────────────────────────────
 const PLAYER_DATA := preload("res://resources/data/player_default.tres")
 
-const ENEMY_HUD_SCENE  := preload("res://scenes/battle/CombatantHUD.tscn")
-const ENEMY_VIS_SCENE  := preload("res://scenes/battle/Combatant.tscn")
+const ENEMY_HUD_SCENE := preload("res://scenes/battle/CombatantHUD.tscn")
+const ENEMY_VIS_SCENE := preload("res://scenes/battle/Combatant.tscn")
 
 # ── Debug scenes (remove path + add_child call to strip at release) ───────────
-const _DBG_WEAPON_SEL   := "res://scenes/debug/DebugWeaponSelector.tscn"
-const _DBG_FERVOR_DISP  := "res://scenes/debug/DebugFervorDisplay.tscn"
+const _DBG_WEAPON_SEL  := "res://scenes/debug/DebugWeaponSelector.tscn"
+const _DBG_FERVOR_DISP := "res://scenes/debug/DebugFervorDisplay.tscn"
 var _dbg_fervor_disp = null
 
 # ── Node references ───────────────────────────────────────────────────────────
-@onready var _player_hud:       CombatantHUD  = $GameLayout/PlayerSide/PlayerHUD
-@onready var _player_visual:    Combatant     = $GameLayout/PlayerSide/PlayerVisual
-@onready var _enemies_container: HBoxContainer = $GameLayout/EnemySide/EnemiesContainer
-@onready var _round_hud:        RoundHUD      = $GameLayout/CenterPanel/RoundHUD
-@onready var _defeat_panel:     Panel         = $DefeatPanel
-@onready var _result_label:     Label         = $DefeatPanel/PanelContent/ResultLabel
-@onready var _debug_equip                     = $DebugEquipmentDisplay if has_node("DebugEquipmentDisplay") else null
+@onready var _player_hud:            CombatantHUD  = $UILayer/PlayerHUD
+@onready var _player_visual:         Combatant     = $WorldLayer/PlayerVisual
+@onready var _enemies_hud_container: HBoxContainer = $UILayer/EnemiesHUDContainer
+@onready var _round_hud:             RoundHUD      = $UILayer/RoundHUD
+@onready var _defeat_panel:          Panel         = $UILayer/DefeatPanel
+@onready var _result_label:          Label         = $UILayer/DefeatPanel/PanelContent/ResultLabel
 
 # ── Enemy runtime arrays ──────────────────────────────────────────────────────
 var _enemies_data: Array      # Array[CombatantData]
@@ -28,6 +27,7 @@ var _enemy_huds: Array        # Array[CombatantHUD]
 var _enemy_visuals: Array     # Array[Combatant]
 var _enemy_defeated: Array    # Array[bool]
 var _target_index: int = 0
+var _enemy_anchors: Array     # Array[Marker2D] — built in _ready
 
 
 func _ready() -> void:
@@ -35,6 +35,12 @@ func _ready() -> void:
 	if _enemies_data.is_empty():
 		get_tree().change_scene_to_file("res://scenes/hub/HubScene.tscn")
 		return
+
+	_enemy_anchors = [
+		$WorldLayer/EnemyAnchor1,
+		$WorldLayer/EnemyAnchor2,
+		$WorldLayer/EnemyAnchor3,
+	]
 
 	_defeat_panel.hide()
 
@@ -45,17 +51,16 @@ func _ready() -> void:
 		if PlayerProgression.equipped_weapon != null else PLAYER_DATA.equipped_weapon
 	_player_hud.set_weapon_display(_eff_weapon)
 
-	# Spawn one HUD + Visual per enemy, side-by-side in EnemiesContainer.
+	# Spawn one HUD into UILayer and one Combatant visual into WorldLayer per enemy.
 	for i in _enemies_data.size():
 		var ed: CombatantData = _enemies_data[i] as CombatantData
-		var wrapper := VBoxContainer.new()
-		wrapper.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		_enemies_container.add_child(wrapper)
 
 		var hud: CombatantHUD = ENEMY_HUD_SCENE.instantiate() as CombatantHUD
-		var vis: Combatant    = ENEMY_VIS_SCENE.instantiate()  as Combatant
-		wrapper.add_child(hud)
-		wrapper.add_child(vis)
+		_enemies_hud_container.add_child(hud)
+
+		var vis: Combatant = ENEMY_VIS_SCENE.instantiate() as Combatant
+		$WorldLayer.add_child(vis)
+		vis.global_position = (_enemy_anchors[i] as Marker2D).global_position
 
 		hud.setup(ed, false)
 		hud.set_weapon_display(ed.equipped_weapon)
@@ -76,9 +81,6 @@ func _ready() -> void:
 		)
 
 	_select_target(0)
-
-	if _debug_equip:
-		_debug_equip.setup(PLAYER_DATA, _enemies_data[0] as CombatantData)
 
 	# Connect RoundHUD action buttons/selections.
 	_round_hud.strike_pressed.connect(_on_strike_pressed)
@@ -103,12 +105,12 @@ func _ready() -> void:
 	CombatManager.fervor_changed.connect(_on_fervor_changed)
 	CombatManager.player_massive_incoming.connect(_on_player_massive_incoming)
 
-	# Debug widgets — instantiated at runtime; safe to remove with the consts above.
+	# Debug widgets — added to UILayer so they render as Controls correctly.
 	if ResourceLoader.exists(_DBG_WEAPON_SEL):
-		add_child((load(_DBG_WEAPON_SEL) as PackedScene).instantiate())
+		$UILayer.add_child((load(_DBG_WEAPON_SEL) as PackedScene).instantiate())
 	if ResourceLoader.exists(_DBG_FERVOR_DISP):
 		_dbg_fervor_disp = (load(_DBG_FERVOR_DISP) as PackedScene).instantiate()
-		add_child(_dbg_fervor_disp)
+		$UILayer.add_child(_dbg_fervor_disp)
 
 	CombatManager.start_combat(PLAYER_DATA, _enemies_data)
 

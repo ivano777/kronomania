@@ -25,6 +25,14 @@ DungeonManager="*res://autoloads/DungeonManager.gd"
 DebugManager="*res://autoloads/DebugManager.gd"
 SaveManager="*res://autoloads/SaveManager.gd"
 
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/size/resizable=false
+window/stretch/mode="viewport"
+window/stretch/aspect="keep"
+
 [gui]
 
 theme/custom="res://theme/dark_fantasy.tres"
@@ -35,4 +43,5 @@ theme/custom="res://theme/dark_fantasy.tres"
 
 [rendering]
 
+textures/canvas_textures/default_texture_filter=0
 rendering_device/driver.windows="d3d12"

@@ -2,18 +2,23 @@
 
 [ext_resource type="Script" uid="uid://combatantscr01" path="res://scenes/battle/Combatant.gd" id="1_cscr"]
 
-[node name="Combatant" type="Control"]
-custom_minimum_size = Vector2(100, 180)
+[node name="Combatant" type="Node2D"]
 script = ExtResource("1_cscr")
 
 [node name="Body" type="ColorRect" parent="."]
-anchor_right = 1.0
-anchor_bottom = 1.0
+offset_left = -60.0
+offset_top = -120.0
+offset_right = 60.0
+offset_bottom = 120.0
 color = Color(0.2, 0.35, 0.8, 1)
 
+[node name="Sprite" type="AnimatedSprite2D" parent="."]
+visible = false
+
 [node name="NameLabel" type="Label" parent="."]
-anchor_right = 1.0
-layout_mode = 1
-anchors_preset = 5
+offset_left = -100.0
+offset_top = 130.0
+offset_right = 100.0
+offset_bottom = 160.0
 text = "Name"
 horizontal_alignment = 1

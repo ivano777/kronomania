@@ -5,68 +5,67 @@
 [ext_resource type="PackedScene" uid="uid://wjwhsrnwy3or" path="res://scenes/battle/RoundHUD.tscn" id="3_rhud"]
 [ext_resource type="PackedScene" uid="uid://be04uyksxvods" path="res://scenes/battle/Combatant.tscn" id="4_comb"]
 
-[node name="BattleScene" type="Control" unique_id=1751107599]
-layout_mode = 3
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
+[node name="BattleScene" type="Node2D"]
 script = ExtResource("1_bscr")
 
-[node name="Background" type="ColorRect" parent="." unique_id=2058934650]
-layout_mode = 0
-anchor_right = 1.0
-anchor_bottom = 1.0
+[node name="WorldLayer" type="Node2D" parent="."]
+
+[node name="Background" type="ColorRect" parent="WorldLayer"]
+offset_right = 1280.0
+offset_bottom = 720.0
 color = Color(0.08, 0.08, 0.12, 1)
 
-[node name="GameLayout" type="HBoxContainer" parent="." unique_id=1736236432]
-layout_mode = 0
+[node name="PlayerAnchor" type="Marker2D" parent="WorldLayer"]
+position = Vector2(720, 570)
+
+[node name="EnemyAnchor1" type="Marker2D" parent="WorldLayer"]
+position = Vector2(170, 380)
+
+[node name="EnemyAnchor2" type="Marker2D" parent="WorldLayer"]
+position = Vector2(340, 360)
+
+[node name="EnemyAnchor3" type="Marker2D" parent="WorldLayer"]
+position = Vector2(510, 380)
+
+[node name="PlayerVisual" parent="WorldLayer" instance=ExtResource("4_comb")]
+position = Vector2(720, 570)
+
+[node name="UILayer" type="CanvasLayer" parent="."]
+layer = 1
+
+[node name="EnemiesHUDContainer" type="HBoxContainer" parent="UILayer"]
+layout_mode = 1
+anchor_right = 0.7
+offset_bottom = 160.0
+
+[node name="PlayerHUD" parent="UILayer" instance=ExtResource("2_chud")]
+layout_mode = 1
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_right = 370.0
+offset_top = -160.0
+
+[node name="RoundHUD" parent="UILayer" instance=ExtResource("3_rhud")]
+layout_mode = 1
+anchor_left = 0.7
 anchor_right = 1.0
 anchor_bottom = 1.0
 
-[node name="PlayerSide" type="VBoxContainer" parent="GameLayout" unique_id=338356683]
-custom_minimum_size = Vector2(200, 0)
-layout_mode = 2
-
-[node name="PlayerHUD" parent="GameLayout/PlayerSide" unique_id=1820282212 instance=ExtResource("2_chud")]
-layout_mode = 2
-
-[node name="PlayerVisual" parent="GameLayout/PlayerSide" unique_id=961022335 instance=ExtResource("4_comb")]
-layout_mode = 2
-size_flags_vertical = 3
-
-[node name="CenterPanel" type="VBoxContainer" parent="GameLayout" unique_id=656109814]
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="RoundHUD" parent="GameLayout/CenterPanel" unique_id=1943023332 instance=ExtResource("3_rhud")]
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="EnemySide" type="VBoxContainer" parent="GameLayout" unique_id=1438999933]
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="EnemiesContainer" type="HBoxContainer" parent="GameLayout/EnemySide" unique_id=111222333]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-
-[node name="DefeatPanel" type="Panel" parent="." unique_id=595927372]
+[node name="DefeatPanel" type="Panel" parent="UILayer"]
 visible = false
 layout_mode = 1
-anchors_preset = -1
 anchor_left = 0.25
 anchor_top = 0.3
 anchor_right = 0.75
 anchor_bottom = 0.7
 
-[node name="PanelContent" type="VBoxContainer" parent="DefeatPanel" unique_id=899831953]
+[node name="PanelContent" type="VBoxContainer" parent="UILayer/DefeatPanel"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 
-[node name="ResultLabel" type="Label" parent="DefeatPanel/PanelContent" unique_id=2020393111]
+[node name="ResultLabel" type="Label" parent="UILayer/DefeatPanel/PanelContent"]
 layout_mode = 2
 text = "Combat Over"
 horizontal_alignment = 1
