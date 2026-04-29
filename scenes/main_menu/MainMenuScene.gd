@@ -115,7 +115,7 @@ func _refresh_slots() -> void:
 func _on_new_game() -> void:
 	PlayerProgression.reset()
 	DungeonManager.start_run()
-	get_tree().change_scene_to_file("res://scenes/battle/BattleScene.tscn")
+	get_tree().change_scene_to_file("res://scenes/campfire/CampfireScene.tscn")
 
 
 func _on_load_slot(slot: int) -> void:

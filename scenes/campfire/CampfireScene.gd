@@ -30,30 +30,35 @@ var _exit_confirm: ConfirmationDialog
 
 func _ready() -> void:
 	if not DungeonManager.run_active:
-		get_tree().change_scene_to_file("res://scenes/main_menu/MainMenuScene.tscn")
-		return
+		PlayerProgression.reset()
+		DungeonManager.start_run()
 
 	if SaveManager.active_slot > 0:
 		SaveManager.save(SaveManager.active_slot)
 
-	var margin := MarginContainer.new()
-	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	margin.add_theme_constant_override("margin_top", 24)
-	margin.add_theme_constant_override("margin_left", 36)
-	margin.add_theme_constant_override("margin_right", 36)
-	margin.add_theme_constant_override("margin_bottom", 24)
-	add_child(margin)
+	# --- Two-column layout: fixed left menu panel + open right area ---
+	var main_layout := HBoxContainer.new()
+	main_layout.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(main_layout)
 
-	var scroll := ScrollContainer.new()
-	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	margin.add_child(scroll)
+	# Left panel — fixed width, full height.
+	var left_panel := PanelContainer.new()
+	left_panel.custom_minimum_size = Vector2(340, 0)
+	left_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	main_layout.add_child(left_panel)
+
+	var panel_margin := MarginContainer.new()
+	panel_margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	for side in ["margin_top", "margin_left", "margin_right", "margin_bottom"]:
+		panel_margin.add_theme_constant_override(side, 20)
+	left_panel.add_child(panel_margin)
 
 	var vbox := VBoxContainer.new()
-	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	vbox.add_theme_constant_override("separation", 14)
-	scroll.add_child(vbox)
+	vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.add_theme_constant_override("separation", 12)
+	panel_margin.add_child(vbox)
 
+	# --- Header + status ---
 	var header := Label.new()
 	header.text = "◆  CAMPFIRE  ◆"
 	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -72,6 +77,7 @@ func _ready() -> void:
 
 	vbox.add_child(HSeparator.new())
 
+	# --- Equipment ---
 	var equip_header := Label.new()
 	equip_header.text = "Equipment"
 	vbox.add_child(equip_header)
@@ -87,52 +93,67 @@ func _ready() -> void:
 
 	vbox.add_child(HSeparator.new())
 
-	# --- CONSUMABLES (deferred) ---
-	var consumables_label := Label.new()
-	consumables_label.text = "No consumables."
-	vbox.add_child(consumables_label)
-
-	vbox.add_child(HSeparator.new())
+	# --- Actions ---
+	var const_btn := Button.new()
+	const_btn.text = "Constellation"
+	const_btn.pressed.connect(_on_constellation)
+	vbox.add_child(const_btn)
 
 	_short_rest_btn = Button.new()
 	_short_rest_btn.pressed.connect(_on_short_rest)
 	vbox.add_child(_short_rest_btn)
 
-	var long_rest_btn := Button.new()
-	long_rest_btn.pressed.connect(_on_long_rest)
-	vbox.add_child(long_rest_btn)
-	_long_rest_btn = long_rest_btn
-
-	_rest_feedback = Label.new()
-	_rest_feedback.hide()
-	vbox.add_child(_rest_feedback)
-
-	vbox.add_child(HSeparator.new())
-
-	var const_btn := Button.new()
-	const_btn.text = "Constellation"
-	const_btn.pressed.connect(_on_constellation)
-	vbox.add_child(const_btn)
+	_long_rest_btn = Button.new()
+	_long_rest_btn.pressed.connect(_on_long_rest)
+	vbox.add_child(_long_rest_btn)
 
 	var save_game_btn := Button.new()
 	save_game_btn.text = "Save Game"
 	save_game_btn.pressed.connect(_on_open_save_popup)
 	vbox.add_child(save_game_btn)
 
+	_rest_feedback = Label.new()
+	_rest_feedback.hide()
+	vbox.add_child(_rest_feedback)
+
+	# --- Spacer pushes footer buttons to the bottom ---
+	var spacer := Control.new()
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.add_child(spacer)
+
+	vbox.add_child(HSeparator.new())
+
+	# --- Footer: Continue (prominent), Give Up + Exit (de-emphasized) ---
 	_continue_btn = Button.new()
-	_continue_btn.text = "Continue"
+	_continue_btn.text = "▶  Continue"
+	_continue_btn.custom_minimum_size = Vector2(0, 48)
+	_continue_btn.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3))
 	_continue_btn.pressed.connect(_on_continue)
 	vbox.add_child(_continue_btn)
 
+	var flat_style := StyleBoxFlat.new()
+	flat_style.bg_color = Color(0.0, 0.0, 0.0, 0.0)
+
 	var give_up_btn := Button.new()
 	give_up_btn.text = "Give Up"
+	give_up_btn.add_theme_color_override("font_color", Color(0.55, 0.38, 0.38))
+	for state in ["normal", "hover", "pressed", "focus"]:
+		give_up_btn.add_theme_stylebox_override(state, flat_style)
 	give_up_btn.pressed.connect(_on_give_up)
 	vbox.add_child(give_up_btn)
 
 	var exit_btn := Button.new()
 	exit_btn.text = "Exit to Menu"
+	exit_btn.add_theme_color_override("font_color", Color(0.50, 0.45, 0.45))
+	for state in ["normal", "hover", "pressed", "focus"]:
+		exit_btn.add_theme_stylebox_override(state, flat_style)
 	exit_btn.pressed.connect(_on_exit_pressed)
 	vbox.add_child(exit_btn)
+
+	# Right area — placeholder for future campfire visual.
+	var right_area := Control.new()
+	right_area.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	main_layout.add_child(right_area)
 
 	# Overlays must be added last so they render on top.
 	_build_save_popup()
