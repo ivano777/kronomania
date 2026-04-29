@@ -133,6 +133,7 @@ func reset() -> void:
 	tier_combat_spent = 0
 	tier_flavor_spent = 0
 	available_points = 3
+	saved_wounds = 0
 	saved_fervor_size = 4
 	saved_is_burned_out = false
 	equipped_weapon = null

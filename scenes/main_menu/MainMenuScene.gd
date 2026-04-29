@@ -5,6 +5,9 @@ extends Control
 
 var _slot_labels: Array[Label] = []
 var _load_btns: Array[Button] = []
+var _delete_btns: Array[Button] = []
+var _pending_delete_slot: int = 0
+var _delete_confirm: ConfirmationDialog
 
 
 func _ready() -> void:
@@ -60,6 +63,12 @@ func _ready() -> void:
 		row.add_child(load_btn)
 		_load_btns.append(load_btn)
 
+		var del_btn := Button.new()
+		del_btn.text = "Delete"
+		del_btn.pressed.connect(_on_delete_slot.bind(i))
+		row.add_child(del_btn)
+		_delete_btns.append(del_btn)
+
 	vbox.add_child(HSeparator.new())
 
 	var settings_btn := Button.new()
@@ -71,6 +80,12 @@ func _ready() -> void:
 	quit_btn.text = "Quit"
 	quit_btn.pressed.connect(_on_quit)
 	vbox.add_child(quit_btn)
+
+	_delete_confirm = ConfirmationDialog.new()
+	_delete_confirm.ok_button_text = "Delete"
+	_delete_confirm.cancel_button_text = "Cancel"
+	_delete_confirm.confirmed.connect(_on_delete_confirmed)
+	add_child(_delete_confirm)
 
 	_refresh_slots()
 
@@ -90,9 +105,11 @@ func _refresh_slots() -> void:
 				_slot_labels[i].text = "SLOT %d — Tier %d · Pts %d · %s" \
 					% [slot, int(meta.get("tier", 1)), int(meta.get("points", 0)), date_part]
 			_load_btns[i].disabled = defeated
+			_delete_btns[i].disabled = false
 		else:
 			_slot_labels[i].text = "SLOT %d — EMPTY" % slot
 			_load_btns[i].disabled = true
+			_delete_btns[i].disabled = true
 
 
 func _on_new_game() -> void:
@@ -110,6 +127,18 @@ func _on_load_slot(slot: int) -> void:
 		get_tree().change_scene_to_file("res://scenes/campfire/CampfireScene.tscn")
 	else:
 		_refresh_slots()
+
+
+func _on_delete_slot(slot: int) -> void:
+	_pending_delete_slot = slot
+	_delete_confirm.title = "Delete Slot %d?" % slot
+	_delete_confirm.dialog_text = "Slot %d will be permanently erased.\nThis cannot be undone." % slot
+	_delete_confirm.popup_centered()
+
+
+func _on_delete_confirmed() -> void:
+	SaveManager.delete_slot(_pending_delete_slot)
+	_refresh_slots()
 
 
 func _on_quit() -> void:

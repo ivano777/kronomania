@@ -179,7 +179,13 @@ func _on_combat_ended(winner_name: String) -> void:
 		get_tree().change_scene_to_file("res://scenes/main_menu/MainMenuScene.tscn")
 	else:
 		DungeonManager.on_victory()
-		if DungeonManager.has_next_enemy():
+		if DungeonManager.was_last_fight_chained():
+			_result_label.text = "Another enemy approaches..."
+			_defeat_panel.show()
+			await get_tree().create_timer(1.5).timeout
+			_teardown_signals()
+			get_tree().change_scene_to_file("res://scenes/battle/BattleScene.tscn")
+		elif DungeonManager.has_next_enemy():
 			_result_label.text = "Victory!  Return to camp."
 			_defeat_panel.show()
 			await get_tree().create_timer(1.5).timeout

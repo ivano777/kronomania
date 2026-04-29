@@ -161,8 +161,7 @@ func start_combat(player_data: CombatantData, enemies_data: Array) -> void:
 	_player.max_wounds += _wounds_node_bonus(_player)
 	_player.stamina_degrade_charges = _meat_grinder_charges(_player)
 	_player.space_domination_active = _has_effect_type(_player, "space_domination")
-	if DungeonManager.was_last_fight_chained():
-		_player.current_wounds = mini(PlayerProgression.saved_wounds, _player.max_wounds)
+	_player.current_wounds = mini(PlayerProgression.saved_wounds, _player.max_wounds)
 	wounds_changed.emit(true, -1, _player.current_wounds, _player.max_wounds)
 	_player.has_minor_studies = _has_effect_type(_player, "minor_studies")
 	_player.has_spellcasting  = _has_effect_type(_player, "spellcasting")
