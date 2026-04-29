@@ -26,7 +26,7 @@ Follow this workflow for every requested feature, without exception.
 - Edit only the files identified in the approved plan.
 - No unnecessary rewrites, refactors, or scope creep.
 - Where files are independent (no shared state, no load order dependency),
-  implement them in parallel using subagents.
+  implement them in parallel using subagents (using the appropriate model based on task complexity).
 - Never parallelize writes to files that share state or that must be
   applied in a specific order (e.g. autoloads before scenes that depend on them).
 - Match subagent model to task complexity:

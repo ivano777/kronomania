@@ -1,22 +1,28 @@
-# HubScene — player's base between dungeon runs.
-# Shows tier, stats, Fervor state, run progress. Provides rest and navigation buttons.
-# All UI is built in code; no sub-nodes required in the .tscn.
+# CampfireScene — between-encounter rest hub.
+# Short Rest (once per run), Long Rest (ambush risk), weapon selection, manual save, constellation, continue.
+# All UI built in code; no sub-nodes required in the .tscn.
 extends Control
 
 const _PLAYER_DATA := preload("res://resources/data/player_default.tres")
 
-var _tier_label: Label
+var _status_label: Label
+var _run_label: Label
 var _fervor_label: Label
-var _stats_label: Label
-var _equip_label: Label
+var _rest_feedback: Label
+var _short_rest_btn: Button
+var _continue_btn: Button
 var _weapon_btns: Array[Button] = []
 var _slot_labels: Array[Label] = []
-var _run_label: Label
-var _continue_btn: Button
-var _start_run_btn: Button
 
 
 func _ready() -> void:
+	if not DungeonManager.run_active:
+		get_tree().change_scene_to_file("res://scenes/main_menu/MainMenuScene.tscn")
+		return
+
+	if SaveManager.active_slot > 0:
+		SaveManager.save(SaveManager.active_slot)
+
 	var margin := MarginContainer.new()
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
 	margin.add_theme_constant_override("margin_top", 24)
@@ -36,27 +42,26 @@ func _ready() -> void:
 	scroll.add_child(vbox)
 
 	var header := Label.new()
-	header.text = "◆  KRONOMANIA — HUB  ◆"
+	header.text = "◆  CAMPFIRE  ◆"
 	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(header)
 
 	vbox.add_child(HSeparator.new())
 
-	_tier_label = Label.new()
-	vbox.add_child(_tier_label)
+	_status_label = Label.new()
+	vbox.add_child(_status_label)
 
 	_fervor_label = Label.new()
 	vbox.add_child(_fervor_label)
 
-	_stats_label = Label.new()
-	vbox.add_child(_stats_label)
+	_run_label = Label.new()
+	vbox.add_child(_run_label)
+
+	vbox.add_child(HSeparator.new())
 
 	var equip_header := Label.new()
 	equip_header.text = "Equipment"
 	vbox.add_child(equip_header)
-
-	_equip_label = Label.new()
-	vbox.add_child(_equip_label)
 
 	var weapon_row := HBoxContainer.new()
 	vbox.add_child(weapon_row)
@@ -88,56 +93,54 @@ func _ready() -> void:
 		save_btn.pressed.connect(_on_save_slot.bind(i))
 		row.add_child(save_btn)
 
-		var load_btn := Button.new()
-		load_btn.text = "Load"
-		load_btn.pressed.connect(_on_load_slot.bind(i))
-		row.add_child(load_btn)
+	vbox.add_child(HSeparator.new())
+
+	# --- CONSUMABLES (deferred) ---
+	var consumables_label := Label.new()
+	consumables_label.text = "No consumables."
+	vbox.add_child(consumables_label)
 
 	vbox.add_child(HSeparator.new())
 
-	_run_label = Label.new()
-	vbox.add_child(_run_label)
+	_short_rest_btn = Button.new()
+	_short_rest_btn.pressed.connect(_on_short_rest)
+	vbox.add_child(_short_rest_btn)
+
+	var long_rest_btn := Button.new()
+	long_rest_btn.text = "Long Rest  (full heal + reset Fervor; 50% ambush risk)"
+	long_rest_btn.pressed.connect(_on_long_rest)
+	vbox.add_child(long_rest_btn)
+
+	_rest_feedback = Label.new()
+	_rest_feedback.hide()
+	vbox.add_child(_rest_feedback)
 
 	vbox.add_child(HSeparator.new())
 
-	var btn_rest := Button.new()
-	btn_rest.text = "Long Rest  (reset Fervor + clear Burnout)"
-	btn_rest.pressed.connect(_on_long_rest)
-	vbox.add_child(btn_rest)
-
-	var btn_rec := Button.new()
-	btn_rec.text = "Recovery  (clear Burnout only)"
-	btn_rec.pressed.connect(_on_recovery)
-	vbox.add_child(btn_rec)
-
-	var btn_const := Button.new()
-	btn_const.text = "Constellation"
-	btn_const.pressed.connect(_on_constellation)
-	vbox.add_child(btn_const)
-
-	vbox.add_child(HSeparator.new())
+	var const_btn := Button.new()
+	const_btn.text = "Constellation"
+	const_btn.pressed.connect(_on_constellation)
+	vbox.add_child(const_btn)
 
 	_continue_btn = Button.new()
-	_continue_btn.text = "Continue Run"
+	_continue_btn.text = "Continue"
 	_continue_btn.pressed.connect(_on_continue)
 	vbox.add_child(_continue_btn)
 
-	_start_run_btn = Button.new()
-	_start_run_btn.text = "Start New Run"
-	_start_run_btn.pressed.connect(_on_start_run)
-	vbox.add_child(_start_run_btn)
-
-	if SaveManager.active_slot > 0 and DungeonManager.last_result != "":
-		SaveManager.save(SaveManager.active_slot)
+	var give_up_btn := Button.new()
+	give_up_btn.text = "Give Up"
+	give_up_btn.pressed.connect(_on_give_up)
+	vbox.add_child(give_up_btn)
 
 	_refresh()
 
 
 func _refresh() -> void:
-	var tier := PlayerProgression.get_tier()
-	var hp   := _max_wounds()
-	var pts  := PlayerProgression.available_points
-	_tier_label.text = "Tier: %d  |  HP: %d  |  Points: %d" % [tier, hp, pts]
+	var tier    := PlayerProgression.get_tier()
+	var wounds  := PlayerProgression.saved_wounds
+	var max_w   := _max_wounds()
+	var pts     := PlayerProgression.available_points
+	_status_label.text = "Tier: %d  |  Wounds: %d / %d  |  Points: %d" % [tier, wounds, max_w, pts]
 
 	var fervor  := PlayerProgression.saved_fervor_size
 	var burned  := PlayerProgression.saved_is_burned_out
@@ -150,37 +153,24 @@ func _refresh() -> void:
 	else:
 		_fervor_label.hide()
 
-	var dom := _effective_stat_size("dominion")
-	var neg := _effective_stat_size("negation")
-	var ing := _effective_stat_size("ingenuity")
-	_stats_label.text = "Dominion: d%d  |  Negation: d%d  |  Ingenuity: d%d" % [dom, neg, ing]
+	var cleared := DungeonManager.enemies_cleared()
+	if cleared == 0:
+		_run_label.text = "Ready to enter the dungeon  (0 / %d cleared)" % DungeonManager.enemies_total()
+	else:
+		_run_label.text = "%d / %d encounters cleared" % [cleared, DungeonManager.enemies_total()]
 
 	var eff_weapon: EquipmentData = PlayerProgression.equipped_weapon \
 		if PlayerProgression.equipped_weapon != null \
 		else _PLAYER_DATA.equipped_weapon
-	if eff_weapon:
-		var tags := ", ".join(Array(eff_weapon.tags)) if eff_weapon.tags.size() > 0 else "—"
-		_equip_label.text = "%s  |  Potency %d  |  Atk +%d  |  [%s]" \
-			% [eff_weapon.item_name, eff_weapon.potency, eff_weapon.flat_attack_bonus, tags]
-	else:
-		_equip_label.text = "No weapon"
 	for i in _weapon_btns.size():
 		_weapon_btns[i].disabled = (PlayerProgression.AVAILABLE_WEAPONS[i] == eff_weapon)
 
-	var run_text: String
-	if DungeonManager.run_active:
-		run_text = "Run in progress  (%d / %d cleared)" \
-			% [DungeonManager.enemies_cleared(), DungeonManager.enemies_total()]
-	elif DungeonManager.is_run_complete():
-		run_text = "Run complete!  All enemies defeated."
-	elif DungeonManager.last_result == "defeat":
-		run_text = "Defeated!  Start a new run to try again."
+	if DungeonManager.short_rest_used:
+		_short_rest_btn.text = "Short Rest  (used)"
+		_short_rest_btn.disabled = true
 	else:
-		run_text = "Ready — start a new run."
-	_run_label.text = run_text
-
-	_continue_btn.visible = DungeonManager.has_next_enemy()
-	_start_run_btn.visible = not DungeonManager.run_active
+		_short_rest_btn.text = "Short Rest  (−1 wound, step down Fervor, clear Burnout)"
+		_short_rest_btn.disabled = false
 
 	_refresh_slots()
 
@@ -203,24 +193,29 @@ func _on_save_slot(slot: int) -> void:
 	_refresh_slots()
 
 
-func _on_load_slot(slot: int) -> void:
-	SaveManager.load(slot)
-	_refresh()
-
-
 func _on_equip_weapon(w: EquipmentData) -> void:
 	PlayerProgression.set_weapon(w)
 	_refresh()
 
 
+func _on_short_rest() -> void:
+	DungeonManager.attempt_short_rest()
+	_rest_feedback.text = "Rested briefly. Wounds eased."
+	_rest_feedback.show()
+	_refresh()
+
+
 func _on_long_rest() -> void:
-	PlayerProgression.apply_long_rest()
-	_refresh()
-
-
-func _on_recovery() -> void:
-	PlayerProgression.apply_recovery()
-	_refresh()
+	var result := DungeonManager.attempt_long_rest()
+	if result.get("ambushed", false):
+		_rest_feedback.text = "⚠ Ambushed during rest! Fight incoming..."
+		_rest_feedback.show()
+		await get_tree().create_timer(1.5).timeout
+		get_tree().change_scene_to_file("res://scenes/battle/BattleScene.tscn")
+	else:
+		_rest_feedback.text = "Rested safely. Wounds healed, Fervor reset."
+		_rest_feedback.show()
+		_refresh()
 
 
 func _on_constellation() -> void:
@@ -231,9 +226,16 @@ func _on_continue() -> void:
 	get_tree().change_scene_to_file("res://scenes/battle/BattleScene.tscn")
 
 
-func _on_start_run() -> void:
-	DungeonManager.start_run()
-	get_tree().change_scene_to_file("res://scenes/battle/BattleScene.tscn")
+func _on_give_up() -> void:
+	var result := DungeonManager.surrender()
+	var msg := "Surrendered. HP fully restored."
+	if result.get("lost_points", 0) > 0:
+		msg += "  Lost %d points." % result.get("lost_points")
+	if result.get("lost_weapon", false):
+		msg += "  Dropped your weapon."
+	_rest_feedback.text = msg
+	_rest_feedback.show()
+	_refresh()
 
 
 func _effective_stat_size(stat: String) -> int:

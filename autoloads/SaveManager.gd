@@ -62,10 +62,11 @@ func get_slot_meta(slot: int) -> Dictionary:
 	if not parsed is Dictionary:
 		return {"exists": false}
 	return {
-		"exists":    true,
-		"tier":      int(parsed.get("tier", 1)),
-		"points":    int(parsed.get("available_points", 0)),
-		"timestamp": str(parsed.get("timestamp", "")),
+		"exists":      true,
+		"tier":        int(parsed.get("tier", 1)),
+		"points":      int(parsed.get("available_points", 0)),
+		"timestamp":   str(parsed.get("timestamp", "")),
+		"last_result": str(parsed.get("last_result", "")),
 	}
 
 

@@ -376,4 +376,7 @@ func _on_unlock(node: NodeData) -> void:
 
 
 func _on_back_pressed() -> void:
-	get_tree().change_scene_to_file("res://scenes/hub/HubScene.tscn")
+	if DungeonManager.run_active:
+		get_tree().change_scene_to_file("res://scenes/campfire/CampfireScene.tscn")
+	else:
+		get_tree().change_scene_to_file("res://scenes/main_menu/MainMenuScene.tscn")

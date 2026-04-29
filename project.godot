@@ -11,10 +11,10 @@ config_version=5
 [application]
 
 config/name="kronomania"
-run/main_scene="res://scenes/hub/HubScene.tscn"
+run/main_scene="res://scenes/main_menu/MainMenuScene.tscn"
 config/features=PackedStringArray("4.6", "Forward Plus")
 config/icon="res://icon.svg"
-config/main_scene="res://scenes/hub/HubScene.tscn"
+config/main_scene="res://scenes/main_menu/MainMenuScene.tscn"
 
 [autoload]
 
@@ -31,7 +31,6 @@ window/size/viewport_width=1280
 window/size/viewport_height=720
 window/size/resizable=false
 window/stretch/mode="viewport"
-window/stretch/aspect="keep"
 
 [gui]
 

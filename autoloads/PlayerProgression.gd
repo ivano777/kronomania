@@ -74,6 +74,8 @@ var saved_fervor_size: int = 4
 var saved_is_burned_out: bool = false
 ## Wounds carried into the next chained encounter. Always written by CombatManager._end_combat().
 var saved_wounds: int = 0
+## Hidden stat — each point reduces Long Rest ambush probability by 1 percentage point.
+var luck: int = 0
 
 
 ## Returns the current level of a node (0 = not purchased).
@@ -137,7 +139,17 @@ func reset() -> void:
 
 
 func apply_long_rest() -> void:
+	saved_wounds = 0
 	saved_fervor_size = 4
+	saved_is_burned_out = false
+
+
+func apply_short_rest() -> void:
+	saved_wounds = max(0, saved_wounds - 1)
+	var track := [4, 6, 8, 10]
+	var idx := track.find(saved_fervor_size)
+	if idx > 0:
+		saved_fervor_size = track[idx - 1]
 	saved_is_burned_out = false
 
 
@@ -212,6 +224,7 @@ func serialize() -> Dictionary:
 		"node_levels":         levels,
 		"saved_fervor_size":   saved_fervor_size,
 		"saved_is_burned_out": saved_is_burned_out,
+		"luck":                luck,
 		"equipped_weapon":     equipped_weapon.item_name if equipped_weapon != null else "",
 	}
 
@@ -223,6 +236,7 @@ func deserialize(data: Dictionary) -> void:
 	tier_flavor_spent    = int(data.get("tier_flavor_spent", 0))
 	saved_fervor_size    = int(data.get("saved_fervor_size", 4))
 	saved_is_burned_out  = bool(data.get("saved_is_burned_out", false))
+	luck                 = int(data.get("luck", 0))
 	node_levels.clear()
 	var saved: Dictionary = data.get("node_levels", {})
 	for node in ALL_NODES:

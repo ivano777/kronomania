@@ -28,13 +28,15 @@ var _enemy_visuals: Array     # Array[Combatant]
 var _enemy_defeated: Array    # Array[bool]
 var _target_index: int = 0
 var _enemy_anchors: Array     # Array[Marker2D] — built in _ready
+var _ambush_base_disadvantage: int = 0
 
 
 func _ready() -> void:
 	_enemies_data = DungeonManager.current_enemies()
 	if _enemies_data.is_empty():
-		get_tree().change_scene_to_file("res://scenes/hub/HubScene.tscn")
+		get_tree().change_scene_to_file("res://scenes/main_menu/MainMenuScene.tscn")
 		return
+	_ambush_base_disadvantage = DungeonManager.ambush_disadvantage
 
 	_enemy_anchors = [
 		$WorldLayer/EnemyAnchor1,
@@ -168,25 +170,27 @@ func _on_combat_ended(winner_name: String) -> void:
 	_round_hud.disable_magic()
 	if winner_name != PLAYER_DATA.combatant_name:
 		DungeonManager.on_defeat()
+		if SaveManager.active_slot > 0:
+			SaveManager.delete_slot(SaveManager.active_slot)
 		_result_label.text = "Defeated by %s..." % winner_name
 		_defeat_panel.show()
 		await get_tree().create_timer(1.5).timeout
 		_teardown_signals()
-		get_tree().change_scene_to_file("res://scenes/hub/HubScene.tscn")
+		get_tree().change_scene_to_file("res://scenes/main_menu/MainMenuScene.tscn")
 	else:
 		DungeonManager.on_victory()
-		if DungeonManager.was_last_fight_chained():
-			_result_label.text = "Another enemy approaches..."
-			_defeat_panel.show()
-			await get_tree().create_timer(0.8).timeout
-			_teardown_signals()
-			get_tree().change_scene_to_file("res://scenes/battle/BattleScene.tscn")
-		else:
-			_result_label.text = "Victory!"
+		if DungeonManager.has_next_enemy():
+			_result_label.text = "Victory!  Return to camp."
 			_defeat_panel.show()
 			await get_tree().create_timer(1.5).timeout
 			_teardown_signals()
-			get_tree().change_scene_to_file("res://scenes/hub/HubScene.tscn")
+			get_tree().change_scene_to_file("res://scenes/campfire/CampfireScene.tscn")
+		else:
+			_result_label.text = "Run complete!  Victory!"
+			_defeat_panel.show()
+			await get_tree().create_timer(1.5).timeout
+			_teardown_signals()
+			get_tree().change_scene_to_file("res://scenes/main_menu/MainMenuScene.tscn")
 
 
 func _on_player_action_required() -> void:
@@ -212,7 +216,7 @@ func _on_wound_degrade_chosen(use_charge: bool) -> void:
 
 func _on_strike_pressed() -> void:
 	CombatManager.player_chose_strike(
-		_round_hud.get_net_advantage(),
+		_round_hud.get_net_advantage() + _ambush_base_disadvantage,
 		_round_hud.get_target_pool(),
 		_round_hud.get_brutal_trade(),
 		_target_index

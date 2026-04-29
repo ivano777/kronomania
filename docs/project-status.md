@@ -276,6 +276,85 @@ Small, self-contained items that were deferred during Group 4.8 and have no rema
 - [ ] **Art pass** — replace placeholder colored rects with actual sprites / animations. Depends on art architecture pass above.
 - [ ] **Sound** — attack, guard break, wound, defeat SFX.
 
+### Group 6.5 — Out-of-Combat Flow Redesign
+
+Splits the monolithic `HubScene` into a **MainMenuScene** (title screen) and a **CampfireScene**
+(between-encounter rest hub). Adds Short Rest / Long Rest wound healing and an ambush risk system
+on Long Rest driven by a hidden `luck` stat. Four sequential implementation phases.
+
+**Phase A — `PlayerProgression.gd` + `DungeonManager.gd` (parallel)**
+
+`PlayerProgression.gd`:
+- [ ] Add `luck: int = 0` — hidden stat; adjusts Long Rest ambush probability in pct-points (positive = less likely to be ambushed). Serialized.
+- [ ] Add `apply_short_rest() -> void`: `saved_wounds = max(0, saved_wounds - 1)`; step `saved_fervor_size` down one notch in `[4,6,8,10]` track (min d4); `saved_is_burned_out = false`.
+- [ ] Modify `apply_long_rest() -> void`: add `saved_wounds = 0` (full heal) before existing Fervor reset. Ambush roll lives in DungeonManager, not here.
+- [ ] Update `serialize()` / `deserialize()` to include `luck`.
+
+`DungeonManager.gd`:
+- [ ] Add `short_rest_used: bool = false` — per-run flag; reset by `start_run()`.
+- [ ] Add `ambush_net_advantage: int = 0` — net advantage modifier applied to all player strikes in the next combat after an ambush; cleared by `on_victory()` and `on_defeat()`.
+- [ ] Add `attempt_short_rest() -> void`: guard on `short_rest_used`; call `PlayerProgression.apply_short_rest()`; set `short_rest_used = true`.
+- [ ] Add `attempt_long_rest() -> Dictionary`: call `PlayerProgression.apply_long_rest()`; roll `var ambushed := (randi() % 100) < (50 - PlayerProgression.luck)`; if ambushed set `ambush_net_advantage = -2`; stub comment `# TODO: deduct money when money system is implemented`; return `{"ambushed": ambushed}`.
+- [ ] `start_run()`: also reset `short_rest_used = false`, `ambush_net_advantage = 0`.
+- [ ] `on_victory()` / `on_defeat()`: also clear `ambush_net_advantage = 0`.
+- [ ] Update `serialize()` / `deserialize()` to include `short_rest_used`, `ambush_net_advantage`.
+
+**Phase B — New scenes (sequential after Phase A)**
+
+Create `scenes/main_menu/MainMenuScene.gd` + `.tscn`:
+- [ ] Title header "◆ KRONOMANIA ◆".
+- [ ] **New Game** button → `PlayerProgression.reset()`, `DungeonManager.start_run()`, navigate to `BattleScene`.
+- [ ] **Load Game** section — 3 slots with metadata + Load button each; after load navigate to `CampfireScene` if `DungeonManager.run_active`, else refresh.
+- [ ] **Settings** placeholder button (disabled, "coming soon").
+- [ ] **Quit** button → `get_tree().quit()`.
+- [ ] Manual save: 3-slot Save/Load UI (moved from HubScene; sole manual save point).
+
+Create `scenes/campfire/CampfireScene.gd` + `.tscn`:
+- [ ] Guard in `_ready()`: if `not DungeonManager.run_active`, redirect to MainMenuScene.
+- [ ] Auto-save on `_ready()`: `if SaveManager.active_slot > 0: SaveManager.save(active_slot)`.
+- [ ] Header "◆ CAMPFIRE ◆"; character status row (`Wounds: X/Y | Fervor: dN [BURNOUT]`); run progress row (`Encounter X/Y`).
+- [ ] Equipment selector (same weapon-button row as HubScene).
+- [ ] **Consumables stub block** — comment `# --- CONSUMABLES (deferred) ---` + placeholder Label "No consumables."
+- [ ] **Short Rest** button: disabled + "(used)" label when `DungeonManager.short_rest_used`. On press: `DungeonManager.attempt_short_rest()`, refresh.
+- [ ] **Long Rest** button: always available. On press: call `DungeonManager.attempt_long_rest()`; show "Rested safely." or "⚠ Ambushed! Next fight: Disadvantage." feedback; refresh status.
+- [ ] **Constellation** button → navigate to `ConstellationScene`.
+- [ ] **Continue** button (shows ambush warning label when `DungeonManager.ambush_net_advantage != 0`) → navigate to `BattleScene`.
+- [ ] **Give Up** button → `DungeonManager.on_defeat()`, navigate to `MainMenuScene`.
+
+**Phase C — Wire up callers (sequential after Phase B)**
+
+`scenes/battle/BattleScene.gd`:
+- [ ] Store `_ambush_base_disadvantage: int = DungeonManager.ambush_net_advantage` in `_ready()`.
+- [ ] Add `_ambush_base_disadvantage` to `net_advantage` in every `player_chose_strike()` call.
+- [ ] Post-combat navigation: victory + `has_next_enemy()` → CampfireScene; victory + run complete → MainMenuScene; defeat → MainMenuScene.
+
+`scenes/constellation/ConstellationScene.gd`:
+- [ ] Back button: navigate to CampfireScene if `DungeonManager.run_active`, else MainMenuScene.
+
+`project.godot`:
+- [ ] Change `run/main_scene` to `"res://scenes/main_menu/MainMenuScene.tscn"`.
+
+**Phase D — Cleanup + validation**
+- [ ] Delete `scenes/hub/HubScene.gd` and `scenes/hub/HubScene.tscn`.
+- [ ] Run headless validation; confirm zero SCRIPT ERRORs.
+- [ ] Run `/refresh-index` (new `.gd` files added, old ones deleted).
+
+Navigation map (post-implementation):
+```
+MainMenuScene ──New Game──────────────────────────────► BattleScene
+              └─Load (run_active)───────────────────────► CampfireScene
+BattleScene ───Victory + has_next──────────────────────► CampfireScene
+            ├──Victory + run complete──────────────────► MainMenuScene
+            └──Defeat──────────────────────────────────► MainMenuScene
+CampfireScene ─Continue────────────────────────────────► BattleScene
+              ├─Constellation─────────────────────────► ConstellationScene
+              └─Give Up───────────────────────────────► MainMenuScene
+ConstellationScene ─Back (run_active)──────────────────► CampfireScene
+                   └─Back (not active)─────────────────► MainMenuScene
+```
+
+Deferred stubs: consumable items (comment block in CampfireScene), money deduction on ambush (comment in `attempt_long_rest()`), skill-point loss on ambush (not implemented), ambush as a true extra encounter (future design decision).
+
 ### Future — Undesigned or blocked items
 
 - **Brutal L2 Cleave** — multi-enemy overflow after a breach. Group 5 roster exists (3 enemies), but Cleave needs a design decision on overflow mechanics (does excess damage carry over? to which target? in what order?) before implementation.
