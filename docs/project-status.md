@@ -270,9 +270,8 @@ Small, self-contained items that were deferred during Group 4.8 and have no rema
 - [x] **Constellation triangle canvas** — flat geometric canvas replacing 4-column layout; DOM/ING/NEG vertex positioning; `Line2D` connection lines (gold=met, grey=unmet); vertex-click expand/collapse for sub-trees; compact node cards with tooltip descriptions.
 - [x] **UI theme** — `res://theme/dark_fantasy.tres`; dark purple panels, styled button states, warm parchment text, gold accents. Applied globally via `project.godot gui/theme/custom`.
 - [ ] **Art architecture pass** — pixel-perfect rendering foundation before any assets are created.
-  - [ ] `project.godot`: base resolution 640×360, `stretch/mode=viewport`, `aspect=keep`, `default_texture_filter=0` (Nearest).
-  - [ ] `BattleScene.tscn/.gd`: root Control → Node2D; split into `WorldLayer` (Node2D, holds combatant sprites + `Marker2D` spawn anchors: PlayerAnchor bottom-right, EnemyAnchor1/2/3 top-left) and `UILayer` (CanvasLayer layer=1, holds all HUDs). Enemy spawning split: visuals → WorldLayer at anchor positions, HUDs → `EnemiesHUDContainer` in UILayer.
-  - [ ] `Combatant.tscn/.gd`: root Control → Node2D; add `AnimatedSprite2D` (invisible until `SpriteFrames` assigned); keep `ColorRect Body` as dev placeholder (auto-hidden when frames present); add public animation stub API — `play_idle()`, `play_attack_melee()`, `play_cast_spell()`, `play_hurt()`, `play_die()` (silent no-ops until art ships); `flip_h = is_player` in `setup()`.
+  - [x] `BattleScene.tscn/.gd`: root Control → Node2D; split into `WorldLayer` (Node2D, holds combatant sprites + `Marker2D` spawn anchors: PlayerAnchor bottom-right, EnemyAnchor1/2/3 top-left) and `UILayer` (CanvasLayer layer=1, holds all HUDs). Enemy spawning split: visuals → WorldLayer at anchor positions, HUDs → `EnemiesHUDContainer` in UILayer.
+  - [x] `Combatant.tscn/.gd`: root Control → Node2D; add `AnimatedSprite2D` (invisible until `SpriteFrames` assigned); keep `ColorRect Body` as dev placeholder (auto-hidden when frames present); add public animation stub API — `play_idle()`, `play_attack_melee()`, `play_cast_spell()`, `play_hurt()`, `play_die()` (silent no-ops until art ships); `flip_h = is_player` in `setup()`.
 - [ ] **Art pass** — replace placeholder colored rects with actual sprites / animations. Depends on art architecture pass above.
 - [ ] **Sound** — attack, guard break, wound, defeat SFX.
 
@@ -285,59 +284,59 @@ on Long Rest driven by a hidden `luck` stat. Four sequential implementation phas
 **Phase A — `PlayerProgression.gd` + `DungeonManager.gd` (parallel)**
 
 `PlayerProgression.gd`:
-- [ ] Add `luck: int = 0` — hidden stat; adjusts Long Rest ambush probability in pct-points (positive = less likely to be ambushed). Serialized.
-- [ ] Add `apply_short_rest() -> void`: `saved_wounds = max(0, saved_wounds - 1)`; step `saved_fervor_size` down one notch in `[4,6,8,10]` track (min d4); `saved_is_burned_out = false`.
-- [ ] Modify `apply_long_rest() -> void`: add `saved_wounds = 0` (full heal) before existing Fervor reset. Ambush roll lives in DungeonManager, not here.
-- [ ] Update `serialize()` / `deserialize()` to include `luck`.
+- [x] Add `luck: int = 0` — hidden stat; adjusts Long Rest ambush probability in pct-points (positive = less likely to be ambushed). Serialized.
+- [x] Add `apply_short_rest() -> void`: `saved_wounds = max(0, saved_wounds - 1)`; step `saved_fervor_size` down one notch in `[4,6,8,10]` track (min d4); `saved_is_burned_out = false`.
+- [x] Modify `apply_long_rest() -> void`: add `saved_wounds = 0` (full heal) before existing Fervor reset. Ambush roll lives in DungeonManager, not here.
+- [x] Update `serialize()` / `deserialize()` to include `luck`.
 
 `DungeonManager.gd`:
-- [ ] Add `short_rest_used: bool = false` — per-run flag; reset by `start_run()`.
-- [ ] Add `ambush_net_advantage: int = 0` — net advantage modifier applied to all player strikes in the next combat after an ambush; cleared by `on_victory()` and `on_defeat()`.
-- [ ] Add `attempt_short_rest() -> void`: guard on `short_rest_used`; call `PlayerProgression.apply_short_rest()`; set `short_rest_used = true`.
-- [ ] Add `attempt_long_rest() -> Dictionary`: call `PlayerProgression.apply_long_rest()`; roll `var ambushed := (randi() % 100) < (50 - PlayerProgression.luck)`; if ambushed set `ambush_net_advantage = -2`; stub comment `# TODO: deduct money when money system is implemented`; return `{"ambushed": ambushed}`.
-- [ ] `start_run()`: also reset `short_rest_used = false`, `ambush_net_advantage = 0`.
-- [ ] `on_victory()` / `on_defeat()`: also clear `ambush_net_advantage = 0`.
-- [ ] Update `serialize()` / `deserialize()` to include `short_rest_used`, `ambush_net_advantage`.
+- [x] Add `short_rest_used: bool = false` — per-run flag; reset by `start_run()`.
+- [x] Add `ambush_net_advantage: int = 0` — net advantage modifier applied to all player strikes in the next combat after an ambush; cleared by `on_victory()` and `on_defeat()`. *(Implemented as `ambush_disadvantage` in code.)*
+- [x] Add `attempt_short_rest() -> void`: guard on `short_rest_used`; call `PlayerProgression.apply_short_rest()`; set `short_rest_used = true`.
+- [x] Add `attempt_long_rest() -> Dictionary`: call `PlayerProgression.apply_long_rest()`; roll `var ambushed := (randi() % 100) < (50 - PlayerProgression.luck)`; if ambushed set `ambush_net_advantage = -2`; stub comment `# TODO: deduct money when money system is implemented`; return `{"ambushed": ambushed}`.
+- [x] `start_run()`: also reset `short_rest_used = false`, `ambush_net_advantage = 0`.
+- [x] `on_victory()` / `on_defeat()`: also clear `ambush_net_advantage = 0`.
+- [x] Update `serialize()` / `deserialize()` to include `short_rest_used`, `ambush_net_advantage`.
 
 **Phase B — New scenes (sequential after Phase A)**
 
 Create `scenes/main_menu/MainMenuScene.gd` + `.tscn`:
-- [ ] Title header "◆ KRONOMANIA ◆".
-- [ ] **New Game** button → `PlayerProgression.reset()`, `DungeonManager.start_run()`, navigate to `BattleScene`.
-- [ ] **Load Game** section — 3 slots with metadata + Load button each; after load navigate to `CampfireScene` if `DungeonManager.run_active`, else refresh.
-- [ ] **Settings** placeholder button (disabled, "coming soon").
-- [ ] **Quit** button → `get_tree().quit()`.
-- [ ] Manual save: 3-slot Save/Load UI (moved from HubScene; sole manual save point).
+- [x] Title header "◆ KRONOMANIA ◆".
+- [x] **New Game** button → `PlayerProgression.reset()`, `DungeonManager.start_run()`, navigate to `BattleScene`.
+- [x] **Load Game** section — 3 slots with metadata + Load button each; after load navigate to `CampfireScene` if `DungeonManager.run_active`, else refresh.
+- [x] **Settings** placeholder button (disabled, "coming soon").
+- [x] **Quit** button → `get_tree().quit()`.
+- [x] Manual save: 3-slot Save/Load UI (moved from HubScene; sole manual save point).
 
 Create `scenes/campfire/CampfireScene.gd` + `.tscn`:
-- [ ] Guard in `_ready()`: if `not DungeonManager.run_active`, redirect to MainMenuScene.
-- [ ] Auto-save on `_ready()`: `if SaveManager.active_slot > 0: SaveManager.save(active_slot)`.
-- [ ] Header "◆ CAMPFIRE ◆"; character status row (`Wounds: X/Y | Fervor: dN [BURNOUT]`); run progress row (`Encounter X/Y`).
-- [ ] Equipment selector (same weapon-button row as HubScene).
-- [ ] **Consumables stub block** — comment `# --- CONSUMABLES (deferred) ---` + placeholder Label "No consumables."
-- [ ] **Short Rest** button: disabled + "(used)" label when `DungeonManager.short_rest_used`. On press: `DungeonManager.attempt_short_rest()`, refresh.
-- [ ] **Long Rest** button: always available. On press: call `DungeonManager.attempt_long_rest()`; show "Rested safely." or "⚠ Ambushed! Next fight: Disadvantage." feedback; refresh status.
-- [ ] **Constellation** button → navigate to `ConstellationScene`.
-- [ ] **Continue** button (shows ambush warning label when `DungeonManager.ambush_net_advantage != 0`) → navigate to `BattleScene`.
-- [ ] **Give Up** button → `DungeonManager.on_defeat()`, navigate to `MainMenuScene`.
+- [x] Guard in `_ready()`: if `not DungeonManager.run_active`, redirect to MainMenuScene.
+- [x] Auto-save on `_ready()`: `if SaveManager.active_slot > 0: SaveManager.save(active_slot)`.
+- [x] Header "◆ CAMPFIRE ◆"; character status row (`Wounds: X/Y | Fervor: dN [BURNOUT]`); run progress row (`Encounter X/Y`).
+- [x] Equipment selector (same weapon-button row as HubScene).
+- [x] **Consumables stub block** — comment `# --- CONSUMABLES (deferred) ---` + placeholder Label "No consumables."
+- [x] **Short Rest** button: disabled + "(used)" label when `DungeonManager.short_rest_used`. On press: `DungeonManager.attempt_short_rest()`, refresh.
+- [x] **Long Rest** button: always available. On press: call `DungeonManager.attempt_long_rest()`; show "Rested safely." or "⚠ Ambushed! Next fight: Disadvantage." feedback; refresh status.
+- [x] **Constellation** button → navigate to `ConstellationScene`.
+- [x] **Continue** button (shows ambush warning label when `DungeonManager.ambush_net_advantage != 0`) → navigate to `BattleScene`.
+- [x] **Give Up** button → `DungeonManager.surrender()`, navigate to `MainMenuScene`.
 
 **Phase C — Wire up callers (sequential after Phase B)**
 
 `scenes/battle/BattleScene.gd`:
-- [ ] Store `_ambush_base_disadvantage: int = DungeonManager.ambush_net_advantage` in `_ready()`.
-- [ ] Add `_ambush_base_disadvantage` to `net_advantage` in every `player_chose_strike()` call.
-- [ ] Post-combat navigation: victory + `has_next_enemy()` → CampfireScene; victory + run complete → MainMenuScene; defeat → MainMenuScene.
+- [x] Store `_ambush_base_disadvantage: int = DungeonManager.ambush_net_advantage` in `_ready()`.
+- [x] Add `_ambush_base_disadvantage` to `net_advantage` in every `player_chose_strike()` call.
+- [x] Post-combat navigation: victory + `has_next_enemy()` → CampfireScene; victory + run complete → MainMenuScene; defeat → MainMenuScene.
 
 `scenes/constellation/ConstellationScene.gd`:
-- [ ] Back button: navigate to CampfireScene if `DungeonManager.run_active`, else MainMenuScene.
+- [x] Back button: navigate to CampfireScene if `DungeonManager.run_active`, else MainMenuScene.
 
 `project.godot`:
-- [ ] Change `run/main_scene` to `"res://scenes/main_menu/MainMenuScene.tscn"`.
+- [x] Change `run/main_scene` to `"res://scenes/main_menu/MainMenuScene.tscn"`.
 
 **Phase D — Cleanup + validation**
-- [ ] Delete `scenes/hub/HubScene.gd` and `scenes/hub/HubScene.tscn`.
-- [ ] Run headless validation; confirm zero SCRIPT ERRORs.
-- [ ] Run `/refresh-index` (new `.gd` files added, old ones deleted).
+- [x] Delete `scenes/hub/HubScene.gd` and `scenes/hub/HubScene.tscn`.
+- [x] Run headless validation; confirm zero SCRIPT ERRORs.
+- [x] Run `/refresh-index` (new `.gd` files added, old ones deleted).
 
 Navigation map (post-implementation):
 ```
@@ -355,11 +354,151 @@ ConstellationScene ─Back (run_active)─────────────�
 
 Deferred stubs: consumable items (comment block in CampfireScene), money deduction on ambush (comment in `attempt_long_rest()`), skill-point loss on ambush (not implemented), ambush as a true extra encounter (future design decision).
 
+### Group 7 — Action System Foundation
+
+Refactors `EquipmentData` from global flat stats to an action-keyed modifier model. Each item
+exposes an `Array[ActionModifier]` where each entry declares what it can do (`"strike"`, `"defend"`,
+etc.) and its per-action tier cap, flat, keep, and pool bonuses. This supersedes the Group 2
+`EquipmentData` flat-stat design and the `Inefficiency rule` stub (deferred since Group 2).
+
+Three sequential phases.
+
+**Phase A — `ActionModifier` resource + `EquipmentData` refactor**
+- [x] New `resources/ActionModifier.gd` (`class_name ActionModifier`). Fields: `action_key: String`,
+  `action_name: String`, `tier_cap: int` (0 = uncapped; replaces global `potency`), `flat_bonus: int`,
+  `keep_bonus: int`, `pool_bonus: int`, `parent_action_key: String` (derived-action stub),
+  `derivation_ratio: float` (stub, 0.0 = not derived), `rest_type: String`
+  (`""`|`"combat"`|`"short"`|`"long"`), `uses_per_rest: int` (0 = passive/unlimited).
+- [x] `resources/EquipmentData.gd`: add `action_modifiers: Array[ActionModifier]`. Retain old flat
+  fields (`flat_attack_bonus`, `flat_guard_bonus`, `pool_bonus`, `potency`) as a deprecated shim —
+  ignored at runtime when `action_modifiers` is non-empty.
+- [x] Migrate all three weapon `.tres` files to populate `action_modifiers`. Each gets both a
+  `"strike"` and a `"defend"` modifier. Strike: `tier_cap` ← current `potency`, `flat_bonus` ←
+  `flat_attack_bonus`. Defend: `tier_cap = 1` (mundane weapons defend weakly), `flat_bonus` ←
+  `flat_guard_bonus`. Most war tools get both; exotic exceptions (throwables, etc.) may omit
+  `"defend"` explicitly.
+  *Design reference values — Sharp sword: strike tier_cap=2 flat=3; defend tier_cap=1 flat=1.*
+  *Heavy shield (future): strike tier_cap=1 flat=2; defend tier_cap=3 flat=3.*
+- [x] `resources/CombatantData.gd`: add `bare_hands_actions: Array[ActionModifier]`.
+  `player_default.tres`: populate with a minimal unarmed `"strike"` modifier (all zeros).
+- [x] Run `/refresh-index`.
+
+**Phase B — `CombatManager` action resolution refactor**
+- [x] New helpers:
+  - `_get_action_modifier(state: CombatantState, action_key: String) -> ActionModifier` — scans
+    equipped weapon `action_modifiers`; falls back to `state.data.bare_hands_actions`; returns a
+    zero-value stub if neither has the key (no crash, no penalty).
+  - `_derived_modifier(mod: ActionModifier, parent: ActionModifier) -> ActionModifier` — applies
+	`derivation_ratio` (floor) to parent's flat_bonus, keep_bonus, pool_bonus. Called when
+	`parent_action_key != ""`. Architecture-ready; no derived actions authored yet.
+- [x] Refactor `_attack_flat()`, `_guard_flat()`, `_pool_bonus()` to use `_get_action_modifier`.
+  Net combat outcome: unchanged.
+- [x] `_effective_tier()` updated to accept an `ActionModifier` and cap via `modifier.tier_cap`
+  instead of `EquipmentData.potency` (0 = uncapped, no change).
+- [x] New field on `CombatantState`: `item_action_charges: Dictionary` (action_key → remaining uses).
+  Initialized at `start_combat()` from all `ActionModifier`s with `rest_type = "combat"`.
+- [x] `DungeonManager.attempt_short_rest()` / `attempt_long_rest()`: reset matching item charges
+  via new `CombatManager.reset_item_charges(rest_type: String)` public method.
+
+**Phase C — `CombatPreferences` resource**
+- [x] New `resources/CombatPreferences.gd` (plain `Resource`). Fields: `atk_mode: String = "manual"`,
+  `def_mode: String = "auto"`, `defaults: Dictionary = {}`.
+  Defaults key format: `"attack.strike.pool"` → `"stance"`, `"attack.cast_spell.spell_id"` → `"fireball"`.
+- [x] Add `combat_prefs: CombatPreferences` to `PlayerProgression`. Instantiated in `reset()`.
+- [x] Include in `PlayerProgression.serialize()` / `deserialize()`.
+- [x] Run `/refresh-index`.
+
+---
+
+### Group 7.5 — Cascading Combat UI (Intent → Tool → Execution)
+
+Replaces the flat Strike / Cantrip / Spell button row with a three-layer cascading menu driven by
+action keys. Pool selection is promoted from debug widget to production UI. Depends on Group 7.
+
+Four sequential phases.
+
+**Phase A — Intent layer**
+- [ ] `CombatManager` gains signal: `player_intents_available(intents: Array[String])`. Emitted
+  from `_begin_round()` alongside `player_action_required`. Intent values: `"attack"` (always),
+  `"magic"` (when `has_minor_studies` or `has_spellcasting`), `"item"` (stub — disabled,
+  label "coming soon").
+- [ ] `RoundHUD`: replace `_on_player_action_required()` with `_on_intents_available(intents)`.
+  Top-level buttons become one button per intent. Compact row, dark-fantasy styled.
+
+**Phase B — Tool sub-panel**
+- [ ] Selecting an intent opens a Tool panel listing items whose `action_modifiers` contain a
+  matching `action_key`:
+  - `"attack"` → items with `"strike"`. With one weapon, auto-collapses to Execution panel.
+  - `"magic"` → conceptual `[Arcane Arts]` entry (not a physical item; stat source = Ingenuity).
+	Always single-entry; auto-collapses.
+  - Each entry shows: item name, modifier summary (e.g. `"Flat +1  Tier ≤ 2"`), Select button.
+
+**Phase C — Execution options panel**
+- [ ] Selecting a tool opens an Execution panel:
+  - For Strike: pool options (Stance / Resolve / Stamina) with modifier preview per pool
+	(e.g. `"Stance — Flat +1, Guard stat: Negation"`).
+  - For Cantrip / Spell: known spell list (replaces current popup).
+  - Each option has a `[★]` pin that writes to `CombatPreferences.defaults` and shows confirmation.
+  - Confirm → `CombatManager.player_chose_*`.
+- [ ] `DebugPoolSelector` retired from production; pool selection lives in this panel.
+  `DebugAdvantageControl` remains debug-only (net advantage is not a player-facing choice).
+- [ ] Brutal Trade checkbox moved from top-level `RoundHUD` into the Strike execution panel
+  (visible when `dom_brutal >= 1`). Same logic, new location.
+- [ ] Execution panel shows roll preview: `tier × avg_die_face + flat_bonus`.
+
+**Phase D — Auto-collapse and back-navigation**
+- [ ] Each layer has a Back button to return to the previous panel.
+- [ ] Single-option layers collapse automatically (no Back button shown for that layer).
+- [ ] Panel state is cleared when `player_action_required` fires again (start of each round).
+
+---
+
+### Group 7.6 — Breakpoint System (ATK & DEF Modes)
+
+Adds Auto / Manual mode toggles to combat pacing. ATK Auto follows saved defaults or falls back to
+a scored heuristic. DEF Observe pauses before the enemy's attack resolves to display incoming info.
+Depends on Groups 7 and 7.5.
+
+Three sequential phases.
+
+**Phase A — ATK Mode toggle**
+- [ ] `RoundHUD`: ATK toggle button (`"ATK: Manual"` / `"ATK: Auto"`) reads/writes
+  `CombatPreferences.atk_mode`. Styled as a mode indicator, not a primary action.
+- [ ] **Manual Mode** (default): waits for player to navigate cascading menus (current behavior, now named).
+- [ ] **Auto Mode** flow in `CombatManager._begin_round()`:
+  1. Read full default path from `CombatPreferences.defaults`.
+  2. Complete path found → execute immediately; log `"[Auto] Strike → Stance (default)"`.
+  3. Any step undefined → call `_auto_best_action()` and execute; log
+     `"[Auto-Best] Strike → Stance (score: 6.5)"`.
+
+**Phase B — `_auto_best_action()` in `CombatManager`**
+- [ ] Private helper `_auto_best_action(state: CombatantState, intent: String) -> Dictionary`.
+  Returns `{ action_key, execution_params }`.
+- [ ] Score formula: `(effective_tier × (1 + die_size) / 2.0) + flat_bonus`. Higher = better.
+  Tie-breaking: saved default first, then first in encounter order.
+- [ ] Called only when `atk_mode == "auto"` and no complete default path exists.
+- [ ] Magic actions always fall through to Manual if no default is set (Auto-Best for magic deferred).
+- [ ] Add `docs/game-rules/combat-auto-best.md` — documents the heuristic formula as a game rule.
+
+**Phase C — DEF Observe Mode**
+- [ ] `RoundHUD`: DEF toggle (`"DEF: Auto"` / `"DEF: Observe"`) reads/writes `CombatPreferences.def_mode`.
+- [ ] **Auto Mode** (default): fully automatic defense as today.
+- [ ] **Observe Mode**: `_resolve_attack()` emits new signal
+  `player_defense_incoming(attacker_name: String, attack_total: int, target_pool: String)` before
+  rolling defense. `CombatManager` awaits `_defense_acknowledged` signal. `BattleScene` connects
+  → `RoundHUD.show_defense_overlay(...)`. Overlay: attacker name, attack total, target pool, `[ OK ]`
+  button → emits `_defense_acknowledged`. Defense rolls automatically after OK. No mechanic change.
+  *Note: Active DEF Mode (player chooses defensive tool/action) is a future design task — requires
+  designing defensive action types per weapon. Deferred to Future.*
+
+---
+
 ### Future — Undesigned or blocked items
 
 - **Brutal L2 Cleave** — multi-enemy overflow after a breach. Group 5 roster exists (3 enemies), but Cleave needs a design decision on overflow mechanics (does excess damage carry over? to which target? in what order?) before implementation.
 - **Negation and Ingenuity subtrees** — `neg_core.tres` and `ing_core.tres` exist as Core-only nodes. Training and ability nodes (analogues to the Dominion tree) are not yet designed or roadmapped.
 - **Cantrip count formula** — currently all known cantrips are always available; a future "known slots" cap is deferred.
-- **Inefficiency rule** — Potency → 1 / Flat → 0 without matching Training node. Deferred since Group 2.
+- **Inefficiency rule** — superseded by Group 7 (per-action tier caps on `ActionModifier` replace the old Potency-without-training penalty). No separate implementation needed.
 - **Cumulative Disadvantage** — second+ different pool targeted in the same turn should stack Disadvantage. Deferred since Group 1.
 - **Hybrid node proportional positioning** — nodes that depend on two different stat trees should be placed on the constellation canvas at a position proportional to their dependency tiers. Example: a node requiring Dominion Tier 3 and Negation Tier 1 sits 3× closer to the Dominion vertex than the Negation vertex (weighted barycentric interpolation between the two vertices using the required tier values as weights). Blocked on: Negation and Ingenuity subtrees being designed.
+- **Active DEF Mode** — player chooses a defensive tool/action (e.g. Parry with Iron Sword vs. Dodge) when an enemy attacks. Requires game design work on defensive action types per weapon. Blocked on that design work.

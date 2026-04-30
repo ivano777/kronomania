@@ -111,6 +111,7 @@ func attempt_short_rest() -> void:
 	if short_rest_used:
 		return
 	PlayerProgression.apply_short_rest()
+	CombatManager.reset_item_charges("short")
 	short_rest_used = true
 
 
@@ -119,6 +120,8 @@ func attempt_long_rest() -> Dictionary:
 		return {"ambushed": false}
 	long_rest_used = true
 	PlayerProgression.apply_long_rest()
+	CombatManager.reset_item_charges("long")
+	CombatManager.reset_item_charges("combat")
 	var ambushed := randi() % 100 < (50 - PlayerProgression.luck)
 	if ambushed:
 		_ambush_enemies = [_pick_ambush_enemy()]

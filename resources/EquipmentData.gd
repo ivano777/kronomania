@@ -23,3 +23,6 @@ extends Resource
 
 ## Weapon tags (e.g. "Sharp", "Blunt", "Flame") for future skill prerequisites.
 @export var tags: PackedStringArray = PackedStringArray()
+
+## Action-keyed modifiers. When non-empty, supersedes the deprecated flat fields above.
+@export var action_modifiers: Array[ActionModifier] = []

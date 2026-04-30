@@ -87,6 +87,7 @@ class CombatantState:
 	var known_cantrips: Array = []  # Array[SpellData] — cantrip spells, player only
 	var stamina_degrade_charges: int = 0  # Meat for the Grinder: charges to degrade Massive Wounds
 	var space_domination_active: bool = false  # Melee L2: Advantage on first Stamina guard roll each combat
+	var item_action_charges: Dictionary = {}   # action_key → remaining uses (from ActionModifier.uses_per_rest)
 
 	func init(d: CombatantData) -> void:
 		data = d
@@ -177,6 +178,12 @@ func start_combat(player_data: CombatantData, enemies_data: Array) -> void:
 		state.init(ed)
 		_enemies.append(state)
 		wounds_changed.emit(false, i, 0, state.max_wounds)
+
+	# Initialise per-combat item charges for all combatants.
+	for state in ([_player] as Array) + _enemies:
+		for mod in _get_all_action_modifiers(state):
+			if mod.rest_type == "combat" and mod.uses_per_rest > 0:
+				state.item_action_charges[mod.action_key] = mod.uses_per_rest
 
 	_round = 0
 	_waiting_for_player = false
@@ -288,7 +295,8 @@ func _resolve_round(net_advantage: int = 0, target_pool: String = "stance", brut
 		log_message.emit("  [color=yellow]Brutal Trade: VT −5, Flat +5.[/color]")
 
 	# ── Roll player attack pool ────────────────────────────────────────────
-	var keep_grade := _physical_keep_grade(_player) + _node_weapon_bonus_sum(_player, "weapon_keep")
+	var _strike_mod := _get_action_modifier(_player, "strike")
+	var keep_grade := _physical_keep_grade(_player) + _node_weapon_bonus_sum(_player, "weapon_keep") + _strike_mod.keep_bonus
 	var brutal_flat := 5 if brutal_trade else 0
 
 	var earthshatter_size := 0
@@ -297,7 +305,7 @@ func _resolve_round(net_advantage: int = 0, target_pool: String = "stance", brut
 		log_message.emit("  [color=cyan]Earthshatter![/color] Post-keep Dominion d%d added." % earthshatter_size)
 
 	var p_atk := RollEngine.resolve(
-		_effective_tier(_player), _stat_size(_player, "dominion"), keep_grade,
+		_effective_tier(_player, _strike_mod), _stat_size(_player, "dominion"), keep_grade,
 		_attack_flat(_player) + brutal_flat,
 		net_advantage + _pool_bonus(_player),
 		0, 0, 0, earthshatter_size
@@ -319,7 +327,7 @@ func _resolve_round(net_advantage: int = 0, target_pool: String = "stance", brut
 		var e_vt: int = e.data.velocity_threshold - (5 if brutal_trade and i == target_index else 0)
 		if not RollEngine.is_fast(p_total, e_vt):
 			var e_atk := RollEngine.resolve(
-				_effective_tier(e), _stat_size(e, "dominion"), _training_keep_grade(e), _attack_flat(e)
+				_effective_tier(e, _get_action_modifier(e, "strike")), _stat_size(e, "dominion"), _training_keep_grade(e), _attack_flat(e)
 			)
 			log_message.emit(_fmt_attack(e.data.combatant_name, e_atk))
 			var e_pool := target_pool if i == target_index else "stance"
@@ -344,7 +352,7 @@ func _resolve_round(net_advantage: int = 0, target_pool: String = "stance", brut
 		var e_vt: int = e.data.velocity_threshold - (5 if brutal_trade and i == target_index else 0)
 		if RollEngine.is_fast(p_total, e_vt):
 			var e_atk := RollEngine.resolve(
-				_effective_tier(e), _stat_size(e, "dominion"), _training_keep_grade(e), _attack_flat(e)
+				_effective_tier(e, _get_action_modifier(e, "strike")), _stat_size(e, "dominion"), _training_keep_grade(e), _attack_flat(e)
 			)
 			log_message.emit(_fmt_attack(e.data.combatant_name, e_atk))
 			var e_pool := target_pool if i == target_index else "stance"
@@ -368,7 +376,7 @@ func _resolve_round_cantrip(spell: SpellData, target_index: int = 0) -> void:
 	])
 
 	var p_atk := RollEngine.resolve(
-		_effective_tier(_player), _stat_size(_player, "ingenuity"), _training_keep_grade(_player),
+		_effective_tier(_player, _get_action_modifier(_player, "strike")), _stat_size(_player, "ingenuity"), _training_keep_grade(_player),
 		spell.flat_bonus, _pool_bonus(_player)
 	)
 	log_message.emit(_fmt_attack(_player.data.combatant_name, p_atk) + " [cantrip]")
@@ -384,7 +392,7 @@ func _resolve_round_cantrip(spell: SpellData, target_index: int = 0) -> void:
 			continue
 		if not RollEngine.is_fast(p_total, e.data.velocity_threshold):
 			var e_atk := RollEngine.resolve(
-				_effective_tier(e), _stat_size(e, "dominion"), _training_keep_grade(e), _attack_flat(e)
+				_effective_tier(e, _get_action_modifier(e, "strike")), _stat_size(e, "dominion"), _training_keep_grade(e), _attack_flat(e)
 			)
 			log_message.emit(_fmt_attack(e.data.combatant_name, e_atk))
 			var e_pool := spell.target_pool if i == target_index else "stance"
@@ -408,7 +416,7 @@ func _resolve_round_cantrip(spell: SpellData, target_index: int = 0) -> void:
 			continue
 		if RollEngine.is_fast(p_total, e.data.velocity_threshold):
 			var e_atk := RollEngine.resolve(
-				_effective_tier(e), _stat_size(e, "dominion"), _training_keep_grade(e), _attack_flat(e)
+				_effective_tier(e, _get_action_modifier(e, "strike")), _stat_size(e, "dominion"), _training_keep_grade(e), _attack_flat(e)
 			)
 			log_message.emit(_fmt_attack(e.data.combatant_name, e_atk))
 			var e_pool := spell.target_pool if i == target_index else "stance"
@@ -470,7 +478,7 @@ func _resolve_round_spell(spell: SpellData, target_index: int = 0) -> void:
 		log_message.emit("  [color=yellow]School bonus: %s[/color]" % ", ".join(parts))
 
 	var p_atk := RollEngine.resolve(
-		_effective_tier(_player) + spell_pool_bonus,
+		_effective_tier(_player, _get_action_modifier(_player, "strike")) + spell_pool_bonus,
 		_stat_size(_player, "ingenuity"),
 		_training_keep_grade(_player) + spell_keep_bonus,
 		spell.flat_bonus, _pool_bonus(_player), _player.fervor_size,
@@ -489,7 +497,7 @@ func _resolve_round_spell(spell: SpellData, target_index: int = 0) -> void:
 			continue
 		if not RollEngine.is_fast(p_total, e.data.velocity_threshold):
 			var e_atk := RollEngine.resolve(
-				_effective_tier(e), _stat_size(e, "dominion"), _training_keep_grade(e), _attack_flat(e)
+				_effective_tier(e, _get_action_modifier(e, "strike")), _stat_size(e, "dominion"), _training_keep_grade(e), _attack_flat(e)
 			)
 			log_message.emit(_fmt_attack(e.data.combatant_name, e_atk))
 			var e_pool := spell.target_pool if i == target_index else "stance"
@@ -513,7 +521,7 @@ func _resolve_round_spell(spell: SpellData, target_index: int = 0) -> void:
 			continue
 		if RollEngine.is_fast(p_total, e.data.velocity_threshold):
 			var e_atk := RollEngine.resolve(
-				_effective_tier(e), _stat_size(e, "dominion"), _training_keep_grade(e), _attack_flat(e)
+				_effective_tier(e, _get_action_modifier(e, "strike")), _stat_size(e, "dominion"), _training_keep_grade(e), _attack_flat(e)
 			)
 			log_message.emit(_fmt_attack(e.data.combatant_name, e_atk))
 			var e_pool := spell.target_pool if i == target_index else "stance"
@@ -564,7 +572,7 @@ func _resolve_attack(attacker_is_player: bool, enemy_index: int, attack_result: 
 			_player.space_domination_active = false
 			log_message.emit("  [color=cyan]Space Domination: Advantage on Stamina guard![/color]")
 		var def_result := RollEngine.resolve(
-				_effective_tier(defender), defensive_size,
+				_effective_tier(defender, _get_action_modifier(defender, "defend")), defensive_size,
 				_training_keep_grade(defender), _guard_flat(defender),
 				sd_adv
 			)
@@ -708,30 +716,63 @@ func _get_pool_size(state: CombatantState, pool: String) -> int:
 	return _stat_size(state, "negation")
 
 
-## Effective Tier: tier_override if set (player Tier from Constellation), else data.tier,
-## then capped by equipment Potency.
-func _effective_tier(state: CombatantState) -> int:
+## Effective Tier: tier_override if set, else data.tier, capped by ActionModifier.tier_cap.
+## Pass the relevant ActionModifier (strike or defend); null or tier_cap=0 means uncapped.
+func _effective_tier(state: CombatantState, mod: ActionModifier = null) -> int:
 	var base := state.tier_override if state.tier_override > 0 else state.data.tier
-	var w: EquipmentData = state.weapon_override if state.weapon_override else state.data.equipped_weapon
-	return mini(base, w.potency) if w else base
+	if mod == null or mod.tier_cap == 0:
+		return base
+	return mini(base, mod.tier_cap)
 
 
-## Flat bonus applied to attack rolls: weapon Forging + matching weapon_flat node bonuses.
+## Flat bonus applied to attack rolls: strike ActionModifier flat + weapon_flat node bonuses.
 func _attack_flat(state: CombatantState) -> int:
-	var w: EquipmentData = state.weapon_override if state.weapon_override else state.data.equipped_weapon
-	return (w.flat_attack_bonus if w else 0) + _node_weapon_bonus_sum(state, "weapon_flat")
+	return _get_action_modifier(state, "strike").flat_bonus + _node_weapon_bonus_sum(state, "weapon_flat")
 
 
-## Flat bonus applied to defense rolls from equipped weapon (Warding).
+## Flat bonus applied to defense rolls: defend ActionModifier flat.
 func _guard_flat(state: CombatantState) -> int:
-	var w: EquipmentData = state.weapon_override if state.weapon_override else state.data.equipped_weapon
-	return w.flat_guard_bonus if w else 0
+	return _get_action_modifier(state, "defend").flat_bonus
 
 
-## Pool size modifier from equipped weapon (Surge/Drain).
-func _pool_bonus(state: CombatantState) -> int:
+## Pool size modifier from the ActionModifier for the given action key.
+func _pool_bonus(state: CombatantState, action_key: String = "strike") -> int:
+	return _get_action_modifier(state, action_key).pool_bonus
+
+
+## Looks up the ActionModifier for action_key: weapon first, bare_hands fallback, zero stub last.
+func _get_action_modifier(state: CombatantState, action_key: String) -> ActionModifier:
 	var w: EquipmentData = state.weapon_override if state.weapon_override else state.data.equipped_weapon
-	return w.pool_bonus if w else 0
+	if w:
+		for mod in w.action_modifiers:
+			if mod.action_key == action_key:
+				return mod
+	for mod in state.data.bare_hands_actions:
+		if mod.action_key == action_key:
+			return mod
+	var stub := ActionModifier.new()
+	stub.action_key = action_key
+	return stub
+
+
+## Architecture stub: applies derivation_ratio to parent's bonuses (floor). No derived actions yet.
+func _derived_modifier(mod: ActionModifier, parent: ActionModifier) -> ActionModifier:
+	var derived := mod.duplicate() as ActionModifier
+	if mod.parent_action_key != "" and mod.derivation_ratio > 0.0:
+		derived.flat_bonus  = floori(parent.flat_bonus  * mod.derivation_ratio)
+		derived.keep_bonus  = floori(parent.keep_bonus  * mod.derivation_ratio)
+		derived.pool_bonus  = floori(parent.pool_bonus  * mod.derivation_ratio)
+	return derived
+
+
+## Returns all ActionModifiers for a state: weapon modifiers + bare_hands modifiers.
+func _get_all_action_modifiers(state: CombatantState) -> Array:
+	var w: EquipmentData = state.weapon_override if state.weapon_override else state.data.equipped_weapon
+	var result: Array = []
+	if w:
+		result.append_array(w.action_modifiers)
+	result.append_array(state.data.bare_hands_actions)
+	return result
 
 
 ## Returns the max effect_value across all purchased NodeLevelData entries matching the given key.
@@ -844,6 +885,19 @@ func _escalate_fervor(state: CombatantState, steps: int) -> void:
 		log_message.emit("[color=orange][b]BURNOUT![/b] Fervor surged beyond control. True spells blocked until next combat.[/color]")
 	state.fervor_size = mini(new_size, cap)
 	fervor_changed.emit(state == _player, state.fervor_size, cap, state.is_burned_out)
+
+
+## Resets item action charges for all active combatants matching the given rest_type.
+## Called by DungeonManager on short/long rest. No-op when no combat is running.
+func reset_item_charges(rest_type: String) -> void:
+	var all_states: Array = []
+	if _player != null:
+		all_states.append(_player)
+	all_states.append_array(_enemies)
+	for state in all_states:
+		for mod in _get_all_action_modifiers(state):
+			if mod.rest_type == rest_type and mod.uses_per_rest > 0:
+				state.item_action_charges[mod.action_key] = mod.uses_per_rest
 
 
 ## Debug only — swap the player's weapon at runtime without restarting combat.

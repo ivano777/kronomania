@@ -38,3 +38,6 @@ extends Resource
 ## Constellation nodes this combatant starts with.
 ## keep_grade above is used as fallback when no Training node provides a value.
 @export var starting_nodes: Array[NodeData] = []
+
+## Fallback action modifiers used when no weapon is equipped or weapon lacks the action key.
+@export var bare_hands_actions: Array[ActionModifier] = []

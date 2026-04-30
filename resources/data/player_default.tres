@@ -2,6 +2,12 @@
 
 [ext_resource type="Script" uid="uid://t8js5de36gq8" path="res://resources/CombatantData.gd" id="1_cdscr"]
 [ext_resource type="Resource" uid="uid://b7k4ry9mj2cph" path="res://resources/data/weapons/iron_sword.tres" id="2_weapon"]
+[ext_resource type="Script" path="res://resources/ActionModifier.gd" id="3_amscr"]
+
+[sub_resource type="Resource" id="UnarmedStrike"]
+script = ExtResource("3_amscr")
+action_key = "strike"
+action_name = "Unarmed Strike"
 
 [resource]
 script = ExtResource("1_cdscr")
@@ -10,3 +16,4 @@ dominion_size = 4
 negation_size = 4
 ingenuity_size = 4
 equipped_weapon = ExtResource("2_weapon")
+bare_hands_actions = [SubResource("UnarmedStrike")]

@@ -76,6 +76,8 @@ var saved_is_burned_out: bool = false
 var saved_wounds: int = 0
 ## Hidden stat — each point reduces Long Rest ambush probability by 1 percentage point.
 var luck: int = 0
+## Saved combat action defaults and mode settings (consumed by Group 7.5 / 7.6).
+var combat_prefs: CombatPreferences = CombatPreferences.new()
 
 
 ## Returns the current level of a node (0 = not purchased).
@@ -137,6 +139,7 @@ func reset() -> void:
 	saved_fervor_size = 4
 	saved_is_burned_out = false
 	equipped_weapon = null
+	combat_prefs = CombatPreferences.new()
 
 
 func apply_long_rest() -> void:
@@ -227,6 +230,11 @@ func serialize() -> Dictionary:
 		"saved_is_burned_out": saved_is_burned_out,
 		"luck":                luck,
 		"equipped_weapon":     equipped_weapon.item_name if equipped_weapon != null else "",
+		"combat_prefs": {
+			"atk_mode": combat_prefs.atk_mode,
+			"def_mode": combat_prefs.def_mode,
+			"defaults": combat_prefs.defaults.duplicate(),
+		},
 	}
 
 
@@ -253,6 +261,12 @@ func deserialize(data: Dictionary) -> void:
 			if (w as EquipmentData).item_name == wname:
 				equipped_weapon = w
 				break
+	combat_prefs = CombatPreferences.new()
+	if data.has("combat_prefs"):
+		var p: Dictionary = data["combat_prefs"]
+		combat_prefs.atk_mode = str(p.get("atk_mode", "manual"))
+		combat_prefs.def_mode = str(p.get("def_mode", "auto"))
+		combat_prefs.defaults = (p.get("defaults", {}) as Dictionary).duplicate()
 
 
 func _node_by_id(id: String) -> NodeData:
