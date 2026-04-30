@@ -84,16 +84,11 @@ func _ready() -> void:
 
 	_select_target(0)
 
-	# Connect RoundHUD action buttons/selections.
-	_round_hud.strike_pressed.connect(_on_strike_pressed)
+	# Connect RoundHUD action signals.
+	_round_hud.strike_confirmed.connect(_on_strike_confirmed)
 	_round_hud.cantrip_selected.connect(_on_cantrip_selected)
 	_round_hud.spell_selected.connect(_on_spell_selected)
 	_round_hud.wound_degrade_chosen.connect(_on_wound_degrade_chosen)
-
-	_round_hud.set_spell_lists(
-		PlayerProgression.get_known_spells(),
-		PlayerProgression.get_known_cantrips()
-	)
 
 	# Connect CombatManager signals.
 	CombatManager.log_message.connect(_on_log)
@@ -102,7 +97,7 @@ func _ready() -> void:
 	CombatManager.wounds_changed.connect(_on_wounds_changed)
 	CombatManager.guard_changed.connect(_on_guard_changed)
 	CombatManager.combat_ended.connect(_on_combat_ended)
-	CombatManager.player_action_required.connect(_on_player_action_required)
+	CombatManager.player_intents_available.connect(_on_intents_available)
 	CombatManager.player_magic_available.connect(_on_player_magic_available)
 	CombatManager.fervor_changed.connect(_on_fervor_changed)
 	CombatManager.player_massive_incoming.connect(_on_player_massive_incoming)
@@ -166,8 +161,7 @@ func _on_guard_changed(is_player: bool, enemy_index: int, pool: String, guard_va
 
 
 func _on_combat_ended(winner_name: String) -> void:
-	_round_hud.disable_strike()
-	_round_hud.disable_magic()
+	_round_hud.disable_actions()
 	if winner_name != PLAYER_DATA.combatant_name:
 		DungeonManager.on_defeat()
 		if SaveManager.active_slot > 0:
@@ -199,8 +193,8 @@ func _on_combat_ended(winner_name: String) -> void:
 			get_tree().change_scene_to_file("res://scenes/main_menu/MainMenuScene.tscn")
 
 
-func _on_player_action_required() -> void:
-	_round_hud.enable_strike()
+func _on_intents_available(intents: Array[String]) -> void:
+	_round_hud.show_intents(intents)
 
 
 func _on_player_magic_available(can_cantrip: bool, can_cast_spell: bool) -> void:
@@ -220,11 +214,11 @@ func _on_wound_degrade_chosen(use_charge: bool) -> void:
 	CombatManager.player_chose_degrade_wound(use_charge)
 
 
-func _on_strike_pressed() -> void:
+func _on_strike_confirmed(pool: String, brutal_trade: bool) -> void:
 	CombatManager.player_chose_strike(
 		_round_hud.get_net_advantage() + _ambush_base_disadvantage,
-		_round_hud.get_target_pool(),
-		_round_hud.get_brutal_trade(),
+		pool,
+		brutal_trade,
 		_target_index
 	)
 
@@ -244,7 +238,7 @@ func _teardown_signals() -> void:
 	CombatManager.wounds_changed.disconnect(_on_wounds_changed)
 	CombatManager.guard_changed.disconnect(_on_guard_changed)
 	CombatManager.combat_ended.disconnect(_on_combat_ended)
-	CombatManager.player_action_required.disconnect(_on_player_action_required)
+	CombatManager.player_intents_available.disconnect(_on_intents_available)
 	CombatManager.player_magic_available.disconnect(_on_player_magic_available)
 	CombatManager.fervor_changed.disconnect(_on_fervor_changed)
 	CombatManager.player_massive_incoming.disconnect(_on_player_massive_incoming)

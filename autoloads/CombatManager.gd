@@ -52,6 +52,9 @@ signal player_action_required()
 ## Emitted before player_action_required to inform the UI which magic actions are available.
 signal player_magic_available(can_cantrip: bool, can_cast_spell: bool)
 
+## Emitted before player_action_required listing available intent keys ("attack", "magic", "item").
+signal player_intents_available(intents: Array[String])
+
 ## Emitted whenever the player's Fervor state changes (initial emit at combat start).
 signal fervor_changed(is_player: bool, fervor_size: int, fervor_cap: int, is_burned_out: bool)
 
@@ -238,6 +241,7 @@ func player_chose_spell(spell: SpellData, target_index: int = 0) -> void:
 		return
 	if _player.is_burned_out:
 		log_message.emit("[color=orange]Burnout! True spells are blocked — choose Strike or Cantrip.[/color]")
+		_emit_player_intents()
 		player_magic_available.emit(_player.known_cantrips.size() > 0, false)
 		player_action_required.emit()
 		return
@@ -260,6 +264,14 @@ func debug_set_fervor(new_fervor_size: int, burned_out: bool) -> void:
 
 # ── Private — round flow ──────────────────────────────────────────────────────
 
+func _emit_player_intents() -> void:
+	var intents: Array[String] = ["attack"]
+	if _player.has_minor_studies or _player.has_spellcasting:
+		intents.append("magic")
+	intents.append("item")
+	player_intents_available.emit(intents)
+
+
 func _begin_round() -> void:
 	_round += 1
 
@@ -278,6 +290,7 @@ func _begin_round() -> void:
 	phase_changed.emit("Choose your action")
 
 	_waiting_for_player = true
+	_emit_player_intents()
 	player_magic_available.emit(
 		_player.known_cantrips.size() > 0,
 		_player.known_spells.size() > 0 and not _player.is_burned_out
@@ -904,6 +917,18 @@ func reset_item_charges(rest_type: String) -> void:
 func debug_set_player_weapon(weapon: EquipmentData) -> void:
 	if _player:
 		_player.weapon_override = weapon
+
+
+## Returns an approximate expected attack total for the player's current strike.
+## Formula: tier × (die_size + 1) / 2 + flat. Pool-independent — pool affects enemy guard only.
+func get_player_attack_preview() -> int:
+	if not _player:
+		return 0
+	var mod := _get_action_modifier(_player, "strike")
+	var tier := _effective_tier(_player, mod)
+	var die_size := _stat_size(_player, "dominion")
+	var flat := _attack_flat(_player)
+	return int(tier * (die_size + 1) / 2.0) + flat
 
 
 # ── Formatting helpers ────────────────────────────────────────────────────────
