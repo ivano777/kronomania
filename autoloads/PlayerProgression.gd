@@ -143,6 +143,7 @@ func reset() -> void:
 	saved_is_burned_out = false
 	equipped_weapon = null
 	combat_prefs = CombatPreferences.new()
+	_grant_default_keep_nodes()
 
 
 func apply_long_rest() -> void:
@@ -270,6 +271,14 @@ func deserialize(data: Dictionary) -> void:
 		combat_prefs.atk_mode = str(p.get("atk_mode", "manual"))
 		combat_prefs.def_mode = str(p.get("def_mode", "auto"))
 		combat_prefs.defaults = (p.get("defaults", {}) as Dictionary).duplicate()
+	_grant_default_keep_nodes()
+
+
+func _grant_default_keep_nodes() -> void:
+	for id in ["dom_martial_arts", "dom_stamina", "neg_stance", "ing_resolve"]:
+		var n := _node_by_id(id)
+		if n != null and get_level(n) < 1:
+			node_levels[n] = 1
 
 
 func _node_by_id(id: String) -> NodeData:

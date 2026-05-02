@@ -3,9 +3,19 @@
 [ext_resource type="Script" path="res://resources/NodeData.gd" id="1_ndscr"]
 [ext_resource type="Script" path="res://resources/NodeLevelData.gd" id="2_ldscr"]
 
-[sub_resource type="Resource" id="Level_1"]
+[sub_resource type="Resource" id="Level_0"]
 script = ExtResource("2_ldscr")
 level_index = 1
+cost = 0
+required_tier = 1
+prerequisites = []
+level_effect_description = "Baseline combat form. Keep 1 die on physical attack rolls."
+effect_type = "physical_keep"
+effect_value = 0
+
+[sub_resource type="Resource" id="Level_1"]
+script = ExtResource("2_ldscr")
+level_index = 2
 cost = 1
 required_tier = 1
 prerequisites = [{"node_id": "dom_core", "required_level": 1}]
@@ -15,10 +25,10 @@ effect_value = 1
 
 [sub_resource type="Resource" id="Level_2"]
 script = ExtResource("2_ldscr")
-level_index = 2
+level_index = 3
 cost = 1
 required_tier = 2
-prerequisites = [{"node_id": "dom_martial_arts", "required_level": 1}, {"node_id": "dom_core", "required_level": 2}]
+prerequisites = [{"node_id": "dom_martial_arts", "required_level": 2}, {"node_id": "dom_core", "required_level": 2}]
 level_effect_description = "Mastered technique. Keep 3 dice on physical attack rolls."
 effect_type = "physical_keep"
 effect_value = 2
@@ -29,5 +39,5 @@ node_id = "dom_martial_arts"
 display_name = "Martial Arts"
 category = "Training"
 base_description = "Disciplined combat training. Improves keep grade on physical attacks."
-max_levels = 2
-levels_data = [SubResource("Level_1"), SubResource("Level_2")]
+max_levels = 3
+levels_data = [SubResource("Level_0"), SubResource("Level_1"), SubResource("Level_2")]
