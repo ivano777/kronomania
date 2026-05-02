@@ -41,3 +41,15 @@ extends Resource
 
 ## Fallback action modifiers used when no weapon is equipped or weapon lacks the action key.
 @export var bare_hands_actions: Array[ActionModifier] = []
+
+
+## Returns the bare-hands modifier for action_key. Uses stored entry if present; otherwise
+## returns a named zero-stat stub so every creature always has bare-hands coverage.
+func get_bare_hands_modifier(action_key: String) -> ActionModifier:
+	for mod in bare_hands_actions:
+		if mod.action_key == action_key:
+			return mod
+	var stub := ActionModifier.new()
+	stub.action_key = action_key
+	stub.action_name = "Bare Hands"
+	return stub

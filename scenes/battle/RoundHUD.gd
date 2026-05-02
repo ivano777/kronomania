@@ -146,10 +146,6 @@ func _on_intent_magic() -> void:
 
 func _show_tool_panel(intent: String) -> void:
 	var entries: Array = _build_tool_entries(intent)
-	if entries.size() == 1:
-		_tool_was_collapsed = true
-		_on_tool_selected(intent, entries[0]["data"])
-		return
 	_tool_was_collapsed = false
 	_clear_action_panel()
 	_action_panel.add_child(_make_back_btn(func() -> void: show_intents(_last_intents)))
@@ -198,44 +194,45 @@ func _format_modifier_summary(mod: ActionModifier) -> String:
 	return "  ".join(parts)
 
 
-func _on_tool_selected(intent: String, _data) -> void:
+func _on_tool_selected(intent: String, data) -> void:
 	match intent:
-		"attack": _show_execution_strike()
+		"attack": _show_execution_strike(data as ActionModifier)
 		"magic":  _show_execution_magic()
 
 
 # ── Execution layer ───────────────────────────────────────────────────────────
 
-func _show_execution_strike() -> void:
+func _show_execution_strike(mod: ActionModifier) -> void:
 	_clear_action_panel()
-	var preview: int = CombatManager.get_player_attack_preview()
-	if _tool_was_collapsed:
-		_action_panel.add_child(_make_back_btn(func() -> void: show_intents(_last_intents)))
-	else:
-		_action_panel.add_child(_make_back_btn(func() -> void: _show_tool_panel(_current_intent)))
-	for pool_name: String in ["stance", "resolve", "stamina"]:
-		var row := HBoxContainer.new()
-		var pool_btn := Button.new()
-		pool_btn.text = pool_name.capitalize()
-		pool_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		var _p: String = pool_name
-		pool_btn.pressed.connect(func() -> void: _confirm_strike(_p))
-		row.add_child(pool_btn)
-		var preview_lbl := Label.new()
-		preview_lbl.text = "~%d avg" % preview
-		row.add_child(preview_lbl)
-		var pin_btn := Button.new()
-		pin_btn.text = "★"
-		pin_btn.custom_minimum_size = Vector2(32, 0)
-		var _pp: String = pool_name
-		var _pin: Button = pin_btn
-		pin_btn.pressed.connect(func() -> void: _pin_strike_pool(_pp, _pin))
-		row.add_child(pin_btn)
-		_action_panel.add_child(row)
+	_action_panel.add_child(_make_back_btn(func() -> void: _show_tool_panel(_current_intent)))
+	# Weapon + action name header
+	var w: EquipmentData = PlayerProgression.equipped_weapon
+	var weapon_name: String = w.item_name if w else "Bare Hands"
+	var action_label: String = mod.action_name if mod and mod.action_name != "" else "Strike"
+	var header_lbl := Label.new()
+	header_lbl.text = "%s — %s" % [weapon_name, action_label]
+	_action_panel.add_child(header_lbl)
+	# Stats + roll preview
+	var parts: Array[String] = []
+	if mod:
+		if mod.flat_bonus != 0:
+			parts.append("Flat %+d" % mod.flat_bonus)
+		if mod.tier_cap > 0:
+			parts.append("Tier ≤ %d" % mod.tier_cap)
+	parts.append("~%d avg" % CombatManager.get_player_attack_preview())
+	var stats_lbl := Label.new()
+	stats_lbl.text = "  |  ".join(parts)
+	_action_panel.add_child(stats_lbl)
+	# Brutal Trade toggle
 	if PlayerProgression.get_node_level_by_id("dom_brutal") >= 1:
 		_brutal_toggle = CheckButton.new()
 		_brutal_toggle.text = "Brutal Trade  (VT −5 / Flat +5)"
 		_action_panel.add_child(_brutal_toggle)
+	# Confirm button — pool is intrinsic to physical strikes (always "stance")
+	var confirm_btn := Button.new()
+	confirm_btn.text = action_label
+	confirm_btn.pressed.connect(_confirm_strike)
+	_action_panel.add_child(confirm_btn)
 
 
 func _show_execution_magic() -> void:
@@ -285,18 +282,10 @@ func _show_execution_magic() -> void:
 			_action_panel.add_child(btn)
 
 
-func _confirm_strike(pool: String) -> void:
+func _confirm_strike() -> void:
 	var bt: bool = get_brutal_trade()
 	disable_actions()
-	strike_confirmed.emit(pool, bt)
-
-
-func _pin_strike_pool(pool: String, btn: Button) -> void:
-	PlayerProgression.combat_prefs.defaults["attack.strike.pool"] = pool
-	btn.text = "✓"
-	await get_tree().create_timer(1.5).timeout
-	if is_instance_valid(btn):
-		btn.text = "★"
+	strike_confirmed.emit("stance", bt)
 
 
 func _on_massive_choice(use_charge: bool) -> void:

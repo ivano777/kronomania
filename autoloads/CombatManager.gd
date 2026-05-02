@@ -586,7 +586,7 @@ func _resolve_attack(attacker_is_player: bool, enemy_index: int, attack_result: 
 			log_message.emit("  [color=cyan]Space Domination: Advantage on Stamina guard![/color]")
 		var def_result := RollEngine.resolve(
 				_effective_tier(defender, _get_action_modifier(defender, "defend")), defensive_size,
-				_training_keep_grade(defender), _guard_flat(defender),
+				_training_keep_grade(defender) + _defense_keep_grade(defender, target_pool), _guard_flat(defender),
 				sd_adv
 			)
 		var guard_val: int = def_result.total as int
@@ -753,19 +753,14 @@ func _pool_bonus(state: CombatantState, action_key: String = "strike") -> int:
 	return _get_action_modifier(state, action_key).pool_bonus
 
 
-## Looks up the ActionModifier for action_key: weapon first, bare_hands fallback, zero stub last.
+## Looks up the ActionModifier for action_key: weapon first, then bare_hands (always present).
 func _get_action_modifier(state: CombatantState, action_key: String) -> ActionModifier:
 	var w: EquipmentData = state.weapon_override if state.weapon_override else state.data.equipped_weapon
 	if w:
 		for mod in w.action_modifiers:
 			if mod.action_key == action_key:
 				return mod
-	for mod in state.data.bare_hands_actions:
-		if mod.action_key == action_key:
-			return mod
-	var stub := ActionModifier.new()
-	stub.action_key = action_key
-	return stub
+	return state.data.get_bare_hands_modifier(action_key)
 
 
 ## Architecture stub: applies derivation_ratio to parent's bonuses (floor). No derived actions yet.
@@ -778,13 +773,17 @@ func _derived_modifier(mod: ActionModifier, parent: ActionModifier) -> ActionMod
 	return derived
 
 
-## Returns all ActionModifiers for a state: weapon modifiers + bare_hands modifiers.
+## Returns all ActionModifiers for a state: weapon modifiers + bare_hands (always present).
 func _get_all_action_modifiers(state: CombatantState) -> Array:
 	var w: EquipmentData = state.weapon_override if state.weapon_override else state.data.equipped_weapon
 	var result: Array = []
 	if w:
 		result.append_array(w.action_modifiers)
-	result.append_array(state.data.bare_hands_actions)
+	if not state.data.bare_hands_actions.is_empty():
+		result.append_array(state.data.bare_hands_actions)
+	else:
+		result.append(state.data.get_bare_hands_modifier("strike"))
+		result.append(state.data.get_bare_hands_modifier("defend"))
 	return result
 
 
@@ -872,6 +871,11 @@ func _stat_size(state: CombatantState, stat: String) -> int:
 ## or data.keep_grade as fallback when no Training node is present.
 func _training_keep_grade(state: CombatantState) -> int:
 	return maxi(state.data.keep_grade, _node_effect_max(state, "training_keep"))
+
+
+## Returns the pool-specific defensive keep grade from stance_keep / resolve_keep / stamina_keep nodes.
+func _defense_keep_grade(state: CombatantState, pool: String) -> int:
+	return _node_effect_max(state, pool + "_keep")
 
 
 ## Steps Fervor up by `steps` track positions. Triggers Burnout if escalation

@@ -5,6 +5,7 @@ extends Node
 
 const ALL_NODES: Array = [
 	preload("res://resources/data/nodes/dominion/dom_core.tres"),
+	preload("res://resources/data/nodes/dominion/dom_stamina.tres"),
 	preload("res://resources/data/nodes/dominion/dom_wounds.tres"),
 	preload("res://resources/data/nodes/dominion/dom_martial_arts.tres"),
 	preload("res://resources/data/nodes/dominion/dom_melee.tres"),
@@ -16,7 +17,9 @@ const ALL_NODES: Array = [
 	preload("res://resources/data/nodes/dominion/dom_meat_grinder.tres"),
 	preload("res://resources/data/nodes/dominion/dom_earthshatter.tres"),
 	preload("res://resources/data/nodes/negation/neg_core.tres"),
+	preload("res://resources/data/nodes/negation/neg_stance.tres"),
 	preload("res://resources/data/nodes/ingenuity/ing_core.tres"),
+	preload("res://resources/data/nodes/ingenuity/ing_resolve.tres"),
 	preload("res://resources/data/nodes/ability_minor_studies.tres"),
 	preload("res://resources/data/nodes/ability_spellcasting.tres"),
 	preload("res://resources/data/nodes/fire_magic_1.tres"),
