@@ -95,48 +95,52 @@ ConstellationScene ──Back (run_active)───► CampfireScene
 Deferred stubs: consumable items, money deduction on ambush, ambush as extra encounter.
 
 ### ✓ Group 7 — Action System Foundation
-`ActionModifier` resource (action_key, tier_cap, flat/keep/pool bonus, rest_type, uses_per_rest). `EquipmentData.action_modifiers` array replaces flat fields (old fields kept as deprecated shims). `CombatManager`: `_get_action_modifier()` with bare_hands fallback, `item_action_charges` on `CombatantState`, `reset_item_charges()`. `CombatPreferences` (atk_mode, def_mode, defaults dict) on `PlayerProgression`.
+`ActionModifier` resource (action_key, tier_cap, flat/keep/pool bonus, rest_type, uses_per_rest, target_pool). `EquipmentData.action_modifiers` array replaces flat fields (old fields kept as deprecated shims). `CombatManager`: `_get_action_modifier()` with bare_hands fallback, `item_action_charges` on `CombatantState`, `reset_item_charges()`. `CombatPreferences` (atk_mode, def_mode, defaults dict) on `PlayerProgression`.
 
 ---
 
-### Group 7.5 — Cascading Combat UI (Intent → Tool → Execution)
+### ✓ Group 7.5 — Cascading Combat UI (Intent → Tool → Execution)
 
 Replaces the flat Strike / Cantrip / Spell button row with a three-layer cascading menu driven by
-action keys. Pool selection is promoted from debug widget to production UI. Depends on Group 7.
+action keys. Target pool is defined by the `ActionModifier` itself (`target_pool` field), not chosen
+by the player. Depends on Group 7.
 
 **Phase A — Intent layer**
-- [ ] `CombatManager` gains signal: `player_intents_available(intents: Array[String])`. Emitted
+- [x] `CombatManager` gains signal: `player_intents_available(intents: Array[String])`. Emitted
   from `_begin_round()` alongside `player_action_required`. Intent values: `"attack"` (always),
   `"magic"` (when `has_minor_studies` or `has_spellcasting`), `"item"` (stub — disabled,
   label "coming soon").
-- [ ] `RoundHUD`: replace `_on_player_action_required()` with `_on_intents_available(intents)`.
+- [x] `RoundHUD`: replace `_on_player_action_required()` with `_on_intents_available(intents)`.
   Top-level buttons become one button per intent. Compact row, dark-fantasy styled.
 
 **Phase B — Tool sub-panel**
-- [ ] Selecting an intent opens a Tool panel listing items whose `action_modifiers` contain a
+- [x] Selecting an intent opens a Tool panel listing items whose `action_modifiers` contain a
   matching `action_key`:
-  - `"attack"` → items with `"strike"`. With one weapon, auto-collapses to Execution panel.
+  - `"attack"` → items with `"strike"`. Bare hands treated as a weapon: if the equipped weapon
+	has no `"strike"` action, falls back to `CombatManager.get_player_bare_hands_modifier("strike")`
+	(actual `ActionModifier` from `CombatantData.bare_hands_actions`).
   - `"magic"` → conceptual `[Arcane Arts]` entry (not a physical item; stat source = Ingenuity).
 	Always single-entry; auto-collapses.
-  - Each entry shows: item name, modifier summary (e.g. `"Flat +1  Tier ≤ 2"`), Select button.
+  - Each entry shows: item name, modifier summary (e.g. `"Flat +1  Tier ≤ 2"`), [★] pin, Select button.
+  - [★] pin on attack tools saves `CombatPreferences.defaults["attack"] = action_key` (foundation for Group 7.6 Auto Mode). Bare hands entries are pinnable the same way.
 
 **Phase C — Execution options panel**
-- [ ] Selecting a tool opens an Execution panel:
-  - For Strike: pool options (Stance / Resolve / Stamina) with modifier preview per pool
-	(e.g. `"Stance — Flat +1, Guard stat: Negation"`).
-  - For Cantrip / Spell: known spell list (replaces current popup).
-  - Each option has a `[★]` pin that writes to `CombatPreferences.defaults` and shows confirmation.
+- [x] Selecting a tool opens an Execution panel:
+  - For Strike: shows target pool from `ActionModifier.target_pool` (e.g. `"Target: Stance  (Guard: Negation)"`),
+	roll preview, optional Brutal Trade toggle, and Confirm button.
+	Pool is an action property — not a player choice.
+  - For Cantrip / Spell: known spell list with [★] pin per entry; pin saves
+	`CombatPreferences.defaults["magic"] = spell_name` (foundation for Group 7.6 Auto Mode).
   - Confirm → `CombatManager.player_chose_*`.
-- [ ] `DebugPoolSelector` retired from production; pool selection lives in this panel.
+- [x] `DebugPoolSelector` remains debug-only (was already gated on `DebugManager.enabled`).
   `DebugAdvantageControl` remains debug-only (net advantage is not a player-facing choice).
-- [ ] Brutal Trade checkbox moved from top-level `RoundHUD` into the Strike execution panel
-  (visible when `dom_brutal >= 1`). Same logic, new location.
-- [ ] Execution panel shows roll preview: `tier × avg_die_face + flat_bonus`.
+- [x] Brutal Trade checkbox in the Strike execution panel (visible when `dom_brutal >= 1`).
+- [x] Execution panel shows roll preview: `tier × avg_die_face + flat_bonus`.
 
 **Phase D — Auto-collapse and back-navigation**
-- [ ] Each layer has a Back button to return to the previous panel.
-- [ ] Single-option layers collapse automatically (no Back button shown for that layer).
-- [ ] Panel state is cleared when `player_action_required` fires again (start of each round).
+- [x] Each layer has a Back button to return to the previous panel.
+- [x] Single-option layers collapse automatically (no Back button shown for that layer).
+- [x] Panel state is cleared when `player_action_required` fires again (start of each round).
 
 ---
 

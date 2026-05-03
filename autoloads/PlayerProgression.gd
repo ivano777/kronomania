@@ -54,6 +54,7 @@ const ALL_NODES: Array = [
 const AVAILABLE_WEAPONS: Array = [
 	preload("res://resources/data/weapons/iron_sword.tres"),
 	preload("res://resources/data/weapons/greatsword.tres"),
+	preload("res://resources/data/weapons/heater_shield.tres"),
 ]
 
 ## Currently equipped weapon. null = fall back to player_default.tres equipped_weapon.

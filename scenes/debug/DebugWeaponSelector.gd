@@ -41,9 +41,21 @@ func _apply(name: String, pot: int, atk: int, def: int, pool: int) -> void:
 	var w := EquipmentData.new()
 	w.item_name = name
 	w.potency = pot
-	w.flat_attack_bonus = atk
-	w.flat_guard_bonus = def
-	w.pool_bonus = pool
+
+	var strike_mod := ActionModifier.new()
+	strike_mod.action_key = "strike"
+	strike_mod.action_name = "Strike"
+	strike_mod.tier_cap = pot
+	strike_mod.flat_bonus = atk
+	strike_mod.pool_bonus = pool
+
+	var defend_mod := ActionModifier.new()
+	defend_mod.action_key = "defend"
+	defend_mod.action_name = "Defend"
+	defend_mod.tier_cap = pot
+	defend_mod.flat_bonus = def
+
+	w.action_modifiers = [strike_mod, defend_mod]
 	CombatManager.debug_set_player_weapon(w)
 	_status.text = "Active: %s" % _label(name, pot, atk, def, pool)
 

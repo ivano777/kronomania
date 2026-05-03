@@ -33,13 +33,14 @@ const CENTROID   := Vector2(450, 433)
 const CARD_SIZE  := Vector2(108, 56)
 
 const _ALWAYS_VISIBLE: Dictionary = {
-	"dom_core": true, "ing_core": true, "neg_core": true
+	"dom_core": true, "ing_core": true, "neg_core": true,
+	"dom_stamina": true, "neg_stance": true, "ing_resolve": true
 }
 const _DOMINION_SUBTREE: Dictionary = {
 	"dom_wounds": true, "dom_martial_arts": true, "dom_melee": true,
 	"dom_ranged": true, "dom_dual_wield": true, "dom_titans_grip": true,
 	"dom_disarm": true, "dom_brutal": true, "dom_meat_grinder": true,
-	"dom_earthshatter": true
+	"dom_earthshatter": true, "dom_stamina": true
 }
 const _INGENUITY_SUBTREE: Dictionary = {
 	"minor_studies": true, "spellcasting": true,
@@ -52,6 +53,10 @@ const _NODE_POSITIONS: Dictionary = {
 	"dom_core":         Vector2(396,  70),
 	"ing_core":         Vector2( 46, 590),
 	"neg_core":         Vector2(746, 590),
+	# Default guard training — always visible, adjacent to their core vertices
+	"dom_stamina":      Vector2(280,  70),
+	"neg_stance":       Vector2(860, 590),
+	"ing_resolve":      Vector2(-70, 590),
 	# DOM subtree — expands UPWARD (negative Y) from dom_core
 	"dom_wounds":       Vector2(220,  -50),
 	"dom_martial_arts": Vector2(580,  -50),
@@ -249,7 +254,12 @@ func _draw_connection_lines() -> void:
 			continue
 		if nd.levels_data.is_empty():
 			continue
-		for prereq in (nd.levels_data[0] as NodeLevelData).prerequisites:
+		var _prereq_list: Array = []
+		for _ld in nd.levels_data:
+			_prereq_list = (_ld as NodeLevelData).prerequisites
+			if not _prereq_list.is_empty():
+				break
+		for prereq in _prereq_list:
 			var pid: String = str(prereq.get("node_id", ""))
 			if pid not in _NODE_POSITIONS:
 				continue

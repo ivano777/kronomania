@@ -16,3 +16,5 @@ extends Resource
 @export var rest_type: String = ""
 ## Uses available per rest. 0 = passive/unlimited.
 @export var uses_per_rest: int = 0
+## Which defense pool this action pressures. Defaults to "stance".
+@export var target_pool: String = "stance"

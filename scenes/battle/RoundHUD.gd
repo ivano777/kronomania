@@ -160,6 +160,18 @@ func _show_tool_panel(intent: String) -> void:
 			var sum_lbl := Label.new()
 			sum_lbl.text = summary
 			row.add_child(sum_lbl)
+		# Pin button — attack tools only; saves default action_key for Group 7.6 Auto Mode.
+		if intent == "attack" and entry["data"] != null:
+			var mod := entry["data"] as ActionModifier
+			var saved_ak: String = PlayerProgression.combat_prefs.defaults.get("attack", "")
+			var pin_btn := Button.new()
+			pin_btn.text = "✓" if mod.action_key == saved_ak else "★"
+			var _ak := mod.action_key
+			pin_btn.pressed.connect(func() -> void:
+				PlayerProgression.combat_prefs.defaults["attack"] = _ak
+				_show_tool_panel("attack")
+			)
+			row.add_child(pin_btn)
 		var sel_btn := Button.new()
 		sel_btn.text = "Select"
 		var _intent := intent
@@ -179,7 +191,8 @@ func _build_tool_entries(intent: String) -> Array:
 					if mod.action_key == "strike":
 						entries.append({"name": w.item_name, "summary": _format_modifier_summary(mod), "data": mod})
 			if entries.is_empty():
-				entries.append({"name": "Bare Hands", "summary": "", "data": null})
+				var bh_mod: ActionModifier = CombatManager.get_player_bare_hands_modifier("strike")
+				entries.append({"name": "Bare Hands", "summary": _format_modifier_summary(bh_mod) if bh_mod else "", "data": bh_mod})
 		"magic":
 			entries.append({"name": "[Arcane Arts]", "summary": "Stat: Ingenuity", "data": null})
 	return entries
@@ -228,10 +241,17 @@ func _show_execution_strike(mod: ActionModifier) -> void:
 		_brutal_toggle = CheckButton.new()
 		_brutal_toggle.text = "Brutal Trade  (VT −5 / Flat +5)"
 		_action_panel.add_child(_brutal_toggle)
-	# Confirm button — pool is intrinsic to physical strikes (always "stance")
+	# Target pool is defined by the action modifier — not a player choice.
+	var target_pool: String = mod.target_pool if mod else "stance"
+	var guard_map: Dictionary = {"stance": "Negation", "resolve": "Ingenuity", "stamina": "Dominion"}
+	var guard_stat: String = guard_map.get(target_pool, target_pool.capitalize())
+	var pool_lbl := Label.new()
+	pool_lbl.text = "Target: %s  (Guard: %s)" % [target_pool.capitalize(), guard_stat]
+	_action_panel.add_child(pool_lbl)
 	var confirm_btn := Button.new()
 	confirm_btn.text = action_label
-	confirm_btn.pressed.connect(_confirm_strike)
+	var _tp := target_pool
+	confirm_btn.pressed.connect(func() -> void: _confirm_strike(_tp))
 	_action_panel.add_child(confirm_btn)
 
 
@@ -258,34 +278,58 @@ func _show_execution_magic() -> void:
 		_action_panel.add_child(lbl)
 		for sp_data in cantrips:
 			var sp := sp_data as SpellData
-			var btn := Button.new()
-			btn.text = sp.spell_name
-			btn.tooltip_text = sp.description
-			btn.pressed.connect(func() -> void:
+			var saved_spell: String = PlayerProgression.combat_prefs.defaults.get("magic", "")
+			var row := HBoxContainer.new()
+			var cast_btn := Button.new()
+			cast_btn.text = ("● " if sp.spell_name == saved_spell else "") + sp.spell_name
+			cast_btn.tooltip_text = sp.description
+			cast_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			cast_btn.pressed.connect(func() -> void:
 				disable_actions()
 				cantrip_selected.emit(sp)
 			)
-			_action_panel.add_child(btn)
+			row.add_child(cast_btn)
+			var pin_btn := Button.new()
+			pin_btn.text = "★"
+			var _sn := sp.spell_name
+			pin_btn.pressed.connect(func() -> void:
+				PlayerProgression.combat_prefs.defaults["magic"] = _sn
+				_show_execution_magic()
+			)
+			row.add_child(pin_btn)
+			_action_panel.add_child(row)
 	if _can_cast_spell and spells.size() > 0:
 		var lbl := Label.new()
 		lbl.text = "— Spells —"
 		_action_panel.add_child(lbl)
 		for sp_data in spells:
 			var sp := sp_data as SpellData
-			var btn := Button.new()
-			btn.text = sp.spell_name
-			btn.tooltip_text = sp.description
-			btn.pressed.connect(func() -> void:
+			var saved_spell: String = PlayerProgression.combat_prefs.defaults.get("magic", "")
+			var row := HBoxContainer.new()
+			var cast_btn := Button.new()
+			cast_btn.text = ("● " if sp.spell_name == saved_spell else "") + sp.spell_name
+			cast_btn.tooltip_text = sp.description
+			cast_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			cast_btn.pressed.connect(func() -> void:
 				disable_actions()
 				spell_selected.emit(sp)
 			)
-			_action_panel.add_child(btn)
+			row.add_child(cast_btn)
+			var pin_btn := Button.new()
+			pin_btn.text = "★"
+			var _sn := sp.spell_name
+			pin_btn.pressed.connect(func() -> void:
+				PlayerProgression.combat_prefs.defaults["magic"] = _sn
+				_show_execution_magic()
+			)
+			row.add_child(pin_btn)
+			_action_panel.add_child(row)
 
 
-func _confirm_strike() -> void:
+func _confirm_strike(pool: String) -> void:
 	var bt: bool = get_brutal_trade()
 	disable_actions()
-	strike_confirmed.emit("stance", bt)
+	strike_confirmed.emit(pool, bt)
 
 
 func _on_massive_choice(use_charge: bool) -> void:

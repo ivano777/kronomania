@@ -579,6 +579,15 @@ func _resolve_attack(attacker_is_player: bool, enemy_index: int, attack_result: 
 	# Each pool may only be rolled once per round (rules: defense-and-guard.md).
 	# If already rolled, reuse the existing Guard value.
 	if not defender.is_pool_rolled(target_pool):
+		var defend_mod := _get_action_modifier(defender, "defend")
+		var eff_weapon := defender.weapon_override if defender.weapon_override else defender.data.equipped_weapon
+		var weapon_name := eff_weapon.item_name if eff_weapon else "Bare Hands"
+		var cap_str := "uncapped" if defend_mod.tier_cap == 0 else "cap %d" % defend_mod.tier_cap
+		var base_tier := defender.tier_override if defender.tier_override > 0 else defender.data.tier
+		log_message.emit("  %s defends with [i]%s[/i] (%s, Tier %d → %d dice)" % [
+			defender.data.combatant_name, weapon_name, cap_str,
+			base_tier, _effective_tier(defender, defend_mod)
+		])
 		var sd_adv := 0
 		if defender_is_player and target_pool == "stamina" and _player.space_domination_active:
 			sd_adv = 1
@@ -921,6 +930,14 @@ func reset_item_charges(rest_type: String) -> void:
 func debug_set_player_weapon(weapon: EquipmentData) -> void:
 	if _player:
 		_player.weapon_override = weapon
+
+
+## Returns the player's bare-hands ActionModifier for action_key, or null if unavailable.
+## Used by RoundHUD to build pinnable bare-hands tool entries.
+func get_player_bare_hands_modifier(action_key: String) -> ActionModifier:
+	if not _player:
+		return null
+	return _player.data.get_bare_hands_modifier(action_key)
 
 
 ## Returns an approximate expected attack total for the player's current strike.
