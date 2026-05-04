@@ -166,7 +166,7 @@ Depends on Groups 7 and 7.5.
 - [x] Score formula: `(effective_tier × (1 + die_size) / 2.0) + flat_bonus`. Higher = better.
 - [x] Called only when `atk_mode == "auto"` and no complete default path resolves.
 - [x] Magic actions only auto-execute when a default spell is saved; no heuristic for magic.
-- [ ] `docs/game-rules/combat-auto-best.md` — documents the heuristic formula. Pending user approval.
+- [x] `docs/game-rules/combat-options/auto-best.md` — documents the heuristic formula.
 
 **Phase C — DEF Observe Mode**
 - [x] `RoundHUD`: DEF toggle (`"DEF: Auto"` / `"DEF: Observe"`) reads/writes `CombatPreferences.def_mode`.

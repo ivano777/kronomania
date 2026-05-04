@@ -56,6 +56,7 @@ It is a structured gameplay guideline that can be translated into code, tools, c
 - [Magical Attacks](./combat-options/magical-attacks.md)
 - [Soft CC](./combat-options/soft-cc.md)
 - [Wounds and Massive Damage](./combat-options/wounds-and-massive-damage.md)
+- [ATK Auto Mode — Heuristic](./combat-options/auto-best.md)
 
 ### Reference
 - [Cheat Sheet](./reference/cheat-sheet.md)
