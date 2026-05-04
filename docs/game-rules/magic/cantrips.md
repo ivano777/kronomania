@@ -5,7 +5,7 @@ Cantrips are safe minor-magic actions unlocked through **Minor Studies**.
 They do not use the Fervor subsystem.
 
 ## Access
-A character needs **Minor Studies** to use cantrips.
+A character needs **Minor Studies** (or the **Spellcasting** node) to access the magic action menu and use cantrips.
 
 ## Known Cantrips
 Cantrips are granted by nodes, not by a formula:

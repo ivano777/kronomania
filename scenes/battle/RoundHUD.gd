@@ -1,5 +1,5 @@
 # RoundHUD — round counter, phase label, cascading action panel, and scrollable combat log.
-# Action UI is a three-layer cascade: Intent → Tool → Execution, all built in code inside ActionPanel.
+# Action UI is a three-layer cascade: Intent → Weapon → Action, all built in code inside ActionPanel.
 class_name RoundHUD
 extends VBoxContainer
 
@@ -22,6 +22,8 @@ var _can_cast_spell: bool = false
 var _last_intents: Array[String] = []
 var _current_intent: String      = ""
 var _tool_was_collapsed: bool    = false
+var _current_weapon_item         = null   # EquipmentData or null for bare hands
+var _action_was_collapsed: bool  = false
 
 # Brutal Trade toggle — lives in execution panel; kept as field for get_brutal_trade().
 var _brutal_toggle: CheckButton = null
@@ -67,9 +69,11 @@ func enable_magic(can_cantrip: bool, can_cast_spell: bool) -> void:
 
 ## Build and show the Intent row. Called each round via player_intents_available.
 func show_intents(intents: Array[String]) -> void:
-	_last_intents   = intents.duplicate()
-	_current_intent = ""
-	_brutal_toggle  = null
+	_last_intents         = intents.duplicate()
+	_current_intent       = ""
+	_brutal_toggle        = null
+	_current_weapon_item  = null
+	_action_was_collapsed = false
 	_clear_action_panel()
 	for intent in intents:
 		var btn := Button.new()
@@ -160,22 +164,21 @@ func _show_tool_panel(intent: String) -> void:
 			var sum_lbl := Label.new()
 			sum_lbl.text = summary
 			row.add_child(sum_lbl)
-		# Pin button — attack tools only; saves default action_key for Group 7.6 Auto Mode.
-		if intent == "attack" and entry["data"] != null:
-			var mod := entry["data"] as ActionModifier
-			var saved_ak: String = PlayerProgression.combat_prefs.defaults.get("attack", "")
+		# Pin button — attack tools only; saves default weapon for Group 7.6 Auto Mode.
+		if intent == "attack" and entry.has("weapon_key"):
+			var saved_wk: String = PlayerProgression.combat_prefs.defaults.get("attack_weapon", "")
+			var _wk: String = entry["weapon_key"] as String
 			var pin_btn := Button.new()
-			pin_btn.text = "✓" if mod.action_key == saved_ak else "★"
-			var _ak := mod.action_key
+			pin_btn.text = "✓" if _wk == saved_wk else "★"
 			pin_btn.pressed.connect(func() -> void:
-				PlayerProgression.combat_prefs.defaults["attack"] = _ak
+				PlayerProgression.combat_prefs.defaults["attack_weapon"] = _wk
 				_show_tool_panel("attack")
 			)
 			row.add_child(pin_btn)
 		var sel_btn := Button.new()
 		sel_btn.text = "Select"
 		var _intent := intent
-		var _data   = entry["data"]
+		var _data   = entry.get("item", null)
 		sel_btn.pressed.connect(func() -> void: _on_tool_selected(_intent, _data))
 		row.add_child(sel_btn)
 		_action_panel.add_child(row)
@@ -186,15 +189,18 @@ func _build_tool_entries(intent: String) -> Array:
 	match intent:
 		"attack":
 			var w: EquipmentData = PlayerProgression.equipped_weapon
+			var has_strike := false
 			if w:
 				for mod: ActionModifier in w.action_modifiers:
 					if mod.action_key == "strike":
-						entries.append({"name": w.item_name, "summary": _format_modifier_summary(mod), "data": mod})
-			if entries.is_empty():
-				var bh_mod: ActionModifier = CombatManager.get_player_bare_hands_modifier("strike")
-				entries.append({"name": "Bare Hands", "summary": _format_modifier_summary(bh_mod) if bh_mod else "", "data": bh_mod})
+						has_strike = true
+						break
+			if w and has_strike:
+				entries.append({"name": w.item_name, "summary": "", "weapon_key": w.item_name, "item": w})
+			else:
+				entries.append({"name": "Bare Hands", "summary": "", "weapon_key": "bare_hands", "item": null})
 		"magic":
-			entries.append({"name": "[Arcane Arts]", "summary": "Stat: Ingenuity", "data": null})
+			entries.append({"name": "[Arcane Arts]", "summary": "Stat: Ingenuity", "item": null})
 	return entries
 
 
@@ -207,52 +213,71 @@ func _format_modifier_summary(mod: ActionModifier) -> String:
 	return "  ".join(parts)
 
 
+func _format_action_summary(mod: ActionModifier) -> String:
+	var target_pool: String = mod.target_pool if mod.target_pool != "" else "stance"
+	var parts: Array[String] = ["→ %s" % target_pool.capitalize()]
+	if mod.flat_bonus != 0:
+		parts.append("Flat %+d" % mod.flat_bonus)
+	return "  ".join(parts)
+
+
 func _on_tool_selected(intent: String, data) -> void:
 	match intent:
-		"attack": _show_execution_strike(data as ActionModifier)
+		"attack": _show_action_panel(data)
 		"magic":  _show_execution_magic()
 
 
-# ── Execution layer ───────────────────────────────────────────────────────────
+# ── Action layer ──────────────────────────────────────────────────────────────
 
-func _show_execution_strike(mod: ActionModifier) -> void:
+func _show_action_panel(weapon_item) -> void:
+	_current_weapon_item  = weapon_item
+	_action_was_collapsed = false
+
+	var actions: Array = []
+	if weapon_item != null:
+		for mod: ActionModifier in (weapon_item as EquipmentData).action_modifiers:
+			if mod.action_key == "strike":
+				actions.append(mod)
+	if actions.is_empty():
+		var bh_mod: ActionModifier = CombatManager.get_player_bare_hands_modifier("strike")
+		if bh_mod:
+			actions.append(bh_mod)
+
 	_clear_action_panel()
-	_action_panel.add_child(_make_back_btn(func() -> void: _show_tool_panel(_current_intent)))
-	# Weapon + action name header
-	var w: EquipmentData = PlayerProgression.equipped_weapon
-	var weapon_name: String = w.item_name if w else "Bare Hands"
-	var action_label: String = mod.action_name if mod and mod.action_name != "" else "Strike"
-	var header_lbl := Label.new()
-	header_lbl.text = "%s — %s" % [weapon_name, action_label]
-	_action_panel.add_child(header_lbl)
-	# Stats + roll preview
-	var parts: Array[String] = []
-	if mod:
-		if mod.flat_bonus != 0:
-			parts.append("Flat %+d" % mod.flat_bonus)
-		if mod.tier_cap > 0:
-			parts.append("Tier ≤ %d" % mod.tier_cap)
-	parts.append("~%d avg" % CombatManager.get_player_attack_preview())
-	var stats_lbl := Label.new()
-	stats_lbl.text = "  |  ".join(parts)
-	_action_panel.add_child(stats_lbl)
-	# Brutal Trade toggle
+	if _tool_was_collapsed:
+		_action_panel.add_child(_make_back_btn(func() -> void: show_intents(_last_intents)))
+	else:
+		_action_panel.add_child(_make_back_btn(func() -> void: _show_tool_panel(_current_intent)))
+
+	var saved_ak: String = PlayerProgression.combat_prefs.defaults.get("attack_action", "")
+	for mod: ActionModifier in actions:
+		var target_pool: String = mod.target_pool if mod.target_pool != "" else "stance"
+		var row := HBoxContainer.new()
+		var name_lbl := Label.new()
+		name_lbl.text = mod.action_name if mod.action_name != "" else mod.action_key.capitalize()
+		name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(name_lbl)
+		var info_lbl := Label.new()
+		info_lbl.text = _format_action_summary(mod)
+		row.add_child(info_lbl)
+		var pin_btn := Button.new()
+		var _ak := mod.action_key
+		pin_btn.text = "✓" if _ak == saved_ak else "★"
+		pin_btn.pressed.connect(func() -> void:
+			PlayerProgression.combat_prefs.defaults["attack_action"] = _ak
+			_show_action_panel(_current_weapon_item)
+		)
+		row.add_child(pin_btn)
+		var confirm_btn := Button.new()
+		confirm_btn.text = "Confirm"
+		var _tp := target_pool
+		confirm_btn.pressed.connect(func() -> void: _confirm_strike(_tp))
+		row.add_child(confirm_btn)
+		_action_panel.add_child(row)
 	if PlayerProgression.get_node_level_by_id("dom_brutal") >= 1:
 		_brutal_toggle = CheckButton.new()
 		_brutal_toggle.text = "Brutal Trade  (VT −5 / Flat +5)"
 		_action_panel.add_child(_brutal_toggle)
-	# Target pool is defined by the action modifier — not a player choice.
-	var target_pool: String = mod.target_pool if mod else "stance"
-	var guard_map: Dictionary = {"stance": "Negation", "resolve": "Ingenuity", "stamina": "Dominion"}
-	var guard_stat: String = guard_map.get(target_pool, target_pool.capitalize())
-	var pool_lbl := Label.new()
-	pool_lbl.text = "Target: %s  (Guard: %s)" % [target_pool.capitalize(), guard_stat]
-	_action_panel.add_child(pool_lbl)
-	var confirm_btn := Button.new()
-	confirm_btn.text = action_label
-	var _tp := target_pool
-	confirm_btn.pressed.connect(func() -> void: _confirm_strike(_tp))
-	_action_panel.add_child(confirm_btn)
 
 
 func _show_execution_magic() -> void:
