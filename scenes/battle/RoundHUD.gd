@@ -275,8 +275,7 @@ func _show_action_panel(weapon_item) -> void:
 		row.add_child(confirm_btn)
 		_action_panel.add_child(row)
 	if PlayerProgression.get_node_level_by_id("dom_brutal") >= 1:
-		_brutal_toggle = CheckButton.new()
-		_brutal_toggle.text = "Brutal Trade  (VT −5 / Flat +5)"
+		_brutal_toggle = _make_persistent_toggle("Brutal Trade  (VT −5 / Flat +5)", "brutal_trade")
 		_action_panel.add_child(_brutal_toggle)
 
 
@@ -360,3 +359,14 @@ func _confirm_strike(pool: String) -> void:
 func _on_massive_choice(use_charge: bool) -> void:
 	_massive_overlay.visible = false
 	wound_degrade_chosen.emit(use_charge)
+
+
+## Creates a CheckButton whose state persists across rounds via combat_prefs.defaults[key].
+func _make_persistent_toggle(label: String, key: String, default_val: bool = false) -> CheckButton:
+	var btn := CheckButton.new()
+	btn.text = label
+	btn.button_pressed = PlayerProgression.combat_prefs.defaults.get(key, default_val)
+	btn.toggled.connect(func(on: bool) -> void:
+		PlayerProgression.combat_prefs.defaults[key] = on
+	)
+	return btn
