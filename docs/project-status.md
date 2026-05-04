@@ -144,39 +144,37 @@ by the player. Depends on Group 7.
 
 ---
 
-### Group 7.6 — Breakpoint System (ATK & DEF Modes)
+### ✓ Group 7.6 — Breakpoint System (ATK & DEF Modes)
 
 Adds Auto / Manual mode toggles to combat pacing. ATK Auto follows saved defaults or falls back to
 a scored heuristic. DEF Observe pauses before the enemy's attack resolves to display incoming info.
 Depends on Groups 7 and 7.5.
 
 **Phase A — ATK Mode toggle**
-- [ ] `RoundHUD`: ATK toggle button (`"ATK: Manual"` / `"ATK: Auto"`) reads/writes
-  `CombatPreferences.atk_mode`. Styled as a mode indicator, not a primary action.
-- [ ] **Manual Mode** (default): waits for player to navigate cascading menus (current behavior, now named).
-- [ ] **Auto Mode** flow in `CombatManager._begin_round()`:
-  1. Read full default path from `CombatPreferences.defaults`.
-  2. Complete path found → execute immediately; log `"[Auto] Strike → Stance (default)"`.
+- [x] `RoundHUD`: ATK toggle button (`"ATK: Manual"` / `"ATK: Auto"`) reads/writes
+  `CombatPreferences.atk_mode`. Persistent strip above the action panel.
+- [x] **Manual Mode** (default): waits for player to navigate cascading menus.
+- [x] **Auto Mode** flow in `CombatManager._begin_round()` via `_try_auto_execute()`:
+  1. Complete path (attack_weapon + attack_action both set, weapon name matches) → execute immediately;
+     log `"[Auto] Strike → Stance (default)"`.
+  2. Magic default set → execute cantrip/spell immediately; log `"[Auto] Cast Fire Orb (default)"`.
   3. Any step undefined → call `_auto_best_action()` and execute; log
      `"[Auto-Best] Strike → Stance (score: 6.5)"`.
 
 **Phase B — `_auto_best_action()` in `CombatManager`**
-- [ ] Private helper `_auto_best_action(state: CombatantState, intent: String) -> Dictionary`.
-  Returns `{ action_key, execution_params }`.
-- [ ] Score formula: `(effective_tier × (1 + die_size) / 2.0) + flat_bonus`. Higher = better.
-  Tie-breaking: saved default first, then first in encounter order.
-- [ ] Called only when `atk_mode == "auto"` and no complete default path exists.
-- [ ] Magic actions always fall through to Manual if no default is set (Auto-Best for magic deferred).
-- [ ] Add `docs/game-rules/combat-auto-best.md` — documents the heuristic formula as a game rule.
+- [x] Private helper `_auto_best_action() -> Dictionary`. Returns `{ target_pool, score }`.
+- [x] Score formula: `(effective_tier × (1 + die_size) / 2.0) + flat_bonus`. Higher = better.
+- [x] Called only when `atk_mode == "auto"` and no complete default path resolves.
+- [x] Magic actions only auto-execute when a default spell is saved; no heuristic for magic.
+- [ ] `docs/game-rules/combat-auto-best.md` — documents the heuristic formula. Pending user approval.
 
 **Phase C — DEF Observe Mode**
-- [ ] `RoundHUD`: DEF toggle (`"DEF: Auto"` / `"DEF: Observe"`) reads/writes `CombatPreferences.def_mode`.
-- [ ] **Auto Mode** (default): fully automatic defense as today.
-- [ ] **Observe Mode**: `_resolve_attack()` emits new signal
-  `player_defense_incoming(attacker_name: String, attack_total: int, target_pool: String)` before
-  rolling defense. `CombatManager` awaits `_defense_acknowledged` signal. `BattleScene` connects
-  → `RoundHUD.show_defense_overlay(...)`. Overlay: attacker name, attack total, target pool, `[ OK ]`
-  button → emits `_defense_acknowledged`. Defense rolls automatically after OK. No mechanic change.
+- [x] `RoundHUD`: DEF toggle (`"DEF: Auto"` / `"DEF: Observe"`) reads/writes `CombatPreferences.def_mode`.
+- [x] **Auto Mode** (default): fully automatic defense as before.
+- [x] **Observe Mode**: `_resolve_attack()` emits `player_defense_incoming(attacker_name, attack_total, target_pool)`
+  before rolling defense, then awaits `_defense_acknowledged`. `BattleScene` routes it to
+  `RoundHUD.show_defense_overlay(...)`. Overlay shows attacker name, attack total, target pool, `[ OK ]`
+  button → `CombatManager.player_acknowledged_defense()` → resumes. No mechanic change.
   *Note: Active DEF Mode (player chooses defensive tool/action) is a future design task — requires
   designing defensive action types per weapon. Deferred to Future.*
 

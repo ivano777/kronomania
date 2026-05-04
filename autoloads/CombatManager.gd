@@ -63,6 +63,11 @@ signal player_massive_incoming(charges_left: int)
 ## Internal coroutine gate: resolved when the player decides whether to spend a charge.
 signal _massive_decision_gate(use_charge: bool)
 
+## Emitted when an enemy attack is about to resolve; DEF Observe mode only.
+signal player_defense_incoming(attacker_name: String, attack_total: int, target_pool: String)
+## Internal coroutine gate: resolved when the player acknowledges the incoming defense.
+signal _defense_acknowledged()
+
 
 # ── Runtime state ─────────────────────────────────────────────────────────────
 
@@ -254,6 +259,11 @@ func player_chose_degrade_wound(use_charge: bool) -> void:
 	_massive_decision_gate.emit(use_charge)
 
 
+## Called by RoundHUD when the player clicks OK on the DEF Observe overlay.
+func player_acknowledged_defense() -> void:
+	_defense_acknowledged.emit()
+
+
 ## Debug only — override Fervor state at runtime.
 func debug_set_fervor(new_fervor_size: int, burned_out: bool) -> void:
 	if _player:
@@ -296,6 +306,45 @@ func _begin_round() -> void:
 		_player.known_spells.size() > 0 and not _player.is_burned_out
 	)
 	player_action_required.emit()
+
+
+## Called by RoundHUD when the player clicks the Attack intent in ATK Auto mode.
+## Skips the tool and execution panels: resolves weapon/action from saved defaults or heuristic.
+func player_auto_execute_attack() -> void:
+	if not _waiting_for_player:
+		return
+	var defaults: Dictionary = PlayerProgression.combat_prefs.defaults
+	var weapon_name: String = defaults.get("attack_weapon", "")
+	var action_key: String = defaults.get("attack_action", "")
+	if weapon_name != "" and action_key != "":
+		var cur_w: EquipmentData = _player.weapon_override if _player.weapon_override else _player.data.equipped_weapon
+		var cur_name: String = cur_w.item_name if cur_w else "bare_hands"
+		if weapon_name == cur_name:
+			var mod := _get_action_modifier(_player, action_key)
+			var brutal: bool = bool(defaults.get("brutal_trade", false)) and (PlayerProgression.get_node_level_by_id("dom_brutal") >= 1)
+			var tp: String = mod.target_pool if mod.target_pool != "" else "stance"
+			var label: String = mod.action_name if mod.action_name != "" else action_key.capitalize()
+			log_message.emit("[color=gray][Auto] %s → %s (default)[/color]" % [label, tp.capitalize()])
+			player_chose_strike(0, tp, brutal)
+			return
+	var best := _auto_best_action()
+	if not best.is_empty():
+		var tp: String = best["target_pool"] as String
+		var score: float = best["score"] as float
+		log_message.emit("[color=gray][Auto-Best] Strike → %s (score: %.1f)[/color]" % [tp.capitalize(), score])
+		player_chose_strike(0, tp, false)
+
+
+func _auto_best_action() -> Dictionary:
+	var mod := _get_action_modifier(_player, "strike")
+	if mod == null:
+		return {}
+	var tier := _effective_tier(_player, mod)
+	var die_size := _stat_size(_player, "dominion")
+	var flat := _attack_flat(_player)
+	var score: float = tier * (1.0 + die_size) / 2.0 + flat
+	var tp: String = mod.target_pool if mod.target_pool != "" else "stance"
+	return {"target_pool": tp, "score": score}
 
 
 # Coroutine: physical Strike — resolves one full round then loops back.
@@ -575,6 +624,10 @@ func _resolve_attack(attacker_is_player: bool, enemy_index: int, attack_result: 
 			attack_result.total as int,
 		]
 	)
+
+	if not attacker_is_player and PlayerProgression.combat_prefs.def_mode == "observe":
+		player_defense_incoming.emit(attacker.data.combatant_name, attack_result.total as int, target_pool)
+		await _defense_acknowledged
 
 	# Each pool may only be rolled once per round (rules: defense-and-guard.md).
 	# If already rolled, reuse the existing Guard value.

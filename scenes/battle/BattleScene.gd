@@ -101,6 +101,7 @@ func _ready() -> void:
 	CombatManager.player_magic_available.connect(_on_player_magic_available)
 	CombatManager.fervor_changed.connect(_on_fervor_changed)
 	CombatManager.player_massive_incoming.connect(_on_player_massive_incoming)
+	CombatManager.player_defense_incoming.connect(_on_defense_incoming)
 
 	# Debug widgets — added to UILayer so they render as Controls correctly.
 	if ResourceLoader.exists(_DBG_WEAPON_SEL):
@@ -210,6 +211,10 @@ func _on_player_massive_incoming(charges_left: int) -> void:
 	_round_hud.show_massive_prompt(charges_left)
 
 
+func _on_defense_incoming(attacker_name: String, attack_total: int, target_pool: String) -> void:
+	_round_hud.show_defense_overlay(attacker_name, attack_total, target_pool)
+
+
 func _on_wound_degrade_chosen(use_charge: bool) -> void:
 	CombatManager.player_chose_degrade_wound(use_charge)
 
@@ -242,5 +247,6 @@ func _teardown_signals() -> void:
 	CombatManager.player_magic_available.disconnect(_on_player_magic_available)
 	CombatManager.fervor_changed.disconnect(_on_fervor_changed)
 	CombatManager.player_massive_incoming.disconnect(_on_player_massive_incoming)
+	CombatManager.player_defense_incoming.disconnect(_on_defense_incoming)
 	if _dbg_fervor_disp:
 		CombatManager.fervor_changed.disconnect(_dbg_fervor_disp._on_fervor_changed)

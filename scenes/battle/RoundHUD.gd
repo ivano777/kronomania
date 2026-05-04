@@ -28,6 +28,10 @@ var _action_was_collapsed: bool  = false
 # Brutal Trade toggle — lives in execution panel; kept as field for get_brutal_trade().
 var _brutal_toggle: CheckButton = null
 
+# ATK/DEF mode toggle buttons — persistent strip above the action panel.
+var _atk_mode_btn: Button = null
+var _def_mode_btn: Button = null
+
 # Meat for the Grinder prompt overlay (appended to this VBox, below the log).
 var _massive_overlay: PanelContainer
 var _massive_spend_btn: Button
@@ -49,6 +53,18 @@ func _ready() -> void:
 	overlay_vbox.add_child(accept_btn)
 	_massive_overlay.add_child(overlay_vbox)
 	add_child(_massive_overlay)
+	# Mode strip — insert before ActionPanel so it renders between PhaseLabel and the action area.
+	var mode_strip := HBoxContainer.new()
+	_atk_mode_btn = Button.new()
+	_atk_mode_btn.text = "ATK: %s" % PlayerProgression.combat_prefs.atk_mode.capitalize()
+	_atk_mode_btn.pressed.connect(_toggle_atk_mode)
+	mode_strip.add_child(_atk_mode_btn)
+	_def_mode_btn = Button.new()
+	_def_mode_btn.text = "DEF: %s" % PlayerProgression.combat_prefs.def_mode.capitalize()
+	_def_mode_btn.pressed.connect(_toggle_def_mode)
+	mode_strip.add_child(_def_mode_btn)
+	add_child(mode_strip)
+	move_child(mode_strip, _action_panel.get_index())
 
 
 # ── Public API called by BattleScene ─────────────────────────────────────────
@@ -104,6 +120,24 @@ func get_brutal_trade() -> bool:
 	return _brutal_toggle.button_pressed if is_instance_valid(_brutal_toggle) else false
 
 
+## Show the DEF Observe overlay before the enemy's defense roll; cleared on OK.
+func show_defense_overlay(attacker_name: String, attack_total: int, target_pool: String) -> void:
+	_clear_action_panel()
+	var lbl := Label.new()
+	lbl.text = "%s attacks for %d\nPool: %s — defense will roll automatically." % [
+		attacker_name, attack_total, target_pool.capitalize()
+	]
+	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_action_panel.add_child(lbl)
+	var ok_btn := Button.new()
+	ok_btn.text = "OK — Roll Defense"
+	ok_btn.pressed.connect(func() -> void:
+		_clear_action_panel()
+		CombatManager.player_acknowledged_defense()
+	)
+	_action_panel.add_child(ok_btn)
+
+
 ## Show the Meat for the Grinder decision prompt; clears the action panel first.
 func show_massive_prompt(charges_left: int) -> void:
 	_brutal_toggle = null
@@ -138,6 +172,10 @@ func _make_back_btn(on_press: Callable) -> Button:
 
 func _on_intent_attack() -> void:
 	_current_intent = "attack"
+	if PlayerProgression.combat_prefs.atk_mode == "auto":
+		disable_actions()
+		CombatManager.player_auto_execute_attack()
+		return
 	_show_tool_panel("attack")
 
 
@@ -359,6 +397,18 @@ func _confirm_strike(pool: String) -> void:
 func _on_massive_choice(use_charge: bool) -> void:
 	_massive_overlay.visible = false
 	wound_degrade_chosen.emit(use_charge)
+
+
+func _toggle_atk_mode() -> void:
+	var prefs := PlayerProgression.combat_prefs
+	prefs.atk_mode = "auto" if prefs.atk_mode == "manual" else "manual"
+	_atk_mode_btn.text = "ATK: %s" % prefs.atk_mode.capitalize()
+
+
+func _toggle_def_mode() -> void:
+	var prefs := PlayerProgression.combat_prefs
+	prefs.def_mode = "observe" if prefs.def_mode == "auto" else "auto"
+	_def_mode_btn.text = "DEF: %s" % prefs.def_mode.capitalize()
 
 
 ## Creates a CheckButton whose state persists across rounds via combat_prefs.defaults[key].
