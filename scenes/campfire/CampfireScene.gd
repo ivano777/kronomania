@@ -317,7 +317,10 @@ func _refresh() -> void:
 
 	for i in _weapon_btns.size():
 		var w: EquipmentData = PlayerProgression.AVAILABLE_WEAPONS[i] as EquipmentData
-		_weapon_btns[i].disabled = (w == mh or w == oh)
+		var in_current := (w == mh and _equip_slot == "main") or (w == oh and _equip_slot == "off")
+		var in_other   := (w == oh and _equip_slot == "main") or (w == mh and _equip_slot == "off")
+		_weapon_btns[i].disabled = in_other
+		_weapon_btns[i].text = ("✓ " + w.item_name) if in_current else w.item_name
 
 	if DungeonManager.short_rest_used:
 		_short_rest_btn.text = "Short Rest  (used)"
@@ -405,9 +408,9 @@ func _on_exit_confirmed() -> void:
 
 func _on_equip_weapon(w: EquipmentData) -> void:
 	if _equip_slot == "off":
-		PlayerProgression.equip_off_hand(w)
+		PlayerProgression.equip_off_hand(null if PlayerProgression.off_hand == w else w)
 	else:
-		PlayerProgression.equip_main_hand(w)
+		PlayerProgression.equip_main_hand(null if PlayerProgression.main_hand == w else w)
 	_refresh()
 
 
