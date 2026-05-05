@@ -18,6 +18,14 @@ text = "⚔ Weapon ▸"
 [node name="Panel" type="VBoxContainer" parent="."]
 visible = false
 
+[node name="SlotRow" type="HBoxContainer" parent="Panel"]
+
+[node name="MainSlotBtn" type="Button" parent="Panel/SlotRow"]
+text = "▶ Main"
+
+[node name="OffSlotBtn" type="Button" parent="Panel/SlotRow"]
+text = "  Off"
+
 [node name="Buttons" type="HBoxContainer" parent="Panel"]
 
 [node name="StatusLabel" type="Label" parent="Panel"]

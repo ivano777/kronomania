@@ -68,6 +68,12 @@ signal player_defense_incoming(attacker_name: String, attack_total: int, target_
 ## Internal coroutine gate: resolved when the player acknowledges the incoming defense.
 signal _defense_acknowledged()
 
+## Emitted when the player must choose which item to use for their defense roll.
+## options: Array of { item_name: String, mod: ActionModifier } Dictionaries.
+signal player_defense_item_choice(options: Array)
+## Internal coroutine gate: resolved when the player selects a defense item.
+signal _defense_item_chosen(mod: ActionModifier)
+
 
 # ── Runtime state ─────────────────────────────────────────────────────────────
 
@@ -76,7 +82,8 @@ class CombatantState:
 	var current_wounds: int = 0
 	var max_wounds: int     = 3
 	var is_defeated: bool   = false
-	var weapon_override: EquipmentData = null  # set by debug tools; null = use data.equipped_weapon
+	var weapon_override: EquipmentData = null      # main-hand override; null = use data.equipped_weapon
+	var off_hand_override: EquipmentData = null    # off-hand override; null = no off-hand equipped
 	var node_levels: Dictionary = {}           # NodeData → int; runtime copy from PlayerProgression for player
 	var tier_override: int = 0                 # when > 0, overrides data.tier (used for player Tier from Constellation)
 	# Per-pool guard state (Stance / Resolve / Stamina).
@@ -160,10 +167,12 @@ var _waiting_for_player: bool = false
 func start_combat(player_data: CombatantData, enemies_data: Array) -> void:
 	_player = CombatantState.new()
 	_player.init(player_data)
-	if PlayerProgression.equipped_weapon != null:
+	if PlayerProgression.main_hand != null:
 		var old_fort: int = player_data.equipped_weapon.max_wounds_bonus if player_data.equipped_weapon else 0
-		_player.max_wounds += PlayerProgression.equipped_weapon.max_wounds_bonus - old_fort
-		_player.weapon_override = PlayerProgression.equipped_weapon
+		_player.max_wounds += PlayerProgression.main_hand.max_wounds_bonus - old_fort
+		_player.weapon_override = PlayerProgression.main_hand
+	if PlayerProgression.off_hand != null:
+		_player.off_hand_override = PlayerProgression.off_hand
 	_player.node_levels = PlayerProgression.node_levels.duplicate()
 	_player.tier_override = PlayerProgression.get_tier()
 	_player.max_wounds += _tier_wound_bonus(_player.tier_override)
@@ -264,6 +273,11 @@ func player_acknowledged_defense() -> void:
 	_defense_acknowledged.emit()
 
 
+## Called by RoundHUD when the player selects a defense item from the choice panel.
+func player_chose_defense_item(mod: ActionModifier) -> void:
+	_defense_item_chosen.emit(mod)
+
+
 ## Debug only — override Fervor state at runtime.
 func debug_set_fervor(new_fervor_size: int, burned_out: bool) -> void:
 	if _player:
@@ -308,9 +322,9 @@ func _begin_round() -> void:
 	player_action_required.emit()
 
 
-## Called by RoundHUD when the player clicks the Attack intent in ATK Auto mode.
+## Called by BattleScene when the player clicks the Attack intent in ATK Auto mode.
 ## Skips the tool and execution panels: resolves weapon/action from saved defaults or heuristic.
-func player_auto_execute_attack() -> void:
+func player_auto_execute_attack(target_index: int = 0, net_advantage: int = 0) -> void:
 	if not _waiting_for_player:
 		return
 	var defaults: Dictionary = PlayerProgression.combat_prefs.defaults
@@ -325,14 +339,14 @@ func player_auto_execute_attack() -> void:
 			var tp: String = mod.target_pool if mod.target_pool != "" else "stance"
 			var label: String = mod.action_name if mod.action_name != "" else action_key.capitalize()
 			log_message.emit("[color=gray][Auto] %s → %s (default)[/color]" % [label, tp.capitalize()])
-			player_chose_strike(0, tp, brutal)
+			player_chose_strike(net_advantage, tp, brutal, target_index)
 			return
 	var best := _auto_best_action()
 	if not best.is_empty():
 		var tp: String = best["target_pool"] as String
 		var score: float = best["score"] as float
 		log_message.emit("[color=gray][Auto-Best] Strike → %s (score: %.1f)[/color]" % [tp.capitalize(), score])
-		player_chose_strike(0, tp, false)
+		player_chose_strike(net_advantage, tp, false, target_index)
 
 
 func _auto_best_action() -> Dictionary:
@@ -625,16 +639,23 @@ func _resolve_attack(attacker_is_player: bool, enemy_index: int, attack_result: 
 		]
 	)
 
-	if not attacker_is_player and PlayerProgression.combat_prefs.def_mode == "observe":
-		player_defense_incoming.emit(attacker.data.combatant_name, attack_result.total as int, target_pool)
-		await _defense_acknowledged
-
 	# Each pool may only be rolled once per round (rules: defense-and-guard.md).
 	# If already rolled, reuse the existing Guard value.
-	if not defender.is_pool_rolled(target_pool):
-		var defend_mod := _get_action_modifier(defender, "defend")
-		var eff_weapon := defender.weapon_override if defender.weapon_override else defender.data.equipped_weapon
-		var weapon_name := eff_weapon.item_name if eff_weapon else "Bare Hands"
+	var _pool_fresh := not defender.is_pool_rolled(target_pool)
+	if not attacker_is_player and PlayerProgression.combat_prefs.def_mode == "observe" and _pool_fresh:
+		player_defense_incoming.emit(attacker.data.combatant_name, attack_result.total as int, target_pool)
+		await _defense_acknowledged
+	if _pool_fresh:
+		# Resolve which item the defender uses — player gets a choice when both slots have "defend".
+		var defend_entry: Dictionary
+		if defender_is_player:
+			defend_entry = await _get_player_defense_modifier()
+		else:
+			var _dm := _get_action_modifier(defender, "defend")
+			var _ew := defender.weapon_override if defender.weapon_override else defender.data.equipped_weapon
+			defend_entry = {"item_name": _ew.item_name if _ew else "Bare Hands", "mod": _dm}
+		var defend_mod: ActionModifier = defend_entry["mod"] as ActionModifier
+		var weapon_name: String = defend_entry["item_name"]
 		var cap_str := "uncapped" if defend_mod.tier_cap == 0 else "cap %d" % defend_mod.tier_cap
 		var base_tier := defender.tier_override if defender.tier_override > 0 else defender.data.tier
 		log_message.emit("  %s defends with [i]%s[/i] (%s, Tier %d → %d dice)" % [
@@ -647,8 +668,8 @@ func _resolve_attack(attacker_is_player: bool, enemy_index: int, attack_result: 
 			_player.space_domination_active = false
 			log_message.emit("  [color=cyan]Space Domination: Advantage on Stamina guard![/color]")
 		var def_result := RollEngine.resolve(
-				_effective_tier(defender, _get_action_modifier(defender, "defend")), defensive_size,
-				_training_keep_grade(defender) + _defense_keep_grade(defender, target_pool), _guard_flat(defender),
+				_effective_tier(defender, defend_mod), defensive_size,
+				_training_keep_grade(defender) + _defense_keep_grade(defender, target_pool), defend_mod.flat_bonus,
 				sd_adv
 			)
 		var guard_val: int = def_result.total as int
@@ -707,6 +728,7 @@ func _resolve_attack(attacker_is_player: bool, enemy_index: int, attack_result: 
 			)
 	else:
 		var remaining: int = current_guard - (attack_result.total as int)
+		defender.set_guard_val(target_pool, remaining)
 		log_message.emit(
 			"  Guard holds. %d absorbed, %d remaining." % [
 				attack_result.total as int, remaining
@@ -805,6 +827,44 @@ func _attack_flat(state: CombatantState) -> int:
 	return _get_action_modifier(state, "strike").flat_bonus + _node_weapon_bonus_sum(state, "weapon_flat")
 
 
+## Returns {item_name, mod} for the player's defense roll.
+## If both main-hand and off-hand carry a "defend" modifier, emits player_defense_item_choice
+## and awaits the player's selection; otherwise auto-selects the sole available option.
+func _get_player_defense_modifier() -> Dictionary:
+	var options: Array = []
+	var main_w: EquipmentData = _player.weapon_override if _player.weapon_override else _player.data.equipped_weapon
+	if main_w:
+		for mod in main_w.action_modifiers:
+			if mod.action_key == "defend":
+				options.append({"item_name": main_w.item_name, "mod": mod})
+				break
+	if _player.off_hand_override:
+		for m in _player.off_hand_override.action_modifiers:
+			if m.action_key == "defend":
+				options.append({"item_name": _player.off_hand_override.item_name, "mod": m})
+				break
+	if options.size() >= 2:
+		if PlayerProgression.combat_prefs.def_mode == "observe":
+			player_defense_item_choice.emit(options)
+			var chosen_mod: ActionModifier = await _defense_item_chosen
+			for opt in options:
+				if opt["mod"] == chosen_mod:
+					return opt
+			return options[0]
+		else:
+			# Auto mode: honour saved default, fall back to main-hand.
+			var saved: String = PlayerProgression.combat_prefs.defaults.get("defend_weapon", "")
+			if saved != "":
+				for opt in options:
+					if opt["item_name"] == saved:
+						log_message.emit("[color=gray][Auto] Defend with %s (default)[/color]" % saved)
+						return opt
+			return options[0]
+	if options.size() >= 1:
+		return options[0]
+	return {"item_name": "Bare Hands", "mod": _player.data.get_bare_hands_modifier("defend")}
+
+
 ## Flat bonus applied to defense rolls: defend ActionModifier flat.
 func _guard_flat(state: CombatantState) -> int:
 	return _get_action_modifier(state, "defend").flat_bonus
@@ -835,12 +895,14 @@ func _derived_modifier(mod: ActionModifier, parent: ActionModifier) -> ActionMod
 	return derived
 
 
-## Returns all ActionModifiers for a state: weapon modifiers + bare_hands (always present).
+## Returns all ActionModifiers for a state: main-hand + off-hand + bare_hands (always present).
 func _get_all_action_modifiers(state: CombatantState) -> Array:
 	var w: EquipmentData = state.weapon_override if state.weapon_override else state.data.equipped_weapon
 	var result: Array = []
 	if w:
 		result.append_array(w.action_modifiers)
+	if state.off_hand_override:
+		result.append_array(state.off_hand_override.action_modifiers)
 	if not state.data.bare_hands_actions.is_empty():
 		result.append_array(state.data.bare_hands_actions)
 	else:
@@ -979,10 +1041,16 @@ func reset_item_charges(rest_type: String) -> void:
 				state.item_action_charges[mod.action_key] = mod.uses_per_rest
 
 
-## Debug only — swap the player's weapon at runtime without restarting combat.
+## Debug only — swap the player's main-hand weapon at runtime without restarting combat.
 func debug_set_player_weapon(weapon: EquipmentData) -> void:
 	if _player:
 		_player.weapon_override = weapon
+
+
+## Debug only — swap the player's off-hand weapon at runtime without restarting combat.
+func debug_set_player_off_hand(weapon: EquipmentData) -> void:
+	if _player:
+		_player.off_hand_override = weapon
 
 
 ## Returns the player's bare-hands ActionModifier for action_key, or null if unavailable.

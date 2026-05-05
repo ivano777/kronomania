@@ -21,8 +21,18 @@ extends Resource
 ## Surge (+) or Drain (-): modifier to the attack pool size (added to net_advantage).
 @export_range(-3, 3) var pool_bonus: int = 0
 
-## Weapon tags (e.g. "Sharp", "Blunt", "Flame") for future skill prerequisites.
+## Weapon tags (e.g. "Sharp", "Blunt", "TwoHanded") for skill prerequisites and slot logic.
 @export var tags: PackedStringArray = PackedStringArray()
 
 ## Action-keyed modifiers. When non-empty, supersedes the deprecated flat fields above.
 @export var action_modifiers: Array[ActionModifier] = []
+
+
+## Returns how many hand slots this item requires, derived from tags.
+## "TwoHanded" → 2; "NoHanded" → 0 (future zero-slot items); default → 1.
+func get_hands_required() -> int:
+	if "TwoHanded" in tags:
+		return 2
+	if "NoHanded" in tags:
+		return 0
+	return 1

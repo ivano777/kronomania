@@ -57,8 +57,10 @@ const AVAILABLE_WEAPONS: Array = [
 	preload("res://resources/data/weapons/heater_shield.tres"),
 ]
 
-## Currently equipped weapon. null = fall back to player_default.tres equipped_weapon.
-var equipped_weapon: EquipmentData = null
+## Currently equipped main-hand weapon. null = fall back to player_default.tres equipped_weapon.
+var main_hand: EquipmentData = null
+## Currently equipped off-hand weapon. null = empty.
+var off_hand: EquipmentData = null
 
 ## node_levels: NodeData → int (0 = not yet purchased, 1..max_levels = current level).
 var node_levels: Dictionary = {}
@@ -142,7 +144,8 @@ func reset() -> void:
 	saved_wounds = 0
 	saved_fervor_size = 4
 	saved_is_burned_out = false
-	equipped_weapon = null
+	main_hand = null
+	off_hand = null
 	combat_prefs = CombatPreferences.new()
 	_grant_default_keep_nodes()
 
@@ -166,8 +169,37 @@ func apply_recovery() -> void:
 	saved_is_burned_out = false
 
 
-func set_weapon(w: EquipmentData) -> void:
-	equipped_weapon = w
+## Equip w into the main-hand slot, enforcing the two-handed constraint.
+func equip_main_hand(w: EquipmentData) -> void:
+	if w == null:
+		main_hand = null
+		return
+	var h := w.get_hands_required()
+	if h == 2:
+		main_hand = w
+		off_hand = null
+	elif h == 1:
+		if main_hand != null and main_hand.get_hands_required() == 2:
+			main_hand = null
+		main_hand = w
+	# h == 0: future zero-slot items bypass the hand limit entirely
+
+
+## Equip w into the off-hand slot, enforcing the two-handed constraint.
+## Passing a two-handed item delegates to equip_main_hand and clears the off-hand.
+func equip_off_hand(w: EquipmentData) -> void:
+	if w == null:
+		off_hand = null
+		return
+	var h := w.get_hands_required()
+	if h == 2:
+		equip_main_hand(w)
+		return
+	elif h == 1:
+		if main_hand != null and main_hand.get_hands_required() == 2:
+			main_hand = null
+		off_hand = w
+	# h == 0: future zero-slot items bypass the hand limit entirely
 
 
 func grant_points(amount: int) -> void:
@@ -234,7 +266,8 @@ func serialize() -> Dictionary:
 		"saved_fervor_size":   saved_fervor_size,
 		"saved_is_burned_out": saved_is_burned_out,
 		"luck":                luck,
-		"equipped_weapon":     equipped_weapon.item_name if equipped_weapon != null else "",
+		"main_hand":           main_hand.item_name if main_hand != null else "",
+		"off_hand":            off_hand.item_name if off_hand != null else "",
 		"combat_prefs": {
 			"atk_mode": combat_prefs.atk_mode,
 			"def_mode": combat_prefs.def_mode,
@@ -259,12 +292,20 @@ func deserialize(data: Dictionary) -> void:
 			var lvl := int(saved[nd.node_id])
 			if lvl > 0:
 				node_levels[node] = lvl
-	var wname: String = str(data.get("equipped_weapon", ""))
-	equipped_weapon = null
-	if wname != "":
+	main_hand = null
+	off_hand = null
+	# Backward-compat: old saves stored a single "equipped_weapon" key.
+	var mhname: String = str(data.get("main_hand", data.get("equipped_weapon", "")))
+	if mhname != "":
 		for w in AVAILABLE_WEAPONS:
-			if (w as EquipmentData).item_name == wname:
-				equipped_weapon = w
+			if (w as EquipmentData).item_name == mhname:
+				main_hand = w
+				break
+	var ohname: String = str(data.get("off_hand", ""))
+	if ohname != "":
+		for w in AVAILABLE_WEAPONS:
+			if (w as EquipmentData).item_name == ohname:
+				off_hand = w
 				break
 	combat_prefs = CombatPreferences.new()
 	if data.has("combat_prefs"):

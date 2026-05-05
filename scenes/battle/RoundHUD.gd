@@ -7,6 +7,7 @@ signal strike_confirmed(pool: String, brutal_trade: bool)
 signal cantrip_selected(spell: SpellData)
 signal spell_selected(spell: SpellData)
 signal wound_degrade_chosen(use_charge: bool)
+signal auto_attack_requested()
 
 @onready var _round_label:  Label         = $RoundLabel
 @onready var _phase_label:  Label         = $PhaseLabel
@@ -138,6 +139,43 @@ func show_defense_overlay(attacker_name: String, attack_total: int, target_pool:
 	_action_panel.add_child(ok_btn)
 
 
+## Show item selection panel when the player must choose a defense item (DEF Observe mode).
+## options: Array of { item_name: String, mod: ActionModifier } Dictionaries.
+func show_defense_item_choice(options: Array) -> void:
+	_clear_action_panel()
+	var lbl := Label.new()
+	lbl.text = "Choose defensive item:"
+	_action_panel.add_child(lbl)
+	var saved_wk: String = PlayerProgression.combat_prefs.defaults.get("defend_weapon", "")
+	for opt in options:
+		var row := HBoxContainer.new()
+		var mod: ActionModifier = opt["mod"] as ActionModifier
+		var item_name: String = opt["item_name"]
+		var cap_str := "uncapped" if mod.tier_cap == 0 else "cap T%d" % mod.tier_cap
+		var name_lbl := Label.new()
+		name_lbl.text = "%s  (Flat %+d  %s)" % [item_name, mod.flat_bonus, cap_str]
+		name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(name_lbl)
+		# Pin button — saves default defense item, mirroring ATK weapon pin.
+		var _wk := item_name
+		var pin_btn := Button.new()
+		pin_btn.text = "✓" if _wk == saved_wk else "★"
+		pin_btn.pressed.connect(func() -> void:
+			PlayerProgression.combat_prefs.defaults["defend_weapon"] = _wk
+			show_defense_item_choice(options)
+		)
+		row.add_child(pin_btn)
+		var sel_btn := Button.new()
+		sel_btn.text = "Select"
+		var chosen_mod: ActionModifier = mod
+		sel_btn.pressed.connect(func() -> void:
+			_clear_action_panel()
+			CombatManager.player_chose_defense_item(chosen_mod)
+		)
+		row.add_child(sel_btn)
+		_action_panel.add_child(row)
+
+
 ## Show the Meat for the Grinder decision prompt; clears the action panel first.
 func show_massive_prompt(charges_left: int) -> void:
 	_brutal_toggle = null
@@ -174,7 +212,7 @@ func _on_intent_attack() -> void:
 	_current_intent = "attack"
 	if PlayerProgression.combat_prefs.atk_mode == "auto":
 		disable_actions()
-		CombatManager.player_auto_execute_attack()
+		auto_attack_requested.emit()
 		return
 	_show_tool_panel("attack")
 
@@ -226,16 +264,16 @@ func _build_tool_entries(intent: String) -> Array:
 	var entries: Array = []
 	match intent:
 		"attack":
-			var w: EquipmentData = PlayerProgression.equipped_weapon
-			var has_strike := false
-			if w:
-				for mod: ActionModifier in w.action_modifiers:
+			var added_any := false
+			for slot_w: EquipmentData in [PlayerProgression.main_hand, PlayerProgression.off_hand]:
+				if slot_w == null:
+					continue
+				for mod: ActionModifier in slot_w.action_modifiers:
 					if mod.action_key == "strike":
-						has_strike = true
+						entries.append({"name": slot_w.item_name, "summary": "", "weapon_key": slot_w.item_name, "item": slot_w})
+						added_any = true
 						break
-			if w and has_strike:
-				entries.append({"name": w.item_name, "summary": "", "weapon_key": w.item_name, "item": w})
-			else:
+			if not added_any:
 				entries.append({"name": "Bare Hands", "summary": "", "weapon_key": "bare_hands", "item": null})
 		"magic":
 			entries.append({"name": "[Arcane Arts]", "summary": "Stat: Ingenuity", "item": null})

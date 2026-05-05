@@ -13,6 +13,10 @@ var _short_rest_btn: Button
 var _long_rest_btn: Button
 var _continue_btn: Button
 var _weapon_btns: Array[Button] = []
+var _equip_slot: String = "main"  # "main" or "off"
+var _main_slot_btn: Button
+var _off_slot_btn: Button
+var _slot_status_label: Label
 
 # Save popup
 var _save_overlay: ColorRect
@@ -81,6 +85,27 @@ func _ready() -> void:
 	var equip_header := Label.new()
 	equip_header.text = "Equipment"
 	vbox.add_child(equip_header)
+
+	var slot_row := HBoxContainer.new()
+	slot_row.add_theme_constant_override("separation", 6)
+	vbox.add_child(slot_row)
+
+	_main_slot_btn = Button.new()
+	_main_slot_btn.pressed.connect(func() -> void:
+		_equip_slot = "main"
+		_refresh()
+	)
+	slot_row.add_child(_main_slot_btn)
+
+	_off_slot_btn = Button.new()
+	_off_slot_btn.pressed.connect(func() -> void:
+		_equip_slot = "off"
+		_refresh()
+	)
+	slot_row.add_child(_off_slot_btn)
+
+	_slot_status_label = Label.new()
+	vbox.add_child(_slot_status_label)
 
 	var weapon_row := HBoxContainer.new()
 	vbox.add_child(weapon_row)
@@ -275,11 +300,24 @@ func _refresh() -> void:
 	else:
 		_run_label.text = "%d / %d encounters cleared" % [cleared, DungeonManager.enemies_total()]
 
-	var eff_weapon: EquipmentData = PlayerProgression.equipped_weapon \
-		if PlayerProgression.equipped_weapon != null \
-		else _PLAYER_DATA.equipped_weapon
+	var mh: EquipmentData = PlayerProgression.main_hand
+	var oh: EquipmentData = PlayerProgression.off_hand
+	var mh_two_handed: bool = mh != null and mh.get_hands_required() == 2
+
+	if mh_two_handed and _equip_slot == "off":
+		_equip_slot = "main"
+
+	_main_slot_btn.text = "▶ Main Hand" if _equip_slot == "main" else "  Main Hand"
+	_off_slot_btn.text  = "▶ Off Hand"  if _equip_slot == "off"  else "  Off Hand"
+	_off_slot_btn.disabled = mh_two_handed
+
+	var mh_name := mh.item_name if mh else "(empty)"
+	var oh_name := "—— (2H)" if mh_two_handed else (oh.item_name if oh else "(empty)")
+	_slot_status_label.text = "Main: %s  |  Off: %s" % [mh_name, oh_name]
+
 	for i in _weapon_btns.size():
-		_weapon_btns[i].disabled = (PlayerProgression.AVAILABLE_WEAPONS[i] == eff_weapon)
+		var w: EquipmentData = PlayerProgression.AVAILABLE_WEAPONS[i] as EquipmentData
+		_weapon_btns[i].disabled = (w == mh or w == oh)
 
 	if DungeonManager.short_rest_used:
 		_short_rest_btn.text = "Short Rest  (used)"
@@ -366,7 +404,10 @@ func _on_exit_confirmed() -> void:
 # --- Rest / actions ---
 
 func _on_equip_weapon(w: EquipmentData) -> void:
-	PlayerProgression.set_weapon(w)
+	if _equip_slot == "off":
+		PlayerProgression.equip_off_hand(w)
+	else:
+		PlayerProgression.equip_main_hand(w)
 	_refresh()
 
 
@@ -433,9 +474,11 @@ func _effective_stat_size(stat: String) -> int:
 func _max_wounds() -> int:
 	var tier  := PlayerProgression.get_tier()
 	var base  := _PLAYER_DATA.max_wounds
-	var eff_w: EquipmentData = PlayerProgression.equipped_weapon \
-		if PlayerProgression.equipped_weapon != null else _PLAYER_DATA.equipped_weapon
-	var equip := eff_w.max_wounds_bonus if eff_w else 0
+	var equip := 0
+	var mh: EquipmentData = PlayerProgression.main_hand if PlayerProgression.main_hand != null else _PLAYER_DATA.equipped_weapon
+	var oh: EquipmentData = PlayerProgression.off_hand
+	if mh: equip += mh.max_wounds_bonus
+	if oh: equip += oh.max_wounds_bonus
 	var bonus := 0
 	for node in PlayerProgression.node_levels.keys():
 		var lvl: int = PlayerProgression.node_levels[node]

@@ -146,10 +146,11 @@ func surrender() -> Dictionary:
 	if randi() % 100 < (50 - PlayerProgression.luck):
 		lost_points = PlayerProgression.available_points / 2
 		PlayerProgression.available_points -= lost_points
-	if PlayerProgression.equipped_weapon != null \
+	if PlayerProgression.main_hand != null \
 			and randi() % 100 < (30 - PlayerProgression.luck):
 		lost_weapon = true
-		PlayerProgression.equipped_weapon = null
+		PlayerProgression.main_hand = null
+		PlayerProgression.off_hand = null
 	return {"lost_points": lost_points, "lost_weapon": lost_weapon}
 
 

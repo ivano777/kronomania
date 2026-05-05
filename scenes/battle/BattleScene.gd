@@ -49,8 +49,8 @@ func _ready() -> void:
 	# Player side.
 	_player_visual.setup(PLAYER_DATA, true)
 	_player_hud.setup(PLAYER_DATA, true)
-	var _eff_weapon: EquipmentData = PlayerProgression.equipped_weapon \
-		if PlayerProgression.equipped_weapon != null else PLAYER_DATA.equipped_weapon
+	var _eff_weapon: EquipmentData = PlayerProgression.main_hand \
+		if PlayerProgression.main_hand != null else PLAYER_DATA.equipped_weapon
 	_player_hud.set_weapon_display(_eff_weapon)
 
 	# Spawn one HUD into UILayer and one Combatant visual into WorldLayer per enemy.
@@ -89,6 +89,7 @@ func _ready() -> void:
 	_round_hud.cantrip_selected.connect(_on_cantrip_selected)
 	_round_hud.spell_selected.connect(_on_spell_selected)
 	_round_hud.wound_degrade_chosen.connect(_on_wound_degrade_chosen)
+	_round_hud.auto_attack_requested.connect(_on_auto_attack_requested)
 
 	# Connect CombatManager signals.
 	CombatManager.log_message.connect(_on_log)
@@ -102,6 +103,7 @@ func _ready() -> void:
 	CombatManager.fervor_changed.connect(_on_fervor_changed)
 	CombatManager.player_massive_incoming.connect(_on_player_massive_incoming)
 	CombatManager.player_defense_incoming.connect(_on_defense_incoming)
+	CombatManager.player_defense_item_choice.connect(_on_defense_item_choice)
 
 	# Debug widgets — added to UILayer so they render as Controls correctly.
 	if ResourceLoader.exists(_DBG_WEAPON_SEL):
@@ -215,8 +217,19 @@ func _on_defense_incoming(attacker_name: String, attack_total: int, target_pool:
 	_round_hud.show_defense_overlay(attacker_name, attack_total, target_pool)
 
 
+func _on_defense_item_choice(options: Array) -> void:
+	_round_hud.show_defense_item_choice(options)
+
+
 func _on_wound_degrade_chosen(use_charge: bool) -> void:
 	CombatManager.player_chose_degrade_wound(use_charge)
+
+
+func _on_auto_attack_requested() -> void:
+	CombatManager.player_auto_execute_attack(
+		_target_index,
+		_round_hud.get_net_advantage() + _ambush_base_disadvantage
+	)
 
 
 func _on_strike_confirmed(pool: String, brutal_trade: bool) -> void:
@@ -248,5 +261,6 @@ func _teardown_signals() -> void:
 	CombatManager.fervor_changed.disconnect(_on_fervor_changed)
 	CombatManager.player_massive_incoming.disconnect(_on_player_massive_incoming)
 	CombatManager.player_defense_incoming.disconnect(_on_defense_incoming)
+	CombatManager.player_defense_item_choice.disconnect(_on_defense_item_choice)
 	if _dbg_fervor_disp:
 		CombatManager.fervor_changed.disconnect(_dbg_fervor_disp._on_fervor_changed)
