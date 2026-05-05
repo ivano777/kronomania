@@ -3,7 +3,7 @@
 class_name RoundHUD
 extends VBoxContainer
 
-signal strike_confirmed(pool: String, brutal_trade: bool)
+signal strike_confirmed(pool: String, brutal_trade: bool, source_weapon: EquipmentData)
 signal cantrip_selected(spell: SpellData)
 signal spell_selected(spell: SpellData)
 signal wound_degrade_chosen(use_charge: bool)
@@ -429,7 +429,7 @@ func _show_execution_magic() -> void:
 func _confirm_strike(pool: String) -> void:
 	var bt: bool = get_brutal_trade()
 	disable_actions()
-	strike_confirmed.emit(pool, bt)
+	strike_confirmed.emit(pool, bt, _current_weapon_item)
 
 
 func _on_massive_choice(use_charge: bool) -> void:

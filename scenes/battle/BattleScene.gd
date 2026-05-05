@@ -232,12 +232,13 @@ func _on_auto_attack_requested() -> void:
 	)
 
 
-func _on_strike_confirmed(pool: String, brutal_trade: bool) -> void:
+func _on_strike_confirmed(pool: String, brutal_trade: bool, source_weapon: EquipmentData) -> void:
 	CombatManager.player_chose_strike(
 		_round_hud.get_net_advantage() + _ambush_base_disadvantage,
 		pool,
 		brutal_trade,
-		_target_index
+		_target_index,
+		source_weapon
 	)
 
 

@@ -158,6 +158,8 @@ var _round:  int = 0
 
 ## True only while awaiting the player's action input.
 var _waiting_for_player: bool = false
+## Weapon the player explicitly chose this round; null = use default main-hand resolution.
+var _player_strike_weapon: EquipmentData = null
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
@@ -232,10 +234,11 @@ func start_combat(player_data: CombatantData, enemies_data: Array) -> void:
 ## target_pool    : which defense pool the attack pressures ("stance" | "resolve" | "stamina").
 ## brutal_trade   : if true, VT −5 and Flat +5 (requires dom_brutal L1).
 ## target_index   : which enemy to attack (index into _enemies array).
-func player_chose_strike(net_advantage: int = 0, target_pool: String = "stance", brutal_trade: bool = false, target_index: int = 0) -> void:
+func player_chose_strike(net_advantage: int = 0, target_pool: String = "stance", brutal_trade: bool = false, target_index: int = 0, source_weapon: EquipmentData = null) -> void:
 	if not _waiting_for_player:
 		return
 	_waiting_for_player = false
+	_player_strike_weapon = source_weapon
 	_resolve_round(net_advantage, target_pool, brutal_trade, target_index)
 
 
@@ -329,22 +332,44 @@ func player_auto_execute_attack(target_index: int = 0, net_advantage: int = 0) -
 		return
 	var defaults: Dictionary = PlayerProgression.combat_prefs.defaults
 	var weapon_name: String = defaults.get("attack_weapon", "")
-	var action_key: String = defaults.get("attack_action", "")
+	var action_key: String  = defaults.get("attack_action", "")
 	if weapon_name != "" and action_key != "":
-		var cur_w: EquipmentData = _player.weapon_override if _player.weapon_override else _player.data.equipped_weapon
-		var cur_name: String = cur_w.item_name if cur_w else "bare_hands"
-		if weapon_name == cur_name:
-			var mod := _get_action_modifier(_player, action_key)
-			var brutal: bool = bool(defaults.get("brutal_trade", false)) and (PlayerProgression.get_node_level_by_id("dom_brutal") >= 1)
-			var tp: String = mod.target_pool if mod.target_pool != "" else "stance"
-			var label: String = mod.action_name if mod.action_name != "" else action_key.capitalize()
-			log_message.emit("[color=gray][Auto] %s → %s (default)[/color]" % [label, tp.capitalize()])
-			player_chose_strike(net_advantage, tp, brutal, target_index)
-			return
+		# Use weapon_override only (not data.equipped_weapon) so "bare_hands" matches correctly.
+		var main_w: EquipmentData = _player.weapon_override
+		var main_name: String     = main_w.item_name if main_w else "bare_hands"
+		var off_w: EquipmentData  = _player.off_hand_override
+		var off_name: String      = off_w.item_name if off_w else ""
+
+		var found_match := false
+		var matched_w: EquipmentData = null
+		if weapon_name == main_name:
+			found_match = true
+			matched_w   = main_w        # null when bare hands — intentional
+		elif off_w != null and weapon_name == off_name:
+			found_match = true
+			matched_w   = off_w
+
+		if found_match:
+			var mod: ActionModifier = null
+			if matched_w != null:
+				for m in matched_w.action_modifiers:
+					if m.action_key == action_key:
+						mod = m
+						break
+			if mod == null:
+				mod = _player.data.get_bare_hands_modifier(action_key)
+			if mod != null:
+				var brutal := bool(defaults.get("brutal_trade", false)) and \
+						(PlayerProgression.get_node_level_by_id("dom_brutal") >= 1)
+				var tp    := mod.target_pool if mod.target_pool != "" else "stance"
+				var label := mod.action_name if mod.action_name != "" else action_key.capitalize()
+				log_message.emit("[color=gray][Auto] %s → %s (default)[/color]" % [label, tp.capitalize()])
+				player_chose_strike(net_advantage, tp, brutal, target_index, matched_w)
+				return
 	var best := _auto_best_action()
 	if not best.is_empty():
-		var tp: String = best["target_pool"] as String
-		var score: float = best["score"] as float
+		var tp    := best["target_pool"] as String
+		var score := best["score"] as float
 		log_message.emit("[color=gray][Auto-Best] Strike → %s (score: %.1f)[/color]" % [tp.capitalize(), score])
 		player_chose_strike(net_advantage, tp, false, target_index)
 
@@ -371,7 +396,18 @@ func _resolve_round(net_advantage: int = 0, target_pool: String = "stance", brut
 		log_message.emit("  [color=yellow]Brutal Trade: VT −5, Flat +5.[/color]")
 
 	# ── Roll player attack pool ────────────────────────────────────────────
-	var _strike_mod := _get_action_modifier(_player, "strike")
+	var chosen_weapon := _player_strike_weapon
+	_player_strike_weapon = null
+	var _strike_mod: ActionModifier
+	if chosen_weapon != null:
+		for m in chosen_weapon.action_modifiers:
+			if m.action_key == "strike":
+				_strike_mod = m
+				break
+		if _strike_mod == null:
+			_strike_mod = _player.data.get_bare_hands_modifier("strike")
+	else:
+		_strike_mod = _get_action_modifier(_player, "strike")
 	var keep_grade := _physical_keep_grade(_player) + _node_weapon_bonus_sum(_player, "weapon_keep") + _strike_mod.keep_bonus
 	var brutal_flat := 5 if brutal_trade else 0
 
@@ -386,7 +422,8 @@ func _resolve_round(net_advantage: int = 0, target_pool: String = "stance", brut
 		net_advantage + _pool_bonus(_player),
 		0, 0, 0, earthshatter_size
 	)
-	log_message.emit(_fmt_attack(_player.data.combatant_name, p_atk))
+	var _atk_weapon_name := chosen_weapon.item_name if chosen_weapon else _attacker_weapon_name(_player)
+	log_message.emit(_fmt_attack(_player.data.combatant_name, p_atk, _atk_weapon_name))
 	if (p_atk.post_keep_bonus_roll as int) > 0:
 		log_message.emit("  [color=cyan]Earthshatter roll: %d[/color]" % (p_atk.post_keep_bonus_roll as int))
 
@@ -405,7 +442,7 @@ func _resolve_round(net_advantage: int = 0, target_pool: String = "stance", brut
 			var e_atk := RollEngine.resolve(
 				_effective_tier(e, _get_action_modifier(e, "strike")), _stat_size(e, "dominion"), _training_keep_grade(e), _attack_flat(e)
 			)
-			log_message.emit(_fmt_attack(e.data.combatant_name, e_atk))
+			log_message.emit(_fmt_attack(e.data.combatant_name, e_atk, _attacker_weapon_name(e)))
 			var e_pool := target_pool if i == target_index else "stance"
 			await _resolve_attack(false, i, e_atk, e_pool)
 			if _player.is_defeated:
@@ -430,7 +467,7 @@ func _resolve_round(net_advantage: int = 0, target_pool: String = "stance", brut
 			var e_atk := RollEngine.resolve(
 				_effective_tier(e, _get_action_modifier(e, "strike")), _stat_size(e, "dominion"), _training_keep_grade(e), _attack_flat(e)
 			)
-			log_message.emit(_fmt_attack(e.data.combatant_name, e_atk))
+			log_message.emit(_fmt_attack(e.data.combatant_name, e_atk, _attacker_weapon_name(e)))
 			var e_pool := target_pool if i == target_index else "stance"
 			await _resolve_attack(false, i, e_atk, e_pool)
 			if _player.is_defeated:
@@ -876,8 +913,14 @@ func _pool_bonus(state: CombatantState, action_key: String = "strike") -> int:
 
 
 ## Looks up the ActionModifier for action_key: weapon first, then bare_hands (always present).
+## For the player, weapon_override == null means bare hands (PlayerProgression.main_hand not set).
+## For enemies, weapon_override == null falls back to data.equipped_weapon (their fixed weapon).
 func _get_action_modifier(state: CombatantState, action_key: String) -> ActionModifier:
-	var w: EquipmentData = state.weapon_override if state.weapon_override else state.data.equipped_weapon
+	var w: EquipmentData
+	if state == _player:
+		w = state.weapon_override
+	else:
+		w = state.weapon_override if state.weapon_override else state.data.equipped_weapon
 	if w:
 		for mod in w.action_modifiers:
 			if mod.action_key == action_key:
@@ -1075,13 +1118,23 @@ func get_player_attack_preview() -> int:
 
 # ── Formatting helpers ────────────────────────────────────────────────────────
 
-func _fmt_attack(name: String, r: Dictionary) -> String:
+func _attacker_weapon_name(state: CombatantState) -> String:
+	var w: EquipmentData
+	if state == _player:
+		w = state.weapon_override
+	else:
+		w = state.weapon_override if state.weapon_override else state.data.equipped_weapon
+	return w.item_name if w else "Bare Hands"
+
+
+func _fmt_attack(name: String, r: Dictionary, weapon_name: String = "") -> String:
 	var desperation: bool = r.desperation
 	var prefix := "[b][DESPERATION][/b] " if desperation else ""
 	var flat: int = r.flat as int
 	var flat_part := " + %d flat" % flat if flat != 0 else ""
-	return "  %s%s attacks: rolled %s, kept %s%s → [b]%d[/b]" % [
-		prefix, name, _arr(r.dice as Array), _arr(r.kept as Array), flat_part, r.total as int
+	var with_part := " with [i]%s[/i]" % weapon_name if weapon_name != "" else ""
+	return "  %s%s attacks%s: rolled %s, kept %s%s → [b]%d[/b]" % [
+		prefix, name, with_part, _arr(r.dice as Array), _arr(r.kept as Array), flat_part, r.total as int
 	]
 
 
