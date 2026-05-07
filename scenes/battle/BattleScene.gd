@@ -154,6 +154,11 @@ func _on_wounds_changed(is_player: bool, enemy_index: int, current: int, max_wou
 			_enemy_huds[enemy_index].modulate = Color(0.45, 0.45, 0.45)
 			if enemy_index == _target_index:
 				_auto_select_living_target()
+	var vis: Combatant = _player_visual if is_player else _enemy_visuals[enemy_index]
+	if current >= max_wounds:
+		vis.play_die()
+	else:
+		vis.play_hurt()
 
 
 func _on_guard_changed(is_player: bool, enemy_index: int, pool: String, guard_value: int) -> void:
@@ -226,6 +231,8 @@ func _on_wound_degrade_chosen(use_charge: bool) -> void:
 
 
 func _on_auto_attack_requested() -> void:
+	_player_visual.play_attack_melee()
+	await get_tree().create_timer(0.35).timeout
 	CombatManager.player_auto_execute_attack(
 		_target_index,
 		_round_hud.get_net_advantage() + _ambush_base_disadvantage
@@ -233,6 +240,7 @@ func _on_auto_attack_requested() -> void:
 
 
 func _on_strike_confirmed(pool: String, brutal_trade: bool, source_weapon: EquipmentData) -> void:
+	_player_visual.play_attack_melee()
 	CombatManager.player_chose_strike(
 		_round_hud.get_net_advantage() + _ambush_base_disadvantage,
 		pool,
@@ -243,10 +251,12 @@ func _on_strike_confirmed(pool: String, brutal_trade: bool, source_weapon: Equip
 
 
 func _on_cantrip_selected(spell: SpellData) -> void:
+	_player_visual.play_cast_spell()
 	CombatManager.player_chose_cantrip(spell, _target_index)
 
 
 func _on_spell_selected(spell: SpellData) -> void:
+	_player_visual.play_cast_spell()
 	CombatManager.player_chose_spell(spell, _target_index)
 
 

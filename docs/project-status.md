@@ -180,6 +180,16 @@ Depends on Groups 7 and 7.5.
 
 ---
 
+### ✓ Group 8 — Sprite Registry & Art Infrastructure
+
+Convention-based asset loader. Drop a PNG in the right folder with the right name; the system picks
+it up automatically — no `.tres` editing required. Covers battle combatant sprites and a registry
+foundation for weapon / spell / node icons.
+
+Full spec: [docs/impl/group-8-sprite-registry.md](impl/group-8-sprite-registry.md)
+
+---
+
 ### Future — Undesigned or blocked items
 
 - **Brutal L2 Cleave** — multi-enemy overflow after a breach. Needs design decision on overflow mechanics (does excess carry over? to which target? in what order?).

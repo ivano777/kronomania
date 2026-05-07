@@ -29,7 +29,16 @@ func _weapon_line(w: EquipmentData) -> String:
 	if w == null:
 		return "(no weapon)"
 	var tag_str := ", ".join(w.tags) if not w.tags.is_empty() else "none"
+	var atk_flat := 0
+	var def_flat := 0
+	var pool_b   := 0
+	for mod in w.action_modifiers:
+		if mod.action_key == "strike":
+			atk_flat = mod.flat_bonus
+			pool_b   = mod.pool_bonus
+		elif mod.action_key == "defend":
+			def_flat = mod.flat_bonus
 	return "%s  Pot %d | Atk+%d Def+%d Pool%+d Wounds+%d | [%s]" % [
-		w.item_name, w.potency, w.flat_attack_bonus, w.flat_guard_bonus,
-		w.pool_bonus, w.max_wounds_bonus, tag_str,
+		w.item_name, w.potency, atk_flat, def_flat,
+		pool_b, w.max_wounds_bonus, tag_str,
 	]
