@@ -31,6 +31,9 @@ var _delete_confirm: ConfirmationDialog
 # Exit confirmation
 var _exit_confirm: ConfirmationDialog
 
+# Autosave indicator (corner banner)
+var _save_indicator: Control
+
 
 func _ready() -> void:
 	if not DungeonManager.run_active:
@@ -184,8 +187,15 @@ func _ready() -> void:
 	# Overlays must be added last so they render on top.
 	_build_save_popup()
 	_build_exit_confirm()
+	_build_save_indicator()
+	SaveManager.save_completed.connect(_on_save_completed)
 
 	_refresh()
+
+
+func _exit_tree() -> void:
+	if SaveManager.save_completed.is_connected(_on_save_completed):
+		SaveManager.save_completed.disconnect(_on_save_completed)
 
 
 func _build_save_popup() -> void:
@@ -267,6 +277,47 @@ func _build_save_popup() -> void:
 	add_child(_delete_confirm)
 
 
+func _build_save_indicator() -> void:
+	var layer := Control.new()
+	layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(layer)
+
+	var panel := PanelContainer.new()
+	panel.anchor_left   = 1.0
+	panel.anchor_right  = 1.0
+	panel.anchor_top    = 0.0
+	panel.anchor_bottom = 0.0
+	panel.offset_left   = -172.0
+	panel.offset_right  = -8.0
+	panel.offset_top    = 8.0
+	panel.offset_bottom = 44.0
+	panel.mouse_filter  = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(panel)
+
+	var margin := MarginContainer.new()
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for side in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
+		margin.add_theme_constant_override(side, 8)
+	panel.add_child(margin)
+
+	var lbl := Label.new()
+	lbl.text = "Saving…"
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	lbl.add_theme_color_override("font_color", Color(0.85, 0.8, 0.7, 1))
+	margin.add_child(lbl)
+
+	_save_indicator = layer
+	_save_indicator.modulate.a = 0.0
+
+
+func _on_save_completed(_slot: int) -> void:
+	var tw := create_tween()
+	tw.tween_property(_save_indicator, "modulate:a", 1.0, 0.25)
+	tw.tween_interval(2.0)
+	tw.tween_property(_save_indicator, "modulate:a", 0.0, 0.5)
+
+
 func _build_exit_confirm() -> void:
 	_exit_confirm = ConfirmationDialog.new()
 	_exit_confirm.title = "Exit to Main Menu"
@@ -345,9 +396,10 @@ func _refresh_popup_slots() -> void:
 		var has_data: bool = meta.get("exists", false)
 		if has_data:
 			var ts: String = str(meta.get("timestamp", ""))
-			var date_part := ts.substr(0, 10) if ts.length() >= 10 else ts
-			_popup_slot_labels[i].text = "SLOT %d — Tier %d · Pts %d · %s" \
-				% [slot, int(meta.get("tier", 1)), int(meta.get("points", 0)), date_part]
+			var run_name: String = str(meta.get("run_name", ""))
+			var name_part := ("[%s]  " % run_name) if run_name != "" else ""
+			_popup_slot_labels[i].text = "SLOT %d — %sTier %d · Pts %d · %s" \
+				% [slot, name_part, int(meta.get("tier", 1)), int(meta.get("points", 0)), ts]
 		else:
 			_popup_slot_labels[i].text = "SLOT %d — EMPTY" % slot
 		_popup_delete_btns[i].disabled = not has_data

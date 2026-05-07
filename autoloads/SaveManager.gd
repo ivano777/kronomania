@@ -7,6 +7,10 @@ const SAVE_VER := 1
 
 ## Last slot used for save or load (0 = none; auto-targets slot 1 on first explicit save).
 var active_slot: int = 0
+## Name given to the current run at New Game. Travels with the save across slots.
+var active_run_name: String = ""
+
+signal save_completed(slot: int)
 
 
 func _ready() -> void:
@@ -19,13 +23,15 @@ func save(slot: int) -> void:
 	data.merge(PlayerProgression.serialize())
 	data.merge(DungeonManager.serialize())
 	data["version"]   = SAVE_VER
-	data["timestamp"] = Time.get_datetime_string_from_system()
+	data["run_name"]  = active_run_name
+	data["timestamp"] = int(Time.get_unix_time_from_system() * 1000)
 	var file := FileAccess.open(_slot_path(slot), FileAccess.WRITE)
 	if file == null:
 		push_error("SaveManager.save: cannot open '%s'" % _slot_path(slot))
 		return
 	file.store_string(JSON.stringify(data, "\t"))
 	file.close()
+	save_completed.emit(slot)
 
 
 func load(slot: int) -> void:
@@ -44,6 +50,7 @@ func load(slot: int) -> void:
 		push_error("SaveManager.load: invalid JSON in slot %d." % slot)
 		return
 	active_slot = slot
+	active_run_name = str(parsed.get("run_name", ""))
 	PlayerProgression.deserialize(parsed)
 	DungeonManager.deserialize(parsed)
 
@@ -63,6 +70,7 @@ func get_slot_meta(slot: int) -> Dictionary:
 		return {"exists": false}
 	return {
 		"exists":      true,
+		"run_name":    str(parsed.get("run_name", "")),
 		"tier":        int(parsed.get("tier", 1)),
 		"points":      int(parsed.get("available_points", 0)),
 		"timestamp":   str(parsed.get("timestamp", "")),
@@ -76,6 +84,7 @@ func delete_slot(slot: int) -> void:
 		DirAccess.remove_absolute(path)
 	if active_slot == slot:
 		active_slot = 0
+		active_run_name = ""
 
 
 func _slot_path(slot: int) -> String:

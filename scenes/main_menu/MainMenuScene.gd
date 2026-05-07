@@ -9,6 +9,12 @@ var _delete_btns: Array[Button] = []
 var _pending_delete_slot: int = 0
 var _delete_confirm: ConfirmationDialog
 
+# New Game slot picker
+var _new_game_popup: Control = null
+var _ng_name_edit: LineEdit = null
+var _ng_pending_slot: int = 0
+var _ng_overwrite_confirm: ConfirmationDialog
+
 
 func _ready() -> void:
 	var margin := MarginContainer.new()
@@ -87,6 +93,12 @@ func _ready() -> void:
 	_delete_confirm.confirmed.connect(_on_delete_confirmed)
 	add_child(_delete_confirm)
 
+	_ng_overwrite_confirm = ConfirmationDialog.new()
+	_ng_overwrite_confirm.ok_button_text = "Overwrite"
+	_ng_overwrite_confirm.cancel_button_text = "Cancel"
+	_ng_overwrite_confirm.confirmed.connect(_on_ng_overwrite_confirmed)
+	add_child(_ng_overwrite_confirm)
+
 	_refresh_slots()
 
 
@@ -96,14 +108,15 @@ func _refresh_slots() -> void:
 		var meta := SaveManager.get_slot_meta(slot)
 		if meta.get("exists", false):
 			var ts: String = str(meta.get("timestamp", ""))
-			var date_part := ts.substr(0, 10) if ts.length() >= 10 else ts
+			var run_name: String = str(meta.get("run_name", ""))
+			var name_part := ("[%s]  " % run_name) if run_name != "" else ""
 			var defeated: bool = str(meta.get("last_result", "")) == "defeat"
 			if defeated:
-				_slot_labels[i].text = "SLOT %d — GAME OVER · Tier %d · %s" \
-					% [slot, int(meta.get("tier", 1)), date_part]
+				_slot_labels[i].text = "SLOT %d — %sGAME OVER · Tier %d · %s" \
+					% [slot, name_part, int(meta.get("tier", 1)), ts]
 			else:
-				_slot_labels[i].text = "SLOT %d — Tier %d · Pts %d · %s" \
-					% [slot, int(meta.get("tier", 1)), int(meta.get("points", 0)), date_part]
+				_slot_labels[i].text = "SLOT %d — %sTier %d · Pts %d · %s" \
+					% [slot, name_part, int(meta.get("tier", 1)), int(meta.get("points", 0)), ts]
 			_load_btns[i].disabled = defeated
 			_delete_btns[i].disabled = false
 		else:
@@ -113,6 +126,108 @@ func _refresh_slots() -> void:
 
 
 func _on_new_game() -> void:
+	_show_new_game_popup()
+
+
+func _show_new_game_popup() -> void:
+	_new_game_popup = ColorRect.new()
+	_new_game_popup.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_new_game_popup.color = Color(0.0, 0.0, 0.0, 0.65)
+	_new_game_popup.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(_new_game_popup)
+
+	var popup := PanelContainer.new()
+	popup.anchor_left   = 0.15
+	popup.anchor_right  = 0.85
+	popup.anchor_top    = 0.08
+	popup.anchor_bottom = 0.92
+	_new_game_popup.add_child(popup)
+
+	var popup_margin := MarginContainer.new()
+	for side in ["margin_top", "margin_left", "margin_right", "margin_bottom"]:
+		popup_margin.add_theme_constant_override(side, 24)
+	popup.add_child(popup_margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 12)
+	popup_margin.add_child(vbox)
+
+	var title := Label.new()
+	title.text = "◆  NEW GAME  ◆"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(title)
+
+	vbox.add_child(HSeparator.new())
+
+	var name_lbl := Label.new()
+	name_lbl.text = "Run name"
+	vbox.add_child(name_lbl)
+
+	_ng_name_edit = LineEdit.new()
+	_ng_name_edit.placeholder_text = "Enter a name…"
+	_ng_name_edit.max_length = 32
+	vbox.add_child(_ng_name_edit)
+
+	vbox.add_child(HSeparator.new())
+
+	for i in range(1, 4):
+		var meta := SaveManager.get_slot_meta(i)
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
+		vbox.add_child(row)
+
+		var slot_lbl := Label.new()
+		slot_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		if meta.get("exists", false):
+			var ts: String = str(meta.get("timestamp", ""))
+			var run_name: String = str(meta.get("run_name", ""))
+			var name_part := ("[%s]  " % run_name) if run_name != "" else ""
+			slot_lbl.text = "Slot %d  %sTier %d · Pts %d · %s" \
+				% [i, name_part, int(meta.get("tier", 1)), int(meta.get("points", 0)), ts]
+		else:
+			slot_lbl.text = "Slot %d — EMPTY" % i
+		row.add_child(slot_lbl)
+
+		var slot_btn := Button.new()
+		slot_btn.text = "Overwrite" if meta.get("exists", false) else "Start Here"
+		slot_btn.pressed.connect(_on_ng_slot_chosen.bind(i))
+		row.add_child(slot_btn)
+
+	vbox.add_child(HSeparator.new())
+
+	var cancel_btn := Button.new()
+	cancel_btn.text = "Cancel"
+	cancel_btn.pressed.connect(func() -> void: _new_game_popup.queue_free())
+	vbox.add_child(cancel_btn)
+
+
+func _on_ng_slot_chosen(slot: int) -> void:
+	var name := _ng_name_edit.text.strip_edges()
+	if name.is_empty():
+		_ng_name_edit.grab_focus()
+		return
+	var meta := SaveManager.get_slot_meta(slot)
+	if meta.get("exists", false):
+		_ng_pending_slot = slot
+		var existing_name: String = str(meta.get("run_name", ""))
+		var existing_str := (" '%s'" % existing_name) if existing_name != "" else ""
+		_ng_overwrite_confirm.title = "Overwrite Slot %d?" % slot
+		_ng_overwrite_confirm.dialog_text = \
+			"Slot %d already has a save%s.\nThis cannot be undone. Overwrite?" % [slot, existing_str]
+		_ng_overwrite_confirm.popup_centered()
+	else:
+		_commit_new_game(slot)
+
+
+func _on_ng_overwrite_confirmed() -> void:
+	_commit_new_game(_ng_pending_slot)
+
+
+func _commit_new_game(slot: int) -> void:
+	var run_name := _ng_name_edit.text.strip_edges()
+	_new_game_popup.queue_free()
+	SaveManager.active_slot = slot
+	SaveManager.active_run_name = run_name
 	PlayerProgression.reset()
 	DungeonManager.start_run()
 	get_tree().change_scene_to_file("res://scenes/campfire/CampfireScene.tscn")
