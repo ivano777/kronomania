@@ -155,6 +155,8 @@ class CombatantState:
 var _player: CombatantState
 var _enemies: Array  # Array[CombatantState]
 var _round:  int = 0
+var _debug_immortal: bool = false
+var _debug_lethal: bool = false
 
 ## True only while awaiting the player's action input.
 var _waiting_for_player: bool = false
@@ -287,6 +289,23 @@ func debug_set_fervor(new_fervor_size: int, burned_out: bool) -> void:
 		_player.fervor_size = new_fervor_size
 		_player.is_burned_out = burned_out
 		fervor_changed.emit(true, _player.fervor_size, _stat_size(_player, "ingenuity"), burned_out)
+
+
+## Debug only — restore player wounds to 0 mid-combat.
+func debug_refill_hp() -> void:
+	if _player:
+		_player.current_wounds = 0
+		wounds_changed.emit(true, -1, 0, _player.max_wounds)
+
+
+## Debug only — toggle player immortality (wounds can't trigger defeat).
+func debug_set_immortal(enabled: bool) -> void:
+	_debug_immortal = enabled
+
+
+## Debug only — toggle lethal attacks (player breaches instantly kill enemies).
+func debug_set_lethal(enabled: bool) -> void:
+	_debug_lethal = enabled
 
 
 # ── Private — round flow ──────────────────────────────────────────────────────
@@ -724,7 +743,8 @@ func _resolve_attack(attacker_is_player: bool, enemy_index: int, attack_result: 
 
 	# Breach check: attack_total >= guard (guard reaches 0 or below).
 	var current_guard: int = defender.get_guard(target_pool)
-	if (attack_result.total as int) >= current_guard:
+	var force_breach := _debug_lethal and attacker_is_player and not defender_is_player
+	if (attack_result.total as int) >= current_guard or force_breach:
 		var massive := RollEngine.is_massive(
 			attack_result.total as int, current_guard, defensive_size
 		)
@@ -738,6 +758,10 @@ func _resolve_attack(attacker_is_player: bool, enemy_index: int, attack_result: 
 				wounds = 1
 				log_message.emit("  [color=lime]Meat for the Grinder! Massive Wound degraded to 1 Wound.[/color]")
 		defender.current_wounds += wounds
+		if _debug_lethal and attacker_is_player and not defender_is_player:
+			defender.current_wounds = defender.max_wounds
+		if _debug_immortal and defender_is_player and defender.current_wounds >= defender.max_wounds:
+			defender.current_wounds = defender.max_wounds - 1
 
 		if massive:
 			log_message.emit(

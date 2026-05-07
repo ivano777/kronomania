@@ -9,8 +9,9 @@ const ENEMY_HUD_SCENE := preload("res://scenes/battle/CombatantHUD.tscn")
 const ENEMY_VIS_SCENE := preload("res://scenes/battle/Combatant.tscn")
 
 # ── Debug scenes (remove path + add_child call to strip at release) ───────────
-const _DBG_WEAPON_SEL  := "res://scenes/debug/DebugWeaponSelector.tscn"
-const _DBG_FERVOR_DISP := "res://scenes/debug/DebugFervorDisplay.tscn"
+const _DBG_WEAPON_SEL    := "res://scenes/debug/DebugWeaponSelector.tscn"
+const _DBG_FERVOR_DISP   := "res://scenes/debug/DebugFervorDisplay.tscn"
+const _DBG_COMBAT_CTRL   := "res://scenes/debug/DebugCombatControl.tscn"
 var _dbg_fervor_disp = null
 
 # ── Node references ───────────────────────────────────────────────────────────
@@ -112,6 +113,8 @@ func _ready() -> void:
 	if ResourceLoader.exists(_DBG_FERVOR_DISP):
 		_dbg_fervor_disp = (load(_DBG_FERVOR_DISP) as PackedScene).instantiate()
 		$UILayer.add_child(_dbg_fervor_disp)
+	if ResourceLoader.exists(_DBG_COMBAT_CTRL):
+		$UILayer.add_child((load(_DBG_COMBAT_CTRL) as PackedScene).instantiate())
 
 	CombatManager.start_combat(PLAYER_DATA, _enemies_data)
 

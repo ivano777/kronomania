@@ -51,6 +51,7 @@ func _ready() -> void:
 	_desc = RichTextLabel.new()
 	_desc.bbcode_enabled = true
 	_desc.fit_content = true
+	_desc.scroll_active = false
 	_desc.add_theme_font_size_override("font_size", 11)
 	_desc.mouse_filter = MOUSE_FILTER_IGNORE
 	_desc.custom_minimum_size = Vector2(220, 0)
@@ -231,7 +232,7 @@ func _add_row(label: String, value: String, dimmed: bool = false) -> void:
 
 func _clear_stats() -> void:
 	for child in _stats.get_children():
-		child.queue_free()
+		child.free()
 	_desc_sep.show()
 	_desc.show()
 

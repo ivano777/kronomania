@@ -17,11 +17,13 @@ func _ready() -> void:
 	_canvas.add_child(_tooltip)
 
 
-func _unhandled_input(event: InputEvent) -> void:
+func _input(event: InputEvent) -> void:
 	if not _tooltip.visible:
 		return
-	if event is InputEventMouseButton and (event as InputEventMouseButton).pressed:
-		hide()
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
+			hide()
 	elif event is InputEventKey:
 		var key := event as InputEventKey
 		if key.pressed and key.keycode == KEY_ESCAPE:
@@ -33,14 +35,28 @@ func _unhandled_input(event: InputEvent) -> void:
 func show_for(resource: Resource, screen_pos: Vector2, source: Control = null) -> void:
 	_active_control = source
 	_tooltip.populate(resource)
+	_tooltip.size = Vector2(260, 600)
+	_tooltip.modulate.a = 0.0
 	_tooltip.show()
+	await get_tree().process_frame
+	if _active_control != source:
+		return
+	_tooltip.modulate.a = 1.0
+	_tooltip.reset_size()
 	_position_tooltip(screen_pos)
 
 
 func show_delta(node: NodeData, screen_pos: Vector2, source: Control = null) -> void:
 	_active_control = source
 	_tooltip.populate_delta(node)
+	_tooltip.size = Vector2(260, 600)
+	_tooltip.modulate.a = 0.0
 	_tooltip.show()
+	await get_tree().process_frame
+	if _active_control != source:
+		return
+	_tooltip.modulate.a = 1.0
+	_tooltip.reset_size()
 	_position_tooltip(screen_pos)
 
 

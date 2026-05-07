@@ -1,0 +1,28 @@
+[gd_scene format=3 uid="uid://cxp2ateank0v5"]
+
+[ext_resource type="Script" path="res://scenes/debug/DebugCombatControl.gd" id="1_combctrl"]
+
+[node name="DebugCombatControl" type="VBoxContainer"]
+anchor_left = 0.0
+anchor_top = 1.0
+anchor_right = 0.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = -320.0
+offset_bottom = -210.0
+script = ExtResource("1_combctrl")
+
+[node name="ToggleButton" type="Button" parent="."]
+text = "💀 Combat ▸"
+
+[node name="Panel" type="VBoxContainer" parent="."]
+visible = false
+
+[node name="RefillHPBtn" type="Button" parent="Panel"]
+text = "Refill HP"
+
+[node name="ImmortalBtn" type="Button" parent="Panel"]
+text = "Immortal: OFF"
+
+[node name="LethalBtn" type="Button" parent="Panel"]
+text = "Lethal: OFF"
