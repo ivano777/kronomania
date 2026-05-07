@@ -45,10 +45,10 @@ Exceptional / temporary:
 
 Default target if unspecified: **Stance**
 
-Each defense pool is normally rolled **once per turn**.
-Once rolled, it absorbs further same-type pressure until depleted or turn ends.
-Additional different pools in same turn: cumulative Disadvantage.
-Guard resets at start of each new turn.
+Each defense pool is normally rolled **once per round**.
+Once rolled, it absorbs further same-type pressure until depleted or round ends.
+Additional different pools in same round: cumulative Disadvantage.
+Guard resets at start of each new round.
 
 ## Wounds and Defeat
 - 1 Wound on broken Guard
@@ -94,6 +94,9 @@ Guard resets at start of each new turn.
 - Recovery Scene -> remove Burnout only (Fervor stays)
 
 ## Cantrip Knowledge
+
+*(Deferred — cantrip slots are currently unlimited; all known cantrips from purchased nodes are always available.)*
+
 stable Ingenuity / 2 + Minor Studies bonus
 
 | Stable Ingenuity | Base |

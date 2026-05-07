@@ -6,6 +6,8 @@
 [resource]
 script = ExtResource("1_cdscr")
 combatant_name = "Grunt"
+tier = 1
+dominion_size = 4
 negation_size = 4
 ingenuity_size = 4
 velocity_threshold = 10

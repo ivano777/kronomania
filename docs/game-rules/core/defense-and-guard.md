@@ -21,23 +21,23 @@ Guard is rolled, generated, and consumed.
 It is not a passive armor value.
 
 ## One Roll per Pool per Turn
-Each defense pool may normally be rolled once per stat per turn.
+Each defense pool may normally be rolled once per stat per round.
 
 Once rolled, that pool remains active and absorbs pressure until:
 - it is depleted (Guard reaches 0 or lower), or
-- the turn ends.
+- the round ends.
 
-If the same pool is pressured again in the same turn, do not re-roll it by default — the existing Guard value absorbs the new pressure.
+If the same pool is pressured again in the same round, do not re-roll it by default — the existing Guard value absorbs the new pressure.
 
 Features or nodes may explicitly allow extra rolls or exceptions.
 
 ## Multiple Different Pools in One Turn
-If a character must roll different defense pools in the same turn,
+If a character must roll different defense pools in the same round,
 each additional defensive roll takes cumulative disadvantage.
 
 ## Guard Reset
-Guard resets at the **start of each new turn**.
-Any remaining Guard from the previous turn does not carry over.
+Guard resets at the **start of each new round**.
+Any remaining Guard from the previous round does not carry over.
 
 ## Consuming Guard
 When hostile pressure hits a Guard pool:

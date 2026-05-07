@@ -78,7 +78,7 @@ Ask the user to run `/ship`.
 ## Project structure
 
 ```
-autoloads/          # RollEngine (dice), CombatManager (combat SM), PlayerProgression (constellation), DungeonManager (run state), SaveManager (save/load), DebugManager (debug toggle)
+autoloads/          # RollEngine (dice), CombatManager (combat SM), PlayerProgression (constellation), DungeonManager (run state), SaveManager (save/load), DebugManager (debug toggle), SpriteRegistry (sprite/icon registry), TooltipManager (contextual tooltips)
 resources/          # Resource class definitions (.gd) + data/ (.tres files) — see project-index.md
 scenes/main_menu/   # MainMenuScene (title, New Game, 3-slot save/load, Quit)
 scenes/battle/      # BattleScene (1v1 combat), CombatantHUD, RoundHUD, Combatant
@@ -87,6 +87,7 @@ scenes/constellation/  # ConstellationScene (skill tree)
 scenes/debug/       # Debug widgets — removable at release; never imported by production code directly
 scripts/            # gen_project_index.py — regenerates docs/project-index.md
 docs/game-rules/    # Design source of truth — navigation TOC at index.md; load files on demand
+docs/impl/          # per-group implementation specs (e.g. group-8-sprite-registry.md)
 docs/               # project-status.md (roadmap), project-index.md (generated code map)
 .claude/            # agents/docs-alignment-auditor.md, commands/audit-docs.md + refresh-index.md
 ```
@@ -99,14 +100,14 @@ docs/               # project-status.md (roadmap), project-index.md (generated c
 
 `CombatantData` is **immutable config** only. All runtime state lives inside `CombatManager.CombatantState`, an inner class instantiated per combat. Scene nodes hold no game state.
 
-`CombatantState` fields: `data` (CombatantData), `current_wounds`, `max_wounds`, `is_defeated`, `node_levels: Dictionary` (NodeData → int), `tier_override`, `weapon_override`, `stamina_degrade_charges` (Meat for the Grinder charges), `space_domination_active: bool`, `item_action_charges: Dictionary` (action_key → remaining uses; initialized at `start_combat()` from `ActionModifier`s with `rest_type="combat"`), plus per-pool guard state (`stance_guard`, `resolve_guard`, `stamina_guard`, and matching `_rolled` booleans), plus magic state (`fervor_size`, `is_burned_out`, `has_minor_studies`, `has_spellcasting`, `known_spells: Array`, `known_cantrips: Array`). Methods: `init()`, `reset_guard()`, `get_guard(pool)`, `set_guard_val(pool, value)`, `is_pool_rolled(pool)`, `set_pool_rolled(pool, value)`.
+`CombatantState` fields: `data` (CombatantData), `current_wounds`, `max_wounds`, `is_defeated`, `node_levels: Dictionary` (NodeData → int), `tier_override`, `weapon_override`, `off_hand_override` (EquipmentData), `stamina_degrade_charges` (Meat for the Grinder charges), `space_domination_active: bool`, `item_action_charges: Dictionary` (action_key → remaining uses; initialized at `start_combat()` from `ActionModifier`s with `rest_type="combat"`), plus per-pool guard state (`stance_guard`, `resolve_guard`, `stamina_guard`, and matching `_rolled` booleans), plus magic state (`fervor_size`, `is_burned_out`, `has_minor_studies`, `has_spellcasting`, `known_spells: Array`, `known_cantrips: Array`). Methods: `init()`, `reset_guard()`, `get_guard(pool)`, `set_guard_val(pool, value)`, `is_pool_rolled(pool)`, `set_pool_rolled(pool, value)`.
 
 ### Autoload singletons
 
 Signatures and signals are in `docs/project-index.md`. Architectural gotchas:
 - **`RollEngine`** — stateless. Returns `Dictionary`; always cast values with `as int` / `as Array` — the type inferencer cannot infer through `Dictionary`. `resolve()` accepts optional `fervor_size` (additive post-Keep Fervor die), `aspect_stat_size` and `aspect_count` (for mixed-pool spells), `post_keep_bonus_size` (additive post-Keep bonus die, e.g. Earthshatter). Returns `primary_dice_maxed_count` (Fervor escalation) and `post_keep_bonus_roll` (Earthshatter die result).
-- **`CombatManager`** — all output via signals; nothing returned. Disconnect all signals before `reload_current_scene()`. Signals: `player_intents_available(intents: Array[String])`, `fervor_changed(is_player, fervor_size, fervor_cap, is_burned_out)`, `player_magic_available(can_cantrip, can_cast_spell)`, `player_massive_incoming(charges_left)`. Public methods: `start_combat(player_data: CombatantData, enemies_data: Array)`, `player_chose_strike(net_advantage, target_pool, brutal_trade, target_index: int = 0)`, `player_chose_cantrip(spell: SpellData, target_index: int = 0)`, `player_chose_spell(spell: SpellData, target_index: int = 0)`, `player_chose_degrade_wound(use_charge: bool)`, `reset_item_charges(rest_type: String)` (called by DungeonManager on rest), `debug_set_fervor(size, burned_out)`, `get_player_bare_hands_modifier(action_key: String) → ActionModifier`, `get_player_attack_preview() → int`. Key helpers: `_get_action_modifier(state, action_key) → ActionModifier` (weapon → bare_hands → zero stub), `_effective_tier(state, mod: ActionModifier = null)` (mod.tier_cap=0 = uncapped), `_attack_flat(state)` / `_guard_flat(state)` / `_pool_bonus(state, action_key="strike")` all delegate to `_get_action_modifier`.
-- **`PlayerProgression`** — constellation state; read by `CombatManager` at `start_combat()`. `ALL_NODES` catalog (now includes 11 Dominion nodes; old core_dominion_1/2 replaced by dom_core). `get_known_spells()` and `get_known_cantrips()` iterate all purchased `node_levels`, collect from `levels_data[0..level-1].spells`. `get_node_level_by_id(id)` looks up a node by string ID and returns its current level (0 if absent). **Fervor persistence** (Group 5): `saved_fervor_size` / `saved_is_burned_out` / `saved_wounds` fields written by `CombatManager._end_combat()`, read by `start_combat()` (`saved_wounds` carries wounds between chained encounters). `combat_prefs: CombatPreferences` — persisted action defaults and mode flags; instantiated fresh in `reset()`, serialized/deserialized with save data. Methods: `reset()`, `apply_long_rest()` (reset fervor + clear burnout), `apply_short_rest()` (−1 wound, −1 fervor step, clear burnout), `apply_recovery()` (clear burnout only), `grant_points(n)`, `set_weapon(w)`, `debug_set_points(n)`, `debug_set_tier(t)`.
+- **`CombatManager`** — all output via signals; nothing returned. Disconnect all signals before `reload_current_scene()`. Signals: `player_intents_available(intents: Array[String])`, `fervor_changed(is_player, fervor_size, fervor_cap, is_burned_out)`, `player_magic_available(can_cantrip, can_cast_spell)`, `player_massive_incoming(charges_left)`, `player_defense_incoming(attacker_name, attack_total, target_pool)`, `player_defense_item_choice(options: Array)`. Public methods: `start_combat(player_data: CombatantData, enemies_data: Array)`, `player_chose_strike(net_advantage, target_pool, brutal_trade, target_index: int = 0, source_weapon: EquipmentData = null)`, `player_chose_cantrip(spell: SpellData, target_index: int = 0)`, `player_chose_spell(spell: SpellData, target_index: int = 0)`, `player_chose_degrade_wound(use_charge: bool)`, `player_acknowledged_defense()`, `player_chose_defense_item(mod: ActionModifier)`, `player_auto_execute_attack(target_index: int = 0, net_advantage: int = 0)`, `reset_item_charges(rest_type: String)` (called by DungeonManager on rest), `debug_set_fervor(size, burned_out)`, `debug_refill_hp()`, `debug_set_immortal(enabled: bool)`, `debug_set_lethal(enabled: bool)`, `debug_set_player_off_hand(weapon: EquipmentData)`, `get_player_bare_hands_modifier(action_key: String) → ActionModifier`, `get_player_attack_preview() → int`. Key helpers: `_get_action_modifier(state, action_key) → ActionModifier` (weapon → bare_hands → zero stub), `_effective_tier(state, mod: ActionModifier = null)` (mod.tier_cap=0 = uncapped), `_attack_flat(state)` / `_guard_flat(state)` / `_pool_bonus(state, action_key="strike")` all delegate to `_get_action_modifier`.
+- **`PlayerProgression`** — constellation state; read by `CombatManager` at `start_combat()`. `ALL_NODES` catalog (now includes 11 Dominion nodes; old core_dominion_1/2 replaced by dom_core). `get_known_spells()` and `get_known_cantrips()` iterate all purchased `node_levels`, collect from `levels_data[0..level-1].spells`. `get_node_level_by_id(id)` looks up a node by string ID and returns its current level (0 if absent). **Fervor persistence** (Group 5): `saved_fervor_size` / `saved_is_burned_out` / `saved_wounds` fields written by `CombatManager._end_combat()`, read by `start_combat()` (`saved_wounds` carries wounds between chained encounters). `combat_prefs: CombatPreferences` — persisted action defaults and mode flags; instantiated fresh in `reset()`, serialized/deserialized with save data. Methods: `reset()`, `apply_long_rest()` (reset fervor + clear burnout), `apply_short_rest()` (−1 wound, −1 fervor step, clear burnout), `apply_recovery()` (clear burnout only), `grant_points(n)`, `equip_main_hand(w)`, `equip_off_hand(w)`, `debug_set_points(n)`, `debug_set_tier(t)`.
 - **`DungeonManager`** — run state: `start_run()`, `current_enemies() → Array`, `on_victory()` (grants 1 point + advances index), `on_defeat()`, `has_next_enemy()`, `is_run_complete()`, `was_last_fight_chained()`, `enemies_cleared()`, `enemies_total()`. Hard-coded 8-encounter sequence: [1] Grunt, [2] Grunt→Grunt, [3] Grunt+Grunt, [4] Soldier, [5] Grunt→Grunt+Soldier, [6] Grunt+Grunt+Grunt, [7] Grunt+Soldier→Soldier+Soldier, [8] Knight (solo).
 
 ### Round loop (CombatManager)
@@ -120,7 +121,7 @@ _begin_round()
   → (player presses Strike / Cantrip / Spell → BattleScene calls player_chose_strike / _cantrip / _spell)
   → _resolve_round / _resolve_round_cantrip / _resolve_round_spell
   → rolls both attacks, VT check, _resolve_attack() × 2
-  → [spell only] _escalate_fervor(steps) where steps = primary_dice_maxed_count + (1 if fervor_maxed)
+  → [spell only] _escalate_fervor(steps) where steps = primary_dice_maxed_count (Ingenuity-tagged dice that rolled max, pre-Keep, including discarded) + (1 if fervor_maxed)
   → await 0.8s timer
   → _begin_round()  ← loops until defeat
 ```
@@ -132,9 +133,9 @@ _begin_round()
 Group 4 implements Fervor / Burnout / Cantrips / True Spells with per-spell `SpellData`:
 
 - **Fervor** — player-only runtime state on `CombatantState`. Track: d4 → d6 → d8 → d10 (`FERVOR_TRACK` const). Cap = `data.ingenuity_size`. Persists across combats via `PlayerProgression.saved_fervor_size`; Long Rest resets to d4, Recovery Scene only clears Burnout.
-- **Escalation** — after a true spell resolves, `_escalate_fervor(_player, steps)` where `steps = primary_dice_maxed_count + (1 if fervor_maxed)`. Multiple steps possible in a single cast.
+- **Escalation** — after a true spell resolves, `_escalate_fervor(_player, steps)` where `steps = primary_dice_maxed_count` (Ingenuity-tagged dice that rolled max, pre-Keep, including discarded) `+ (1 if fervor_maxed)`. Multiple steps possible in a single cast.
 - **Burnout** — blocks `player_chose_spell()`; cantrips remain available. Persists across combats; cleared by Long Rest or Recovery.
-- **Cantrip** — uses `SpellData` (is_cantrip=true). Ingenuity pool, no Fervor die, no escalation. Available during Burnout. Granted via `node.spells` (Minor Studies carries cantrip_spark + arcane_touch; Fire Magic I carries Sparks).
+- **Cantrip** — uses `SpellData` (is_cantrip=true). Ingenuity pool, no Fervor die, no escalation. Available during Burnout. Granted via `node.spells` (Minor Studies carries "Cantrip Spark" [`cantrip_spark.tres`] + "Arcane Touch" [`arcane_touch.tres`]; Fire Magic I carries "Sparks" [`sparks.tres`]).
 - **True spell** — uses `SpellData`. Ingenuity pool + optional aspect dice + real Fervor die. Granted by spell school nodes (Fire Magic II–IV, Arcane I–III).
 
 ### SpellData (implemented)
@@ -214,7 +215,7 @@ The rules live in `docs/game-rules/`. The implementation must match them exactly
 | Wounds | 1 on breach; 2 if Massive: `(attack - guard) > defensive_size` |
 | Defeat | `wounds >= max_wounds` |
 | Cantrip | Ingenuity die, Tier pool, no Fervor die, no escalation, available during Burnout; spell granted by Minor Studies or school nodes (`SpellData.is_cantrip=true`) |
-| True spell | Ingenuity + optional aspect dice + real Fervor die; spell granted by school node; escalation = `primary_dice_maxed_count + (1 if fervor_maxed)` |
+| True spell | Ingenuity + optional aspect dice + real Fervor die; spell granted by school node; escalation = `primary_dice_maxed_count` (Ingenuity-tagged dice maxed pre-Keep, including discarded) `+ (1 if fervor_maxed)` |
 | Fervor cap | = `ingenuity_size` die face; caster may act at cap; escalating **beyond** cap triggers Burnout |
 | Burnout | Blocks true spells; cantrips unaffected; persists across combats. Cleared by Long Rest (also resets Fervor) or Recovery Scene (Burnout only). |
 | Stat sizes | Base from `CombatantData`; upgraded by Core nodes (mechanic wired in Phase A of spell school feature) |
