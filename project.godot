@@ -25,6 +25,7 @@ DungeonManager="*res://autoloads/DungeonManager.gd"
 DebugManager="*res://autoloads/DebugManager.gd"
 SaveManager="*res://autoloads/SaveManager.gd"
 SpriteRegistry="*res://autoloads/SpriteRegistry.gd"
+TooltipManager="*res://autoloads/TooltipManager.gd"
 
 [display]
 

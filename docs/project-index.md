@@ -15,6 +15,7 @@ _adding an `@export` field, or adding a `.tres` file._
 | `autoloads/RollEngine.gd` | — | `roll_dice(n: int, size: int) -> Array[int]:`<br>`keep_best(dice: Array[int], keep_count: int) -> Array[int]:`<br>`keep_worst(dice: Array[int], keep_count: int) -> Array[int]:`<br>`resolve(tier: int, die_size: int, keep_grade: int, flat: int = 0, net_advantage: int = 0, fervor_size: int = 0, aspect_stat_size: int = 0, aspect_count: int = 0, post_keep_bonus_size: int = 0) -> Dictionary:`<br>`is_fast(total: int, vt: int) -> bool:`<br>`is_massive(attack_total: int, guard: int, defensive_size: int) -> bool:` |
 | `autoloads/SaveManager.gd` | — | `save(slot: int) -> void:`<br>`load(slot: int) -> void:`<br>`get_slot_meta(slot: int) -> Dictionary:`<br>`delete_slot(slot: int) -> void:` |
 | `autoloads/SpriteRegistry.gd` | — | `get_icon(category: String, key: String) -> Texture2D:`<br>`get_combatant_frames(combatant_name: String) -> SpriteFrames:` |
+| `autoloads/TooltipManager.gd` | — | `show_for(resource: Resource, screen_pos: Vector2, source: Control = null) -> void:`<br>`show_delta(node: NodeData, screen_pos: Vector2, source: Control = null) -> void:`<br>`hide() -> void:`<br>`attach(control: Control, resource: Resource) -> void:`<br>`attach_delta(control: Control, node: NodeData) -> void:` |
 
 ## Resource schemas
 
@@ -109,6 +110,7 @@ _adding an `@export` field, or adding a `.tres` file._
 | `scenes/campfire/CampfireScene.gd` | `—` | `player_default.tres` |
 | `scenes/constellation/ConstellationScene.gd` | `—` | — |
 | `scenes/main_menu/MainMenuScene.gd` | `—` | — |
+| `scenes/ui/CustomTooltip.gd` | `—` | — |
 
 ## Debug scenes _(removable at release)_
 

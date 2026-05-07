@@ -115,6 +115,7 @@ func _ready() -> void:
 		btn.pressed.connect(_on_equip_weapon.bind(w))
 		weapon_row.add_child(btn)
 		_weapon_btns.append(btn)
+		TooltipManager.attach(btn, w as EquipmentData)
 
 	vbox.add_child(HSeparator.new())
 

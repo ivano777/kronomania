@@ -1,0 +1,99 @@
+extends Node
+
+const _TOOLTIP_SCENE := preload("res://scenes/ui/CustomTooltip.tscn")
+
+var _canvas: CanvasLayer
+var _tooltip  # CustomTooltip instance
+var _active_control: Control = null
+
+
+func _ready() -> void:
+	_canvas = CanvasLayer.new()
+	_canvas.layer = 50
+	add_child(_canvas)
+
+	_tooltip = _TOOLTIP_SCENE.instantiate()
+	_tooltip.hide()
+	_canvas.add_child(_tooltip)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not _tooltip.visible:
+		return
+	if event is InputEventMouseButton and (event as InputEventMouseButton).pressed:
+		hide()
+	elif event is InputEventKey:
+		var key := event as InputEventKey
+		if key.pressed and key.keycode == KEY_ESCAPE:
+			hide()
+
+
+# ── Public API ─────────────────────────────────────────────────────────────────
+
+func show_for(resource: Resource, screen_pos: Vector2, source: Control = null) -> void:
+	_active_control = source
+	_tooltip.populate(resource)
+	_tooltip.show()
+	_position_tooltip(screen_pos)
+
+
+func show_delta(node: NodeData, screen_pos: Vector2, source: Control = null) -> void:
+	_active_control = source
+	_tooltip.populate_delta(node)
+	_tooltip.show()
+	_position_tooltip(screen_pos)
+
+
+func hide() -> void:
+	_active_control = null
+	_tooltip.hide()
+
+
+# Wire right-click on a Control to show a full tooltip for a resource.
+func attach(control: Control, resource: Resource) -> void:
+	control.gui_input.connect(func(event: InputEvent) -> void:
+		if not (event is InputEventMouseButton):
+			return
+		var mb := event as InputEventMouseButton
+		if not (mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT):
+			return
+		get_viewport().set_input_as_handled()
+		if _active_control == control and _tooltip.visible:
+			hide()
+		else:
+			show_for(resource, control.get_screen_position() + mb.position, control)
+	)
+
+
+# Wire right-click on a Control to show a delta (upgrade preview) tooltip for a NodeData.
+func attach_delta(control: Control, node: NodeData) -> void:
+	control.gui_input.connect(func(event: InputEvent) -> void:
+		if not (event is InputEventMouseButton):
+			return
+		var mb := event as InputEventMouseButton
+		if not (mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT):
+			return
+		get_viewport().set_input_as_handled()
+		if _active_control == control and _tooltip.visible:
+			hide()
+		else:
+			show_delta(node, control.get_screen_position() + mb.position, control)
+	)
+
+
+# ── Positioning ────────────────────────────────────────────────────────────────
+
+func _position_tooltip(screen_pos: Vector2) -> void:
+	var offset := Vector2(16, 16)
+	var viewport_size := get_viewport().get_visible_rect().size
+	var tip_size: Vector2 = _tooltip.get_minimum_size()
+	if tip_size == Vector2.ZERO:
+		tip_size = Vector2(240, 120)
+	var pos := screen_pos + offset
+	if pos.x + tip_size.x > viewport_size.x:
+		pos.x = screen_pos.x - tip_size.x - offset.x
+	if pos.y + tip_size.y > viewport_size.y:
+		pos.y = screen_pos.y - tip_size.y - offset.y
+	pos.x = clampf(pos.x, 0.0, viewport_size.x - tip_size.x)
+	pos.y = clampf(pos.y, 0.0, viewport_size.y - tip_size.y)
+	_tooltip.position = pos

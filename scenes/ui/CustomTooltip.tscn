@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://bctip1scene001"]
+
+[ext_resource type="Script" path="res://scenes/ui/CustomTooltip.gd" id="1_ctip"]
+
+[node name="CustomTooltip" type="PanelContainer"]
+script = ExtResource("1_ctip")

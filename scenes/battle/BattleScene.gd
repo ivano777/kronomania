@@ -81,6 +81,7 @@ func _ready() -> void:
 					and not _enemy_defeated[idx]:
 				_select_target(idx)
 		)
+		TooltipManager.attach(hud, ed)
 
 	_select_target(0)
 

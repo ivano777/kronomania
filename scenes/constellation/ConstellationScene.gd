@@ -115,7 +115,7 @@ func _populate_canvas() -> void:
 func _make_card(node: NodeData) -> PanelContainer:
 	var card := PanelContainer.new()
 	card.custom_minimum_size = CARD_SIZE
-	card.tooltip_text = node.base_description
+	# tooltip_text removed — CustomTooltip handles this via right-click
 
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 2)
@@ -152,6 +152,9 @@ func _make_card(node: NodeData) -> PanelContainer:
 
 	if node.node_id in _VERTEX_NAMES:
 		card.gui_input.connect(_on_vertex_gui_input.bind(_VERTEX_NAMES[node.node_id]))
+
+	TooltipManager.attach(card, node)
+	TooltipManager.attach_delta(btn, node)
 
 	return card
 
