@@ -159,6 +159,56 @@ _begin_round()
 
 `_resolve_round*` are GDScript coroutines (use `await`). Calling them without `await` from the `player_chose_*` methods is intentional — they run cooperatively on the main thread, yielding at the timer. `_resolve_attack()` is also a coroutine (conditionally awaits `_massive_decision_resolved` for Meat for the Grinder); all `_resolve_round*` calls to it use `await`.
 
+### Target round loop architecture (in implementation — Group A)
+
+The round loop will be extended to explicit phases. Target structure:
+
+```
+START_OF_ROUND
+  → _process_statuses_hook("start_of_round", _player)
+  → _process_statuses_hook("start_of_round", enemy)
+  → _tick_statuses(_player / enemy)
+PLAYER_ACTION
+  → player_chose_* → _resolve_round_* → _resolve_attack × N
+  → inside _resolve_attack(), after breach confirmed:
+     _process_statuses_hook("on_breach", defender, {pool: target_pool})
+END_OF_ROUND  ← new private method
+  → _process_statuses_hook("end_of_round", _player / enemy)
+  → guard reset (moved here from current location)
+  → await timer
+  → _begin_round()
+```
+
+`_process_statuses_hook(hook, state, context)` iterates `state.active_statuses`
+and dispatches on `status_id` via an internal match block. Logic lives in the
+dispatcher, NEVER in the CombatStatus resource.
+
+### New architectural resources (in implementation — Group A)
+
+**CombatStatus** — temporary state on a combatant. Hard rule: data only,
+zero functional methods. Fields: `status_id`, `duration_rounds`
+(-1 = permanent), `stat_overrides: Dictionary`, `escalation_threshold: int`,
+`source_node_id: String`.
+
+**InterruptHandler** — reactive interrupt during _resolve_attack(). Fields:
+`handler_id`, `trigger` ("on_massive_wound" | "on_lethal_wound" | "on_wound"),
+`target` ("self" | "enemy"), `charges`, `priority`.
+Priority table: Mental Fortress = 10, Meat for the Grinder = 20.
+Rule: the second handler sees the outcome already modified by the first.
+
+**SpellOutcomeEffect** — post-resolution spell effect. Fields: `spell_id`,
+`trigger` ("on_hit" | "on_breach" | "on_cast" | "on_detonate"), `target`,
+`target_pool`, `effect_type`
+("debuff_flat" | "debuff_keep" | "bonus_keep" | "bonus_flat" | "apply_status"),
+`value`, `condition`, `status_to_apply: CombatStatus`.
+
+**Critical boundary — SpellOutcomeEffect vs CombatStatus:**
+- SpellOutcomeEffect = instantaneous effect resolved within the same spell
+  resolution
+- If the effect must persist across rounds, SpellOutcomeEffect with
+  effect_type="apply_status" applies a CombatStatus
+- NEVER add a duration field to SpellOutcomeEffect
+
 ### Magic system
 
 Group 4 implements Fervor / Burnout / Cantrips / True Spells with per-spell `SpellData`:
@@ -229,6 +279,11 @@ Group 4 implements Fervor / Burnout / Cantrips / True Spells with per-spell `Spe
 | `EquipmentData` flat fields (`potency`, `flat_attack_bonus`, etc.) | Still present on the resource | Deprecated shims — superseded by `action_modifiers`. Retained for backwards-compat with old `.tres` files; ignored at runtime when `action_modifiers` is non-empty |
 | Per-pool guard state in `CombatantState` | Three separate guard/rolled pairs | Intentional; cumulative Disadvantage on second+ pool pressure is deferred to a future group (see project-status.md Future section) |
 | `debug_set_player_weapon` on `CombatManager` | Public method with "debug" in name on a production autoload | Used by `DebugWeaponSelector`; safe because it's null-guarded at the call site |
+| `_process_statuses_hook` with potential `await` | Adds latency to the round loop | Required for future statuses that need player input |
+| `CombatStatus` with no methods | Nearly empty resource | Intentional — logic lives in the dispatcher, not in the data |
+| `_apply_wounds` bypassing interrupts in some contexts | Appears to ignore the interrupt system | Intentional for self-damage (blood_channeling) and hex damage — documented in code |
+| InterruptHandler priority 10/20 | Apparently arbitrary numbers | Mental Fortress (10) before MftG (20) — deliberate design order, do not change |
+| `_end_of_round()` called without visible `await` | Looks like a blocking call | It is a coroutine, must be called with await — same rule as _resolve_round* |
 
 ## Game rules summary
 

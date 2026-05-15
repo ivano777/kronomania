@@ -68,6 +68,83 @@ Hub scene (rest/recovery/weapon selector/save). Enemy roster (Grunt/Soldier/Knig
 ### ✓ Group 5.5 — Mechanics completion
 Space Domination (Melee L2): once-per-combat Advantage on player's next Stamina guard roll.
 
+### ⏳ Group A — Foundational Architecture (prerequisite for Ingenuity branch)
+
+Four new architectural systems that extend CombatManager without breaking
+existing behaviour. Must be implemented in order. Each phase has independent
+headless validation.
+
+**Phase A1 — CombatStatus and active_statuses**
+New resource `CombatStatus` (data only, zero logic). `CombatantState` gains
+`active_statuses: Array[CombatStatus]`. Helpers on CombatManager:
+`_add_status`, `_remove_status`, `_has_status`, `_get_status`,
+`_tick_statuses`. `_stat_size()` updated to read stat_overrides from active
+statuses before the base value.
+
+**Phase A2 — Phased round loop with hooks**
+The flat round loop becomes explicit phases: START_OF_ROUND →
+PLAYER_ACTION → ON_BREACH → END_OF_ROUND. New method `_end_of_round()`.
+New method `_process_statuses_hook(hook, state, context)`. Hooks exist but
+do nothing yet — combat behaviour remains identical.
+
+**Phase A3 — Generalised InterruptHandler**
+New resource `InterruptHandler` (data only). `CombatantState` gains
+`interrupt_handlers: Array[InterruptHandler]`. The hardcoded Meat for the
+Grinder pattern is migrated to this system. Final behaviour identical to
+current, but now extensible.
+
+**Phase A4 — SpellOutcomeEffect**
+New resource `SpellOutcomeEffect` describing post-resolution spell effects
+(flat/keep debuffs, conditional bonuses, status application).
+`NodeLevelData` gains `outcome_effects: Array[SpellOutcomeEffect]`.
+`SpellBonusEffect` gains optional field `spell_id: String`.
+Processing in `_resolve_round_spell()` via dedicated helper
+`_apply_spell_outcome_effects()`.
+
+---
+
+### ⏳ Group B — Ingenuity Branch: Core and Spellcasting
+Prerequisites: Group A complete.
+
+Full rewrite of the Ingenuity branch. Minor Studies rewritten with new
+cantrips (arcane_bolt, aether_barrier stub, chrono_shift stub).
+Spellcasting node L1-L3: caster engine, injects Arcane Missile and Arcane
+Mark, adds progressive Keep and SpellOutcomeEffects for spell upgrades.
+Mental Fortress migrated from Dominion to Ingenuity as a generalised
+InterruptHandler.
+
+**Note:** aether_barrier and chrono_shift are created as stub .tres files
+with no special effects. Their full design must be written in
+docs/game-rules/ before functional implementation.
+
+---
+
+### ⏳ Group C — Ingenuity Branch: Disciplines
+Prerequisites: Group B complete.
+
+Four specialised disciplines using all Group A systems:
+- Mind Detonation (delayed effect via CombatStatus, explosion at
+  start_of_round)
+- Chrono-Tinkering (skip next guard roll on a specific pool)
+- Echoing Mind (spells with tag "echo" hit again at end_of_round)
+- Hex Mastery (persistent CombatStatus: +1 wound on every player breach)
+
+---
+
+### ⏳ Group D — Ingenuity Branch: Late Game and Hybrids
+Prerequisites: Group C complete.
+
+- Lucidity (L1-L2): action to decrement Fervor by 1 step,
+  uses existing item_action_charges
+- Purple Hollow (L1): suicide trance, CombatStatus with stat_override
+  ingenuity_size=12 and escalation_threshold=10, consequences on expiry
+- Blood Channeling (Dom+Ing hybrid): cast during Burnout with self-damage
+  via direct RollEngine call, keep grade scales with node level (3→2→1)
+- Cataclysmic Arts / Meteor Shower: hybrid spell with aspect_stat="dominion",
+  uses existing RollEngine.resolve() with no resolver changes
+
+---
+
 ### Group 6 — Polish
 - [x] **Save / load** — `SaveManager`, 3-slot JSON, auto-save on campfire entry.
 - [x] **Constellation triangle canvas** — DOM/ING/NEG vertex layout, `Line2D` connections, expand/collapse, compact node cards.
@@ -198,3 +275,9 @@ Full spec: [docs/impl/group-8-sprite-registry.md](impl/group-8-sprite-registry.m
 - **Cumulative Disadvantage** — second+ different pool targeted same turn should stack Disadvantage. Deferred since Group 1.
 - **Hybrid node proportional positioning** — constellation canvas barycentric positioning for cross-tree nodes. Blocked on NEG/ING subtrees being designed.
 - **Active DEF Mode** — player chooses defensive tool/action. Requires game design work on defensive action types per weapon.
+- **aether_barrier cantrip design** — stub .tres created, mechanic undefined. Requires a design session before functional implementation.
+- **chrono_shift cantrip design** — same as above.
+- **Ingenuity non-magic subtree** — Resolve Guard and training nodes for Ingenuity have not been designed. Blocked on design decisions.
+- **Cumulative Disadvantage on multiple pools** — deferred since Group 1, remains deferred. Requires `_current_round_targeted_pools` tracking.
+- **Active DEF Mode for magic** — deferred since Group 7.6. Requires design of magic defensive action types.
+- **Cantrip count cap** — all purchased cantrips always available. "Known slots" formula not designed.
