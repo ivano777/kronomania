@@ -19,7 +19,7 @@ Deploy the `docs-alignment-auditor` agent to cross-check all documentation and c
 
 ## Steps
 
-1. Deploy the `docs-alignment-auditor` agent against the project at `C:/Users/ivano/Documents/ivano/svago/godot/kronomania`.
+1. Deploy the `docs-alignment-auditor` agent against the project at the current working directory.
 2. Wait for the full audit report.
 3. Present the report to the user, highlighting any **Critical** or **Major** misalignments.
 4. Ask the user which fixes to apply.

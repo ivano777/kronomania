@@ -1,7 +1,9 @@
 import sys
 import json
+import os
 import subprocess
 import re
+from pathlib import Path
 
 data = json.load(sys.stdin)
 fp = data.get("file_path", "")
@@ -9,12 +11,45 @@ fp = data.get("file_path", "")
 if not (fp.endswith(".gd") or fp.endswith(".tres")):
     sys.exit(0)
 
-GODOT = "C:/Program Files/Godot/Godot_v4.6.2-stable_win64_console.exe"
-PROJECT = "C:/Users/ivano/Documents/ivano/svago/godot/kronomania"
+PROJECT = Path(__file__).parent.parent.parent
+
+
+def find_godot() -> str:
+    if os.environ.get("GODOT"):
+        return os.environ["GODOT"]
+
+    env_file = PROJECT / ".env.local"
+    if env_file.exists():
+        for line in env_file.read_text().splitlines():
+            line = line.strip()
+            if line.startswith("GODOT=") and not line.startswith("#"):
+                value = line.split("=", 1)[1].strip()
+                if value:
+                    return value
+
+    try:
+        subprocess.run(["godot", "--version"], capture_output=True, check=True)
+        return "godot"
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        pass
+
+    common_paths = [
+        Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Godot" / "Godot.exe",
+        Path("C:/Program Files/Godot/Godot.exe"),
+    ]
+    for p in common_paths:
+        if p.exists():
+            return str(p)
+
+    print("Godot executable not found — skipping hook validation.")
+    sys.exit(0)
+
+
+GODOT = find_godot()
 
 try:
     result = subprocess.run(
-        [GODOT, "--headless", "--path", PROJECT, "--quit-after", "5"],
+        [GODOT, "--headless", "--path", str(PROJECT), "--quit-after", "5"],
         capture_output=True, text=True, timeout=30
     )
 except subprocess.TimeoutExpired:

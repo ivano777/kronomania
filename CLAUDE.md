@@ -5,9 +5,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Engine and tooling
 
 - **Godot 4.6.2** — Forward Plus renderer, D3D12 on Windows, Jolt Physics.
-- The Godot console executable is at `$GODOT` (set in `.claude/settings.local.json`).
-- Run headless validation: `"$GODOT" --headless --path "C:/Users/ivano/Documents/ivano/svago/godot/kronomania" --quit-after 5`
-- No build step, no test runner, no linter — Godot parses scripts on load. Headless run is the check.
+- The Godot binary is resolved automatically (see "Running all checks" for the priority order).
+- Run headless validation: `python scripts/run_headless.py`
+- Run unit + integration tests: `python scripts/run_tests.py`
+- **GUT 9.6.0** is installed at `addons/gut/`. Tests live in `tests/`.
+- After adding a new plugin/addon for the first time, set `GODOT` and run `python scripts/run_headless.py` with `--import` manually if needed to register class names before running tests.
+- No build step, no linter — Godot parses scripts on load. See "Running all checks" for the canonical validation command.
 
 ## Committing and pushing
 
@@ -43,13 +46,15 @@ Debug widgets live exclusively in `scenes/debug/`. Reference via null-safe `@onr
 When implementing a multi-phase feature (e.g. Phase A / B / C), it is acceptable — and encouraged when the context window is growing large — to `/compact` the conversation between phases. Compact after each phase's validation passes and before starting the next phase. This keeps context healthy without losing continuity: the phase boundary is a natural checkpoint, the plan file preserves intent, and the next phase can be resumed from the plan.
 
 ### 3. Validate (deploy a sub-agent)
-Deploy a sub-agent: run headless (see Engine section), check for SCRIPT ERRORs and ERRORs (UID WARNINGs are safe), verify `@onready` paths, signal connections, and `class_name` registrations in `.godot/global_script_class_cache.cfg`.
+Deploy a sub-agent and run **both** checks in order:
+1. **Tests first**: `python scripts/run_tests.py` — a test failure blocks the loop; do not proceed to the headless run until tests are green.
+2. **Headless run**: `"$GODOT" --headless --path "..." --quit-after 5` — check for SCRIPT ERRORs and ERRORs (UID WARNINGs are safe), verify `@onready` paths, signal connections, and `class_name` registrations in `.godot/global_script_class_cache.cfg`.
 
 ### 4. Fix Loop
 If validation fails:
-- Fix the specific error reported.
-- Re-run validation.
-- Repeat until the headless run is clean.
+- If a **test** fails: fix the logic first, re-run `python scripts/run_tests.py`, then re-run headless validation.
+- If the **headless run** fails: fix the specific SCRIPT ERROR reported, re-run headless only (tests need not re-run for script-load errors).
+- Repeat until both checks are clean.
 
 ### 5. Update Documentation
 Only after a clean validation pass:
@@ -74,6 +79,32 @@ Ask the user to run `/ship`.
 - Docs updated only after successful validation, never before.
 - The final report must be short enough to scan in under a minute.
 - Never edit files under `docs/game-rules/` without explicit user approval — it is the single source of truth for all game design. If a rule is ambiguous, ask; never decide unilaterally.
+
+## Running all checks
+
+Canonical validation command (run tests first, then headless):
+```
+python scripts/run_tests.py && python scripts/run_headless.py
+```
+Exits 0 only if all tests pass **and** the headless engine check is clean.
+
+The Godot binary is resolved automatically from (in order):
+1. `GODOT` environment variable
+2. `.env.local` file in the project root (copy `.env.local.example` to get started)
+3. `godot` on the system PATH
+4. Common Windows install locations (`%LOCALAPPDATA%\Programs\Godot\Godot.exe`, `C:\Program Files\Godot\Godot.exe`)
+
+New contributors: copy `.env.local.example` → `.env.local` and set your path.
+
+## Testing rules
+
+- Every new mechanic must ship with at least one unit test.
+- Tests live in `tests/unit/<system_name>/test_<system_name>.gd`.
+- Integration-level tests (scene-dependent or autoload-dependent flows) go in `tests/integration/`.
+- Tests must be deterministic: seed `RollEngine` calls with `seed(N)` before calling `resolve()`.
+- Do not add `class_name` to test files — avoids polluting the global script class cache.
+- Debug widgets (`scenes/debug/`) are never tested directly.
+- Helper classes used only by tests (e.g. `combat_rules_helper.gd`) live alongside the test file and extend `RefCounted` with no `class_name`.
 
 ## Project structure
 

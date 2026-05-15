@@ -4,3 +4,12 @@
 
 # Claude Code — machine-local config (GODOT path, permission allowlists)
 .claude/settings.local.json
+
+# Local environment — contains machine-specific paths (never commit)
+.env.local
+
+# Validation / test run log artifacts
+*.log
+error.txt
+output.txt
+validation*.txt

@@ -34,9 +34,11 @@ _adding an `@export` field, or adding a `.tres` file._
 
 | File | Type | Key values | References |
 |------|------|-----------|-----------|
+| `addons/gut/gui/EditorRadioButton.tres` | `—` | Button/colors/font_hover_pressed_color=Color(1, 1, 1, 1), Button/colors/font_pressed_color=Color(1, 1, 1, 1), Button/styles/hover=SubResource("StyleBoxFlat_u716c"), Button/styles/pressed=SubResource("StyleBoxFlat_ht2pf") | — |
+| `addons/gut/gui/GutSceneTheme.tres` | `—` | default_font=AnonymousPro-Regular.ttf, Label/fonts/font=AnonymousPro-Regular.ttf | — |
 | `resources/data/enemies/enemy_knight.tres` | `CombatantData` | combatant_name="Knight", tier=2, dominion_size=8, negation_size=8, ingenuity_size=4, keep_grade=1 | `greatsword.tres` |
 | `resources/data/enemies/enemy_soldier.tres` | `CombatantData` | combatant_name="Soldier", tier=1, dominion_size=6, negation_size=6, ingenuity_size=4, keep_grade=0 | `iron_sword.tres` |
-| `resources/data/enemy_grunt.tres` | `CombatantData` | combatant_name="Grunt", negation_size=4, ingenuity_size=4, velocity_threshold=10, max_wounds=2, equipped_weapon=crude_club.tres | `crude_club.tres` |
+| `resources/data/enemy_grunt.tres` | `CombatantData` | combatant_name="Grunt", tier=1, dominion_size=4, negation_size=4, ingenuity_size=4, velocity_threshold=10 | `crude_club.tres` |
 | `resources/data/nodes/ability_minor_studies.tres` | `NodeData` | node_id="minor_studies", display_name="Minor Studies", category="Ability", base_description="You have learned basic cantrips. Ingenuity-based attack; no Fervor cost. Available even during Burnout.", max_levels=1, levels_data=[SubResource("Level_1")] | `cantrip_spark.tres`, `arcane_touch.tres` |
 | `resources/data/nodes/ability_spellcasting.tres` | `NodeData` | node_id="spellcasting", display_name="Spellcasting", category="Ability", base_description="You have mastered Fervor channeling. Cast true spells using Ingenuity + a real Fervor die. Each max-roll escalates Fervor instability.", max_levels=1, levels_data=[SubResource("Level_1")] | — |
 | `resources/data/nodes/arcane_1.tres` | `NodeData` | node_id="arcane_1", display_name="Arcane I", category="Ability", base_description="Entry into the arcane arts. Unlocks Arcane Missile.", max_levels=1, levels_data=[SubResource("Level_1")] | `arcane_missile.tres` |

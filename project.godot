@@ -42,6 +42,10 @@ theme/custom="res://theme/dark_fantasy.tres"
 
 3d/physics_engine="Jolt Physics"
 
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/gut/plugin.cfg")
+
 [rendering]
 
 textures/canvas_textures/default_texture_filter=0
