@@ -103,6 +103,7 @@ class CombatantState:
 	var stamina_degrade_charges: int = 0  # Meat for the Grinder: charges to degrade Massive Wounds
 	var space_domination_active: bool = false  # Melee L2: Advantage on first Stamina guard roll each combat
 	var item_action_charges: Dictionary = {}   # action_key → remaining uses (from ActionModifier.uses_per_rest)
+	var active_statuses: Array[CombatStatus] = []
 
 	func init(d: CombatantData) -> void:
 		data = d
@@ -119,6 +120,7 @@ class CombatantState:
 		has_spellcasting = false
 		stamina_degrade_charges = 0
 		space_domination_active = false
+		active_statuses = []
 		reset_guard()
 
 	func reset_guard() -> void:
@@ -834,6 +836,41 @@ func _all_enemies_defeated() -> bool:
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+# --- Status system helpers (Group A) ---
+
+func _add_status(state: CombatantState, status: CombatStatus) -> void:
+	_remove_status(state, status.status_id)
+	state.active_statuses.append(status)
+
+func _remove_status(state: CombatantState, status_id: String) -> void:
+	state.active_statuses = state.active_statuses.filter(
+		func(s): return s.status_id != status_id
+	)
+
+func _has_status(state: CombatantState, status_id: String) -> bool:
+	return state.active_statuses.any(
+		func(s): return s.status_id == status_id
+	)
+
+func _get_status(state: CombatantState, status_id: String) -> CombatStatus:
+	for s in state.active_statuses:
+		if s.status_id == status_id:
+			return s
+	return null
+
+func _tick_statuses(state: CombatantState) -> void:
+	var expired: Array[CombatStatus] = []
+	for s in state.active_statuses:
+		if s.duration_rounds == -1:
+			continue
+		s.duration_rounds -= 1
+		if s.duration_rounds <= 0:
+			expired.append(s)
+	for s in expired:
+		state.active_statuses.erase(s)
+
+# --- End status system helpers ---
+
 ## Passive Max Wounds bonus from Tier: +1 at Tier 2, +1 again at Tier 4 (cumulative +2).
 func _tier_wound_bonus(tier: int) -> int:
 	return (1 if tier >= 2 else 0) + (1 if tier >= 4 else 0)
@@ -1049,6 +1086,10 @@ func _has_effect_type(state: CombatantState, key: String) -> bool:
 
 ## Returns the effective die size for a stat, upgraded by any unlocked Core nodes.
 func _stat_size(state: CombatantState, stat: String) -> int:
+	# Status overrides take priority over all other sources.
+	for status in state.active_statuses:
+		if status.stat_overrides.has(stat):
+			return status.stat_overrides[stat] as int
 	var base: int
 	match stat:
 		"dominion":  base = state.data.dominion_size

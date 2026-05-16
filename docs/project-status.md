@@ -74,7 +74,7 @@ Four new architectural systems that extend CombatManager without breaking
 existing behaviour. Must be implemented in order. Each phase has independent
 headless validation.
 
-**Phase A1 — CombatStatus and active_statuses**
+**Phase A1 — CombatStatus and active_statuses** ✓
 New resource `CombatStatus` (data only, zero logic). `CombatantState` gains
 `active_statuses: Array[CombatStatus]`. Helpers on CombatManager:
 `_add_status`, `_remove_status`, `_has_status`, `_get_status`,

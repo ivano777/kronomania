@@ -284,6 +284,8 @@ Group 4 implements Fervor / Burnout / Cantrips / True Spells with per-spell `Spe
 | `_apply_wounds` bypassing interrupts in some contexts | Appears to ignore the interrupt system | Intentional for self-damage (blood_channeling) and hex damage — documented in code |
 | InterruptHandler priority 10/20 | Apparently arbitrary numbers | Mental Fortress (10) before MftG (20) — deliberate design order, do not change |
 | `_end_of_round()` called without visible `await` | Looks like a blocking call | It is a coroutine, must be called with await — same rule as _resolve_round* |
+| `_stat_size()` checks active_statuses before node_levels | Seems to give statuses higher priority than purchased nodes | Intentional — temporary overrides (e.g. Purple Hollow d12) must win over permanent progression |
+| `_add_status` silently replaces duplicates | Looks like a bug swallower | Intentional — applying the same status twice refreshes it, not stacks it |
 
 ## Game rules summary
 
