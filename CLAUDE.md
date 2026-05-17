@@ -131,7 +131,7 @@ docs/               # project-status.md (roadmap), project-index.md (generated c
 
 `CombatantData` is **immutable config** only. All runtime state lives inside `CombatManager.CombatantState`, an inner class instantiated per combat. Scene nodes hold no game state.
 
-`CombatantState` fields: `data` (CombatantData), `current_wounds`, `max_wounds`, `is_defeated`, `node_levels: Dictionary` (NodeData → int), `tier_override`, `weapon_override`, `off_hand_override` (EquipmentData), `space_domination_active: bool`, `item_action_charges: Dictionary` (action_key → remaining uses; initialized at `start_combat()` from `ActionModifier`s with `rest_type="combat"`), `active_statuses: Array[CombatStatus]` (temporary effects; always iterated as `.duplicate()`), `interrupt_handlers: Array[InterruptHandler]` (registered at `start_combat()` based on purchased nodes; combat-scoped, charges reset each combat), plus per-pool guard state (`stance_guard`, `resolve_guard`, `stamina_guard`, and matching `_rolled` booleans), plus magic state (`fervor_size`, `is_burned_out`, `has_minor_studies`, `has_spellcasting`, `known_spells: Array`, `known_cantrips: Array`). Methods: `init()`, `reset_guard()`, `get_guard(pool)`, `set_guard_val(pool, value)`, `is_pool_rolled(pool)`, `set_pool_rolled(pool, value)`.
+`CombatantState` fields: `data` (CombatantData), `current_wounds`, `max_wounds`, `is_defeated`, `node_levels: Dictionary` (NodeData → int), `tier_override`, `weapon_override`, `off_hand_override` (EquipmentData), `space_domination_active: bool`, `item_action_charges: Dictionary` (action_key → remaining uses; initialized at `start_combat()` from `ActionModifier`s with `rest_type="combat"`), `active_statuses: Array[CombatStatus]` (temporary effects; always iterated as `.duplicate()`), `interrupt_handlers: Array[InterruptHandler]` (registered at `start_combat()` based on purchased nodes; combat-scoped, charges reset each combat), `pending_guard_debuffs: Dictionary` (`{ "<pool>": { "flat": int, "keep": int } }`; single-use debuffs queued by SpellOutcomeEffect, consumed on the next guard roll for that pool), plus per-pool guard state (`stance_guard`, `resolve_guard`, `stamina_guard`, and matching `_rolled` booleans), plus magic state (`fervor_size`, `is_burned_out`, `has_minor_studies`, `has_spellcasting`, `known_spells: Array`, `known_cantrips: Array`). Methods: `init()`, `reset_guard()`, `get_guard(pool)`, `set_guard_val(pool, value)`, `is_pool_rolled(pool)`, `set_pool_rolled(pool, value)`.
 
 ### Autoload singletons
 
@@ -208,7 +208,7 @@ Adding a new handler:
 3. Register in `start_combat()` based on the relevant node level
 4. Update the priority table above and in CLAUDE.md
 
-### New architectural resources (Group A — A1/A2/A3 implemented; A4 pending)
+### New architectural resources (Group A — fully implemented; unblocks Group B)
 
 **CombatStatus** — temporary state on a combatant. Hard rule: data only,
 zero functional methods. Fields: `status_id`, `duration_rounds`
@@ -262,15 +262,41 @@ Group 4 implements Fervor / Burnout / Cantrips / True Spells with per-spell `Spe
 - `CombatManager._stat_size(state, stat)` — reads base from `CombatantData`, returns highest `effect_value` across all purchased `NodeLevelData` entries for `"stat_size_<stat>"`.
 
 **Phase B — Spell schools (implemented):**
-- `SpellBonusEffect` resource (`resources/SpellBonusEffect.gd`): `tag: String`, `bonus_type: "pool"|"keep"`, `value: int`, `stat: String`.
+- `SpellBonusEffect` resource (`resources/SpellBonusEffect.gd`): `tag: String`, `bonus_type: "pool"|"keep"`, `value: int`, `stat: String`, `spell_id: String` (optional per-spell filter; empty = tag matching, non-empty = name match, overrides tag check).
 - School nodes Fire Magic I–IV and Arcane I–III grant spells via `levels_data[0].spells`. Fire Magic II adds fire pool +1, Fire Magic IV adds fire keep +1 via `bonus_effects` on the `NodeLevelData`.
-- `CombatManager._resolve_round_spell()` sums matching `bonus_effects` from all purchased `node_levels → levels_data` entries.
+- `CombatManager._resolve_round_spell()` sums matching `bonus_effects`: a bonus applies if `spell_id` matches the spell's name (non-empty), or `tag` matches one of the spell's tags (empty `spell_id`).
 
 **Multi-level Node Schema (implemented — Group 4.8 Phase A):**
 - `NodeData` fields: `node_id: String`, `display_name: String`, `category: String`, `base_description: String`, `icon: Texture2D`, `max_levels: int`, `levels_data: Array[NodeLevelData]`.
-- `NodeLevelData` fields: `level_index`, `cost`, `required_tier`, `prerequisites: Array` (untyped, `[{node_id: String, required_level: int}]`), `level_effect_description`, `effect_type`, `effect_value`, `stat`, `weapon_tags: PackedStringArray`, `uses_per_combat`, `spells: Array[SpellData]`, `bonus_effects: Array[SpellBonusEffect]`.
+- `NodeLevelData` fields: `level_index`, `cost`, `required_tier`, `prerequisites: Array` (untyped, `[{node_id: String, required_level: int}]`), `level_effect_description`, `effect_type`, `effect_value`, `stat`, `weapon_tags: PackedStringArray`, `uses_per_combat`, `spells: Array[SpellData]`, `bonus_effects: Array[SpellBonusEffect]`, `outcome_effects: Array[SpellOutcomeEffect]`.
 - `PlayerProgression.node_levels: Dictionary` (NodeData → int); methods: `can_upgrade(node)`, `upgrade(node)`, `get_level(node)`, `get_node_level_by_id(id)`.
 - `CombatManager` helpers: `_node_effect_max(state, key)`, `_node_effect_sum(state, key)`, `_node_weapon_bonus_sum(state, key)`, `_has_effect_type(state, key)`, `_physical_keep_grade(state)`, `_wounds_node_bonus(state)`, `_meat_grinder_charges(state)`.
+
+### Spell outcome effect system (Group A4)
+
+`SpellOutcomeEffect` is a data-only resource attached to `NodeLevelData` via `outcome_effects: Array[SpellOutcomeEffect]`. It describes effects applied AFTER spell resolution, in contrast to `SpellBonusEffect` which modifies the caster's roll itself.
+
+Flow at spell resolution (`_resolve_round_spell`, `_resolve_round_cantrip`):
+1. The attack roll is built (`SpellBonusEffect` applied here, including `spell_id`-filtered bonuses)
+2. `_resolve_attack` runs, producing breach/hit outcome; updates `_current_round_player_breaches`
+3. `_apply_spell_outcome_effects` collects all matching `SpellOutcomeEffect` entries from purchased nodes
+4. Each effect is filtered by `trigger`, then `condition`, then dispatched
+5. Effects either: queue a single-use debuff in `pending_guard_debuffs` (consumed on next defense on that pool), apply a `CombatStatus`, or are no-ops with `push_warning`
+
+**Boundary with `SpellBonusEffect`:**
+- `SpellBonusEffect` modifies the caster's roll → applied at roll construction time
+- `SpellOutcomeEffect` modifies post-resolution state → applied after the resolver returns
+- `SpellBonusEffect` now has optional `spell_id` for per-spell numerical upgrades (e.g. "Arcane Missile gets +1 flat from Spellcasting L2")
+
+**Boundary with `CombatStatus`:**
+- `SpellOutcomeEffect` is instantaneous — resolves in the same spell resolution that produced it
+- If persistence is needed, use `effect_type="apply_status"` to apply a `CombatStatus`
+- NEVER add a duration field to `SpellOutcomeEffect`
+
+**Round-scoped tracking:**
+- `_current_round_player_breaches: Dictionary` lives on `CombatManager` (not `CombatantState`) — it is round-scoped, reset every `_begin_round()`
+- Conditions like `"if_stance_breached_this_round"` read from this dict
+- `"hit"/"breach"` in the outcome dict means "this spell caused the round's FIRST breach on its target_pool". A spell that targets an already-breached pool will have `breach=false`. Pure per-spell breach detection is deferred to Group B.
 
 ### GDScript typing rules
 
@@ -317,6 +343,12 @@ Group 4 implements Fervor / Burnout / Cantrips / True Spells with per-spell `Spe
 | InterruptHandler charges live on the handler instance, not on `CombatantState` | Charge counting feels scattered | Intentional — each handler manages its own resource; multiple handlers with the same trigger have independent charges |
 | Interrupt registration happens in `start_combat`, not on node purchase | Looks like late binding | Intentional — handlers are combat-scoped; charges reset every combat per design |
 | `wounds_pending` reassigned inside the interrupt loop before being assigned to `wounds` | Looks like a refactor smell | Intentional — the interrupt loop modifies wound count only on the player-defender/massive path; the final `var wounds := wounds_pending` is always the applied count |
+| `pending_guard_debuffs` is consumed and erased in `_resolve_attack` before the roll | Looks like state mutation during read | Intentional — debuffs are single-use; consuming before the roll guarantees they apply once and only once |
+| `_current_round_player_breaches` lives on `CombatManager`, not `CombatantState` | Looks like scope confusion | Intentional — it is round-scoped, not combatant-scoped; resets every `_begin_round()` |
+| `status_to_apply` is `.duplicate()`'d before adding in `_dispatch_spell_outcome_effect` | Looks like unnecessary copy | Intentional — each application must be independent; otherwise duration ticks would share state across enemies |
+| `bonus_keep`/`bonus_flat` in `SpellOutcomeEffect` produce a `push_warning` at dispatch | Looks like a stub | Intentional — reserved for outcome-driven bonuses (e.g. Mind Detonation L2); the warning prevents silent misuse before Group D authors them |
+| `SpellBonusEffect` with `spell_id` set matches OR-style with tag | Looks like permissive matching | Intentional — when `spell_id` is non-empty it is a name filter; when empty the existing tag-based matching applies; both being true simultaneously is harmless (summed once) |
+| `"hit"/"breach"` in spell outcome dict can be false even when attack_total >= guard | Looks like a bug | Intentional — they mean "this spell caused the round's FIRST breach on its target_pool"; a spell hitting an already-breached pool yields false. Pure per-spell breach detection is deferred to Group B. |
 
 ## Game rules summary
 

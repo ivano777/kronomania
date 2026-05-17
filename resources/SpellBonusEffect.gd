@@ -14,3 +14,8 @@ extends Resource
 
 ## Optional stat restriction (reserved for future use; "" = no restriction).
 @export var stat: String = ""
+
+## Optional per-spell filter. When non-empty, applies only to spells whose
+## spell_name matches. When empty (default), the tag-based matching applies.
+## Used for upgrades like "Spellcasting L2 grants Arcane Missile +1 flat".
+@export var spell_id: String = ""

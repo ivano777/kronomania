@@ -68,10 +68,10 @@ Hub scene (rest/recovery/weapon selector/save). Enemy roster (Grunt/Soldier/Knig
 ### ✓ Group 5.5 — Mechanics completion
 Space Domination (Melee L2): once-per-combat Advantage on player's next Stamina guard roll.
 
-### ✓ Group A — Foundational Architecture (prerequisite for Ingenuity branch)
+### ✓ Group A — Foundational Architecture — fully complete; unblocks Group B (Ingenuity branch rewrite)
 
 Four architectural systems that extend CombatManager without breaking existing
-behaviour. A1–A3 are implemented. A4 remains pending before Group B can start.
+behaviour. All four phases implemented.
 
 **Phase A1 — CombatStatus and active_statuses** ✓
 New resource `CombatStatus` (data only, zero logic). `CombatantState` gains
@@ -95,13 +95,17 @@ Grinder pattern is migrated: registered via `_register_interrupt()` at
 `start_combat()`, fired by `_find_interrupts()` + `await _resolve_interrupt()`
 inside `_resolve_attack()`. Behaviour identical to pre-A3, now extensible.
 
-**Phase A4 — SpellOutcomeEffect** ⏳
-New resource `SpellOutcomeEffect` describing post-resolution spell effects
-(flat/keep debuffs, conditional bonuses, status application).
+**Phase A4 — SpellOutcomeEffect** ✓
+New resource `SpellOutcomeEffect` (data only) describing post-resolution spell
+effects (flat/keep debuffs, conditional bonuses, status application).
 `NodeLevelData` gains `outcome_effects: Array[SpellOutcomeEffect]`.
-`SpellBonusEffect` gains optional field `spell_id: String`.
-Processing in `_resolve_round_spell()` via dedicated helper
-`_apply_spell_outcome_effects()`.
+`SpellBonusEffect` gains optional `spell_id: String` filter for per-spell
+numerical upgrades. `CombatantState` gains `pending_guard_debuffs: Dictionary`
+(consumed on next guard roll). Round-scoped `_current_round_player_breaches`
+on `CombatManager` tracks which pools the player breached each round.
+Processing via `_apply_spell_outcome_effects()` called from both
+`_resolve_round_spell()` and `_resolve_round_cantrip()`. No outcome_effects
+authored yet — arrays empty on all existing nodes; Group B wires real effects.
 
 ---
 

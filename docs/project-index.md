@@ -28,9 +28,10 @@ _adding an `@export` field, or adding a `.tres` file._
 | `resources/EquipmentData.gd` | `EquipmentData` | `item_name: String`, `potency: int`, `flat_attack_bonus: int`, `flat_guard_bonus: int`, `max_wounds_bonus: int`, `pool_bonus: int`, `tags: PackedStringArray`, `action_modifiers: Array[ActionModifier]` | `ActionModifier[]` |
 | `resources/InterruptHandler.gd` | `InterruptHandler` | `handler_id: String`, `trigger: String`, `target: String`, `charges: int`, `priority: int`, `source_node_id: String` | — |
 | `resources/NodeData.gd` | `NodeData` | `node_id: String`, `display_name: String`, `category: String`, `base_description: String`, `icon: Texture2D`, `max_levels: int`, `levels_data: Array[NodeLevelData]` | `Texture2D`, `NodeLevelData[]` |
-| `resources/NodeLevelData.gd` | `NodeLevelData` | `level_index: int`, `cost: int`, `required_tier: int`, `prerequisites: Array`, `level_effect_description: String`, `effect_type: String`, `effect_value: int`, `stat: String`, `weapon_tags: PackedStringArray`, `uses_per_combat: int`, `spells: Array[SpellData]`, `bonus_effects: Array[SpellBonusEffect]` | `SpellData[]`, `SpellBonusEffect[]` |
-| `resources/SpellBonusEffect.gd` | `SpellBonusEffect` | `tag: String`, `bonus_type: String`, `value: int`, `stat: String` | — |
+| `resources/NodeLevelData.gd` | `NodeLevelData` | `level_index: int`, `cost: int`, `required_tier: int`, `prerequisites: Array`, `level_effect_description: String`, `effect_type: String`, `effect_value: int`, `stat: String`, `weapon_tags: PackedStringArray`, `uses_per_combat: int`, `spells: Array[SpellData]`, `bonus_effects: Array[SpellBonusEffect]`, `outcome_effects: Array[SpellOutcomeEffect]` | `SpellData[]`, `SpellBonusEffect[]`, `SpellOutcomeEffect[]` |
+| `resources/SpellBonusEffect.gd` | `SpellBonusEffect` | `tag: String`, `bonus_type: String`, `value: int`, `stat: String`, `spell_id: String` | — |
 | `resources/SpellData.gd` | `SpellData` | `spell_name: String`, `description: String`, `aspect_stat: String`, `aspect_dice: int`, `target_pool: String`, `flat_bonus: int`, `is_cantrip: bool`, `tags: PackedStringArray` | — |
+| `resources/SpellOutcomeEffect.gd` | `SpellOutcomeEffect` | `spell_id: String`, `trigger: String`, `target: String`, `target_pool: String`, `effect_type: String`, `value: int`, `condition: String`, `status_to_apply: CombatStatus`, `source_node_id: String` | `CombatStatus` |
 
 ## Data files (.tres)
 

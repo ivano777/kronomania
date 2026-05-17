@@ -40,3 +40,7 @@ extends Resource
 
 ## Spell bonus effects applied at spell resolution when a spell's tags match.
 @export var bonus_effects: Array[SpellBonusEffect] = []
+
+## Post-resolution spell effects (debuffs, status application) dispatched after
+## the attack outcome is determined. Empty on all existing nodes; wired in Group B.
+@export var outcome_effects: Array[SpellOutcomeEffect] = []

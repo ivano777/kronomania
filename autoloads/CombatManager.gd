@@ -104,6 +104,9 @@ class CombatantState:
 	var item_action_charges: Dictionary = {}   # action_key → remaining uses (from ActionModifier.uses_per_rest)
 	var active_statuses: Array[CombatStatus] = []
 	var interrupt_handlers: Array[InterruptHandler] = []
+	## Single-use debuffs queued by SpellOutcomeEffect; consumed on the next guard roll
+	## for the matching pool. { "<pool>": { "flat": int, "keep": int } }
+	var pending_guard_debuffs: Dictionary = {}
 
 	func init(d: CombatantData) -> void:
 		data = d
@@ -121,6 +124,7 @@ class CombatantState:
 		space_domination_active = false
 		active_statuses = []
 		interrupt_handlers = []
+		pending_guard_debuffs = {}
 		reset_guard()
 
 	func reset_guard() -> void:
@@ -164,6 +168,11 @@ var _debug_lethal: bool = false
 var _waiting_for_player: bool = false
 ## Weapon the player explicitly chose this round; null = use default main-hand resolution.
 var _player_strike_weapon: EquipmentData = null
+## Round-scoped: which defense pools the player has breached this round (any attack/spell).
+## Reset each _begin_round(). Used by SpellOutcomeEffect conditions.
+var _current_round_player_breaches: Dictionary = {
+	"stance": false, "resolve": false, "stamina": false
+}
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
@@ -331,6 +340,7 @@ func _emit_player_intents() -> void:
 
 func _begin_round() -> void:
 	_round += 1
+	_current_round_player_breaches = {"stance": false, "resolve": false, "stamina": false}
 
 	# Start-of-round status hooks (guards are already 0 from _end_of_round).
 	_process_statuses_hook("start_of_round", _player)
@@ -545,8 +555,23 @@ func _resolve_round_cantrip(spell: SpellData, target_index: int = 0) -> void:
 				return
 
 	# ── Phase 2: Player attacks chosen target ──────────────────────────────
+	var _pool_breached_before_c := _current_round_player_breaches.get(spell.target_pool, false) as bool
 	if not target.is_defeated:
 		await _resolve_attack(true, target_index, p_atk, spell.target_pool)
+	# "breach" = this spell caused the round's FIRST breach on its target_pool.
+	# A spell that breaches an already-breached pool sets this to false.
+	# Group B mechanics that need pure per-spell breach detection should read
+	# _resolve_attack's local breach flag instead — deferred to Group B.
+	var _spell_first_breach_this_round_c := (not _pool_breached_before_c) and \
+		(_current_round_player_breaches.get(spell.target_pool, false) as bool)
+	if not target.is_defeated:
+		_apply_spell_outcome_effects(spell, _player, target, {
+			"hit": _spell_first_breach_this_round_c,
+			"breach": _spell_first_breach_this_round_c,
+			"attack_total": p_atk.total as int,
+			"target_pool": spell.target_pool,
+			"round_breaches": _current_round_player_breaches.duplicate()
+		})
 
 	if _all_enemies_defeated():
 		_end_combat()
@@ -607,7 +632,12 @@ func _resolve_round_spell(spell: SpellData, target_index: int = 0) -> void:
 		var lvl: int = _player.node_levels[node]
 		for i in range(mini(lvl, nd.levels_data.size())):
 			for be in nd.levels_data[i].bonus_effects:
-				if spell.tags.has(be.tag):
+				var _be_matches: bool
+				if be.spell_id != "":
+					_be_matches = be.spell_id == spell.spell_name
+				else:
+					_be_matches = spell.tags.has(be.tag)
+				if _be_matches:
 					if be.bonus_type == "pool":
 						spell_pool_bonus += be.value
 					elif be.bonus_type == "keep":
@@ -650,8 +680,23 @@ func _resolve_round_spell(spell: SpellData, target_index: int = 0) -> void:
 				return
 
 	# ── Phase 2: Player attacks chosen target ──────────────────────────────
+	var _pool_breached_before := _current_round_player_breaches.get(spell.target_pool, false) as bool
 	if not target.is_defeated:
 		await _resolve_attack(true, target_index, p_atk, spell.target_pool)
+	# "breach" = this spell caused the round's FIRST breach on its target_pool.
+	# A spell that breaches an already-breached pool sets this to false.
+	# Group B mechanics that need pure per-spell breach detection should read
+	# _resolve_attack's local breach flag instead — deferred to Group B.
+	var _spell_first_breach_this_round := (not _pool_breached_before) and \
+		(_current_round_player_breaches.get(spell.target_pool, false) as bool)
+	if not target.is_defeated:
+		_apply_spell_outcome_effects(spell, _player, target, {
+			"hit": _spell_first_breach_this_round,
+			"breach": _spell_first_breach_this_round,
+			"attack_total": p_atk.total as int,
+			"target_pool": spell.target_pool,
+			"round_breaches": _current_round_player_breaches.duplicate()
+		})
 
 	if _all_enemies_defeated():
 		_end_combat()
@@ -734,12 +779,24 @@ func _resolve_attack(attacker_is_player: bool, enemy_index: int, attack_result: 
 			sd_adv = 1
 			_player.space_domination_active = false
 			log_message.emit("  [color=cyan]Space Domination: Advantage on Stamina guard![/color]")
+		# Consume any pending outcome debuffs for this pool (single-use, Group A4).
+		var flat_debuff := 0
+		var keep_debuff := 0
+		var _pending_debuff = defender.pending_guard_debuffs.get(target_pool, null)
+		if _pending_debuff != null:
+			flat_debuff = (_pending_debuff as Dictionary).get("flat", 0) as int
+			keep_debuff = (_pending_debuff as Dictionary).get("keep", 0) as int
+			defender.pending_guard_debuffs.erase(target_pool)
+			if flat_debuff != 0 or keep_debuff != 0:
+				log_message.emit("  [color=purple][Outcome debuff] flat %+d, keep grade %+d on %s %s guard.[/color]" % [
+					flat_debuff, keep_debuff, defender.data.combatant_name, pool_label
+				])
 		var def_result := RollEngine.resolve(
 				_effective_tier(defender, defend_mod), defensive_size,
-				_training_keep_grade(defender) + _defense_keep_grade(defender, target_pool), defend_mod.flat_bonus,
+				maxi(0, _training_keep_grade(defender) + _defense_keep_grade(defender, target_pool) + keep_debuff), defend_mod.flat_bonus,
 				sd_adv
 			)
-		var guard_val: int = def_result.total as int
+		var guard_val: int = (def_result.total as int) + flat_debuff
 		defender.set_guard_val(target_pool, guard_val)
 		defender.set_pool_rolled(target_pool, true)
 		guard_changed.emit(defender_is_player, defender_ei, target_pool, guard_val)
@@ -760,6 +817,8 @@ func _resolve_attack(attacker_is_player: bool, enemy_index: int, attack_result: 
 			"pool": target_pool,
 			"attacker": attacker
 		})
+		if attacker_is_player:
+			_current_round_player_breaches[target_pool] = true
 		var massive := RollEngine.is_massive(
 			attack_result.total as int, current_guard, defensive_size
 		)
@@ -939,6 +998,115 @@ func _resolve_meat_for_the_grinder(
 	return { "wounds_modified": 2, "resolved": true }
 
 # --- End interrupt system helpers ---
+
+# --- Spell outcome effect helpers (Group A4) ---
+
+func _apply_spell_outcome_effects(
+		spell: SpellData,
+		caster_state: CombatantState,
+		target_state: CombatantState,
+		outcome: Dictionary
+) -> void:
+	## Collects SpellOutcomeEffect entries from all purchased node levels that match
+	## the resolved spell, then filters by trigger and condition before dispatching.
+	##
+	## outcome contents:
+	##   { "hit": bool, "breach": bool, "attack_total": int,
+	##     "target_pool": String, "round_breaches": Dictionary }
+	## round_breaches tracks which pools the player has breached this round across
+	## all attacks (not just this spell).
+	var effects: Array[SpellOutcomeEffect] = []
+	for node in PlayerProgression.node_levels:
+		var nd: NodeData = node as NodeData
+		if nd == null:
+			continue
+		var level := PlayerProgression.node_levels[node] as int
+		for i in range(mini(level, nd.levels_data.size())):
+			for effect in nd.levels_data[i].outcome_effects:
+				if _spell_outcome_matches(effect, spell):
+					effects.append(effect)
+
+	for effect in effects:
+		if not _spell_outcome_trigger_fires(effect, outcome):
+			continue
+		if not _spell_outcome_condition_holds(effect, caster_state, target_state, outcome):
+			continue
+		_dispatch_spell_outcome_effect(effect, caster_state, target_state, outcome)
+
+
+func _spell_outcome_matches(effect: SpellOutcomeEffect, spell: SpellData) -> bool:
+	if effect.spell_id == "":
+		return true
+	return effect.spell_id == spell.spell_name
+
+
+func _spell_outcome_trigger_fires(effect: SpellOutcomeEffect, outcome: Dictionary) -> bool:
+	match effect.trigger:
+		"on_cast":
+			return true
+		"on_hit", "on_breach":
+			return outcome.get("breach", false) as bool
+		_:
+			push_warning("Unknown SpellOutcomeEffect.trigger: " + effect.trigger)
+			return false
+
+
+func _spell_outcome_condition_holds(
+		effect: SpellOutcomeEffect,
+		caster_state: CombatantState,
+		_target_state: CombatantState,
+		outcome: Dictionary
+) -> bool:
+	if effect.condition == "":
+		return true
+	var round_breaches: Dictionary = outcome.get("round_breaches", {})
+	match effect.condition:
+		"if_stance_breached_this_round":
+			return round_breaches.get("stance", false) as bool
+		"if_resolve_breached_this_round":
+			return round_breaches.get("resolve", false) as bool
+		"if_stamina_breached_this_round":
+			return round_breaches.get("stamina", false) as bool
+		"if_fervor_at_cap":
+			return caster_state.fervor_size >= _stat_size(caster_state, "ingenuity_size")
+		_:
+			push_warning("Unknown SpellOutcomeEffect.condition: " + effect.condition)
+			return false
+
+
+func _dispatch_spell_outcome_effect(
+		effect: SpellOutcomeEffect,
+		caster_state: CombatantState,
+		target_state: CombatantState,
+		_outcome: Dictionary
+) -> void:
+	var receiver: CombatantState = caster_state if effect.target == "self" else target_state
+	match effect.effect_type:
+		"debuff_flat":
+			_add_pending_guard_debuff(receiver, effect.target_pool, "flat", effect.value)
+		"debuff_keep":
+			_add_pending_guard_debuff(receiver, effect.target_pool, "keep", effect.value)
+		"apply_status":
+			if effect.status_to_apply != null:
+				# Duplicate so each application is an independent instance.
+				var st: CombatStatus = effect.status_to_apply.duplicate()
+				_add_status(receiver, st)
+		"bonus_keep", "bonus_flat":
+			# Reserved for outcome-conditional bonuses (e.g. Group D Mind Detonation).
+			# These effect_types are NOT for flat roll upgrades — use SpellBonusEffect instead.
+			push_warning("bonus_keep/bonus_flat in outcome_effects not dispatched at A4; use SpellBonusEffect instead")
+		_:
+			push_warning("Unknown SpellOutcomeEffect.effect_type: " + effect.effect_type)
+
+
+func _add_pending_guard_debuff(state: CombatantState, pool: String, kind: String, value: int) -> void:
+	if not state.pending_guard_debuffs.has(pool):
+		state.pending_guard_debuffs[pool] = {"flat": 0, "keep": 0}
+	var entry := state.pending_guard_debuffs[pool] as Dictionary
+	entry[kind] = (entry.get(kind, 0) as int) + value
+	state.pending_guard_debuffs[pool] = entry
+
+# --- End spell outcome effect helpers ---
 
 func _process_statuses_hook(
 		hook: String,
