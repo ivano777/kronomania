@@ -131,7 +131,7 @@ docs/               # project-status.md (roadmap), project-index.md (generated c
 
 `CombatantData` is **immutable config** only. All runtime state lives inside `CombatManager.CombatantState`, an inner class instantiated per combat. Scene nodes hold no game state.
 
-`CombatantState` fields: `data` (CombatantData), `current_wounds`, `max_wounds`, `is_defeated`, `node_levels: Dictionary` (NodeData → int), `tier_override`, `weapon_override`, `off_hand_override` (EquipmentData), `stamina_degrade_charges` (Meat for the Grinder charges), `space_domination_active: bool`, `item_action_charges: Dictionary` (action_key → remaining uses; initialized at `start_combat()` from `ActionModifier`s with `rest_type="combat"`), plus per-pool guard state (`stance_guard`, `resolve_guard`, `stamina_guard`, and matching `_rolled` booleans), plus magic state (`fervor_size`, `is_burned_out`, `has_minor_studies`, `has_spellcasting`, `known_spells: Array`, `known_cantrips: Array`). Methods: `init()`, `reset_guard()`, `get_guard(pool)`, `set_guard_val(pool, value)`, `is_pool_rolled(pool)`, `set_pool_rolled(pool, value)`.
+`CombatantState` fields: `data` (CombatantData), `current_wounds`, `max_wounds`, `is_defeated`, `node_levels: Dictionary` (NodeData → int), `tier_override`, `weapon_override`, `off_hand_override` (EquipmentData), `space_domination_active: bool`, `item_action_charges: Dictionary` (action_key → remaining uses; initialized at `start_combat()` from `ActionModifier`s with `rest_type="combat"`), `active_statuses: Array[CombatStatus]` (temporary effects; always iterated as `.duplicate()`), `interrupt_handlers: Array[InterruptHandler]` (registered at `start_combat()` based on purchased nodes; combat-scoped, charges reset each combat), plus per-pool guard state (`stance_guard`, `resolve_guard`, `stamina_guard`, and matching `_rolled` booleans), plus magic state (`fervor_size`, `is_burned_out`, `has_minor_studies`, `has_spellcasting`, `known_spells: Array`, `known_cantrips: Array`). Methods: `init()`, `reset_guard()`, `get_guard(pool)`, `set_guard_val(pool, value)`, `is_pool_rolled(pool)`, `set_pool_rolled(pool, value)`.
 
 ### Autoload singletons
 
@@ -145,47 +145,46 @@ Signatures and signals are in `docs/project-index.md`. Architectural gotchas:
 
 ```
 _begin_round()
-  → resets all three guard pools to 0 (stance, resolve, stamina) for player and all enemies
+  → _process_statuses_hook("start_of_round", _player / enemy × N)
+  → _tick_statuses(_player / enemy × N)           ← decrements/removes expired statuses
   → emits player_intents_available(intents: Array[String])
   → emits player_magic_available(can_cantrip, can_cast_spell)
   → emits player_action_required
   → (player presses Strike / Cantrip / Spell → BattleScene calls player_chose_strike / _cantrip / _spell)
   → _resolve_round / _resolve_round_cantrip / _resolve_round_spell
-  → rolls both attacks, VT check, _resolve_attack() × 2
+  → rolls attacks, VT check, _resolve_attack() × N (Slow enemies → Player → Fast enemies)
+      → after breach confirmed: _process_statuses_hook("on_breach", defender, {pool, attacker})
+      → [interrupt check] _find_interrupts(defender, trigger) → await _resolve_interrupt() for each
   → [spell only] _escalate_fervor(steps) where steps = primary_dice_maxed_count (Ingenuity-tagged dice that rolled max, pre-Keep, including discarded) + (1 if fervor_maxed)
+
+await _end_of_round()
+  → _process_statuses_hook("end_of_round", _player / enemy × N)
+  → _tick_statuses(_player / enemy × N)           ← decrements/removes expired statuses
+  → guard reset for all combatants (+ guard_changed signals)
   → await 0.8s timer
   → _begin_round()  ← loops until defeat
 ```
 
-`_resolve_round*` are GDScript coroutines (use `await`). Calling them without `await` from the `player_chose_*` methods is intentional — they run cooperatively on the main thread, yielding at the timer. `_resolve_attack()` is also a coroutine (conditionally awaits `_massive_decision_gate` for Meat for the Grinder via the interrupt system); all `_resolve_round*` calls to it use `await`.
+`_resolve_round*` are GDScript coroutines (use `await`). Calling them without `await` from the `player_chose_*` methods is intentional — they run cooperatively on the main thread, yielding at the timer. `_resolve_attack()` is also a coroutine (awaits inside the interrupt gate and inside `_defense_acknowledged`); all `_resolve_round*` calls to it use `await`. `_end_of_round()` is likewise a coroutine and must be called with `await`.
 
-### Round loop — implemented phases (Group A2)
+Guards are reset inside `_end_of_round()`, not `_begin_round()`. This ensures guards are already 0 when `start_of_round` hooks fire.
 
-```
-_begin_round()
-  → _process_statuses_hook("start_of_round", _player)
-  → _process_statuses_hook("start_of_round", enemy × N)
-  → _tick_statuses(_player / enemy × N)
-  → emits player_intents_available / player_magic_available
-  → emits player_action_required
+### Status system
 
-player_chose_* → _resolve_round_* → _resolve_attack × N
-  → inside _resolve_attack(), after breach confirmed:
-     _process_statuses_hook("on_breach", defender, {pool, attacker})
+`CombatStatus` is a data-only resource (`resources/CombatStatus.gd`). Hard rule: zero functional methods — all processing logic lives in `CombatManager._process_statuses_hook()`, never in `CombatStatus` itself.
 
-await _end_of_round()
-  → _process_statuses_hook("end_of_round", _player / enemy × N)
-  → _tick_statuses(_player / enemy × N)
-  → guard reset for all combatants (+ guard_changed signals)
-  → await 0.8s timer
-  → _begin_round()
-```
+Helpers on `CombatManager`:
+- `_add_status(state, status)` — removes any existing status with the same `status_id`, then appends. Applying the same status twice refreshes it (no stacking).
+- `_remove_status(state, status_id)` — filters out all matching entries.
+- `_has_status(state, status_id) → bool`
+- `_get_status(state, status_id) → CombatStatus`
+- `_tick_statuses(state)` — decrements `duration_rounds` for all non-permanent statuses and removes those that reach 0. Called once after `start_of_round` hooks in `_begin_round()` and once after `end_of_round` hooks in `_end_of_round()`.
 
-`_process_statuses_hook(hook, state, context)` iterates `state.active_statuses.duplicate()`
-and dispatches on `status_id` via an internal match block. Logic lives in the
-dispatcher, NEVER in the CombatStatus resource. No cases are active yet (Groups B-D).
+`_process_statuses_hook(hook, state, context)` dispatches on `status.status_id` via a `match` block. Always iterates `state.active_statuses.duplicate()` to prevent mutation during iteration. No match cases are active yet — Groups B–D will add them. Logic must never move into `CombatStatus` itself.
 
-### Interrupt system (Group A3)
+Stat overrides: `_stat_size(state, stat)` reads `status.stat_overrides[stat]` before falling through to node levels — status overrides always win over permanent progression.
+
+### Interrupt system
 
 `InterruptHandler` is a reactive hook fired inside `_resolve_attack()` before final outcome
 application. Handlers are registered per `CombatantState` at `start_combat()` based on
@@ -209,7 +208,7 @@ Adding a new handler:
 3. Register in `start_combat()` based on the relevant node level
 4. Update the priority table above and in CLAUDE.md
 
-### New architectural resources (in implementation — Group A)
+### New architectural resources (Group A — A1/A2/A3 implemented; A4 pending)
 
 **CombatStatus** — temporary state on a combatant. Hard rule: data only,
 zero functional methods. Fields: `status_id`, `duration_rounds`

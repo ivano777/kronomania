@@ -68,32 +68,34 @@ Hub scene (rest/recovery/weapon selector/save). Enemy roster (Grunt/Soldier/Knig
 ### ✓ Group 5.5 — Mechanics completion
 Space Domination (Melee L2): once-per-combat Advantage on player's next Stamina guard roll.
 
-### ⏳ Group A — Foundational Architecture (prerequisite for Ingenuity branch)
+### ✓ Group A — Foundational Architecture (prerequisite for Ingenuity branch)
 
-Four new architectural systems that extend CombatManager without breaking
-existing behaviour. Must be implemented in order. Each phase has independent
-headless validation.
+Four architectural systems that extend CombatManager without breaking existing
+behaviour. A1–A3 are implemented. A4 remains pending before Group B can start.
 
 **Phase A1 — CombatStatus and active_statuses** ✓
 New resource `CombatStatus` (data only, zero logic). `CombatantState` gains
 `active_statuses: Array[CombatStatus]`. Helpers on CombatManager:
 `_add_status`, `_remove_status`, `_has_status`, `_get_status`,
 `_tick_statuses`. `_stat_size()` updated to read stat_overrides from active
-statuses before the base value.
+statuses before node-level values.
 
 **Phase A2 — Phased round loop with hooks** ✓
 The flat round loop becomes explicit phases: START_OF_ROUND →
-PLAYER_ACTION → ON_BREACH → END_OF_ROUND. New method `_end_of_round()`.
-New method `_process_statuses_hook(hook, state, context)`. Hooks exist but
-do nothing yet — combat behaviour remains identical.
+PLAYER_ACTION → ON_BREACH → END_OF_ROUND. New coroutine `_end_of_round()`;
+guard reset moved there so guards are already 0 when start_of_round hooks fire.
+New method `_process_statuses_hook(hook, state, context)` — dispatches on
+`status_id` via match block; iterates `.duplicate()` for mutation safety.
+No match cases active yet — combat behaviour is identical to pre-A2.
 
 **Phase A3 — Generalised InterruptHandler** ✓
 New resource `InterruptHandler` (data only). `CombatantState` gains
 `interrupt_handlers: Array[InterruptHandler]`. The hardcoded Meat for the
-Grinder pattern is migrated to this system. Final behaviour identical to
-current, but now extensible.
+Grinder pattern is migrated: registered via `_register_interrupt()` at
+`start_combat()`, fired by `_find_interrupts()` + `await _resolve_interrupt()`
+inside `_resolve_attack()`. Behaviour identical to pre-A3, now extensible.
 
-**Phase A4 — SpellOutcomeEffect**
+**Phase A4 — SpellOutcomeEffect** ⏳
 New resource `SpellOutcomeEffect` describing post-resolution spell effects
 (flat/keep debuffs, conditional bonuses, status application).
 `NodeLevelData` gains `outcome_effects: Array[SpellOutcomeEffect]`.
