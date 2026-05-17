@@ -87,7 +87,7 @@ PLAYER_ACTION → ON_BREACH → END_OF_ROUND. New method `_end_of_round()`.
 New method `_process_statuses_hook(hook, state, context)`. Hooks exist but
 do nothing yet — combat behaviour remains identical.
 
-**Phase A3 — Generalised InterruptHandler**
+**Phase A3 — Generalised InterruptHandler** ✓
 New resource `InterruptHandler` (data only). `CombatantState` gains
 `interrupt_handlers: Array[InterruptHandler]`. The hardcoded Meat for the
 Grinder pattern is migrated to this system. Final behaviour identical to

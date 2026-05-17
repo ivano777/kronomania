@@ -157,7 +157,7 @@ _begin_round()
   → _begin_round()  ← loops until defeat
 ```
 
-`_resolve_round*` are GDScript coroutines (use `await`). Calling them without `await` from the `player_chose_*` methods is intentional — they run cooperatively on the main thread, yielding at the timer. `_resolve_attack()` is also a coroutine (conditionally awaits `_massive_decision_resolved` for Meat for the Grinder); all `_resolve_round*` calls to it use `await`.
+`_resolve_round*` are GDScript coroutines (use `await`). Calling them without `await` from the `player_chose_*` methods is intentional — they run cooperatively on the main thread, yielding at the timer. `_resolve_attack()` is also a coroutine (conditionally awaits `_massive_decision_gate` for Meat for the Grinder via the interrupt system); all `_resolve_round*` calls to it use `await`.
 
 ### Round loop — implemented phases (Group A2)
 
@@ -184,6 +184,30 @@ await _end_of_round()
 `_process_statuses_hook(hook, state, context)` iterates `state.active_statuses.duplicate()`
 and dispatches on `status_id` via an internal match block. Logic lives in the
 dispatcher, NEVER in the CombatStatus resource. No cases are active yet (Groups B-D).
+
+### Interrupt system (Group A3)
+
+`InterruptHandler` is a reactive hook fired inside `_resolve_attack()` before final outcome
+application. Handlers are registered per `CombatantState` at `start_combat()` based on
+purchased nodes. Each handler has a trigger (currently only `"on_massive_wound"`), charges,
+and priority.
+
+Flow:
+1. `_resolve_attack()` detects a triggerable event (e.g. wound is Massive and defender is player)
+2. `_find_interrupts(state, trigger)` returns matching handlers sorted by priority ascending
+3. For each handler in order, `_resolve_interrupt()` dispatches to the handler-specific method
+4. The handler may emit signals, await player input, modify the outcome, and consume a charge
+5. The next handler (if any) sees the outcome already modified by the previous
+
+Priority table (lower = processed first):
+- Mental Fortress (B3): 10
+- Meat for the Grinder: 20
+
+Adding a new handler:
+1. Add a case in `_resolve_interrupt()` dispatching by `handler_id`
+2. Implement `_resolve_<handler_name>()` with the signal/await contract
+3. Register in `start_combat()` based on the relevant node level
+4. Update the priority table above and in CLAUDE.md
 
 ### New architectural resources (in implementation — Group A)
 
@@ -290,6 +314,10 @@ Group 4 implements Fervor / Burnout / Cantrips / True Spells with per-spell `Spe
 | `_add_status` silently replaces duplicates | Looks like a bug swallower | Intentional — applying the same status twice refreshes it, not stacks it |
 | `_process_statuses_hook` iterates `.duplicate()` of `active_statuses` | Unnecessary copy | Prevents array mutation during iteration if a future case adds/removes statuses mid-loop |
 | Guard reset is in `_end_of_round()` not `_begin_round()` | Reset should happen at round start | Intentional — guards are 0 when `start_of_round` hooks fire, which is the correct state for status processing |
+| `_resolve_interrupt` is awaited inside `_resolve_attack` | Adds an await point in the attack resolution | Intentional — interrupts may need player input; the await is the whole point |
+| InterruptHandler charges live on the handler instance, not on `CombatantState` | Charge counting feels scattered | Intentional — each handler manages its own resource; multiple handlers with the same trigger have independent charges |
+| Interrupt registration happens in `start_combat`, not on node purchase | Looks like late binding | Intentional — handlers are combat-scoped; charges reset every combat per design |
+| `wounds_pending` reassigned inside the interrupt loop before being assigned to `wounds` | Looks like a refactor smell | Intentional — the interrupt loop modifies wound count only on the player-defender/massive path; the final `var wounds := wounds_pending` is always the applied count |
 
 ## Game rules summary
 
@@ -318,7 +346,7 @@ The rules live in `docs/game-rules/`. The implementation must match them exactly
 | Physical keep grade | `_physical_keep_grade()` = max(`_training_keep_grade()`, `physical_keep` nodes). Applied to physical Strike only. |
 | Brutal Trade | Toggle in RoundHUD (visible when `dom_brutal >= 1`): VT −5, Flat +5 on player physical attack. |
 | Earthshatter | Post-keep Dominion die added to Stance physical attacks when `dom_earthshatter` is purchased. Passed as `post_keep_bonus_size` to `RollEngine.resolve()`. |
-| Meat for the Grinder | `stamina_degrade_charges` on `CombatantState` (from `dom_meat_grinder`). When Massive Wound would hit player, `player_massive_incoming` emitted; RoundHUD shows prompt; player can spend charge → 1 Wound instead of 2. |
+| Meat for the Grinder | Registered as an `InterruptHandler` (`handler_id="meat_for_the_grinder"`, `trigger="on_massive_wound"`, `priority=20`) at `start_combat()` via `_register_interrupt`. When a Massive Wound would hit the player, `_find_interrupts` fires the handler, which emits `player_massive_incoming` and awaits `_massive_decision_gate`; player can spend a charge → 1 Wound instead of 2. |
 | Wounds Training | `dom_wounds` NodeLevelData entries (effect_type="training_wounds", effect_value=1 each) summed by `_wounds_node_bonus()` at `start_combat()`. |
 
 Next unimplemented items: Group 6 remainder — Art pass (replace placeholder visuals with sprites/animations) and Sound (SFX for attack, guard break, wound, defeat).

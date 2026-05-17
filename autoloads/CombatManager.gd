@@ -100,10 +100,10 @@ class CombatantState:
 	var has_spellcasting: bool  = false  # derived from unlocked_nodes in start_combat()
 	var known_spells: Array   = []  # Array[SpellData] — non-cantrip spells, player only
 	var known_cantrips: Array = []  # Array[SpellData] — cantrip spells, player only
-	var stamina_degrade_charges: int = 0  # Meat for the Grinder: charges to degrade Massive Wounds
 	var space_domination_active: bool = false  # Melee L2: Advantage on first Stamina guard roll each combat
 	var item_action_charges: Dictionary = {}   # action_key → remaining uses (from ActionModifier.uses_per_rest)
 	var active_statuses: Array[CombatStatus] = []
+	var interrupt_handlers: Array[InterruptHandler] = []
 
 	func init(d: CombatantData) -> void:
 		data = d
@@ -118,9 +118,9 @@ class CombatantState:
 		is_burned_out = false
 		has_minor_studies = false
 		has_spellcasting = false
-		stamina_degrade_charges = 0
 		space_domination_active = false
 		active_statuses = []
+		interrupt_handlers = []
 		reset_guard()
 
 	func reset_guard() -> void:
@@ -183,7 +183,16 @@ func start_combat(player_data: CombatantData, enemies_data: Array) -> void:
 	_player.tier_override = PlayerProgression.get_tier()
 	_player.max_wounds += _tier_wound_bonus(_player.tier_override)
 	_player.max_wounds += _wounds_node_bonus(_player)
-	_player.stamina_degrade_charges = _meat_grinder_charges(_player)
+	var meat_grinder_charges := _meat_grinder_charges(_player)
+	if meat_grinder_charges > 0:
+		var mftg_handler := InterruptHandler.new()
+		mftg_handler.handler_id = "meat_for_the_grinder"
+		mftg_handler.trigger = "on_massive_wound"
+		mftg_handler.target = "self"
+		mftg_handler.charges = meat_grinder_charges
+		mftg_handler.priority = 20
+		mftg_handler.source_node_id = "dom_meat_grinder"
+		_register_interrupt(_player, mftg_handler)
 	_player.space_domination_active = _has_effect_type(_player, "space_domination")
 	_player.current_wounds = mini(PlayerProgression.saved_wounds, _player.max_wounds)
 	wounds_changed.emit(true, -1, _player.current_wounds, _player.max_wounds)
@@ -754,15 +763,18 @@ func _resolve_attack(attacker_is_player: bool, enemy_index: int, attack_result: 
 		var massive := RollEngine.is_massive(
 			attack_result.total as int, current_guard, defensive_size
 		)
-		var wounds := 2 if massive else 1
-		# Meat for the Grinder: player can spend a charge to degrade Massive → 1 Wound.
-		if wounds == 2 and not attacker_is_player and _player.stamina_degrade_charges > 0:
-			player_massive_incoming.emit(_player.stamina_degrade_charges)
-			var use_charge: bool = await _massive_decision_gate
-			if use_charge:
-				_player.stamina_degrade_charges -= 1
-				wounds = 1
-				log_message.emit("  [color=lime]Meat for the Grinder! Massive Wound degraded to 1 Wound.[/color]")
+		var wounds_pending := 2 if massive else 1
+		if massive and not attacker_is_player and defender_is_player:
+			var interrupts := _find_interrupts(defender, "on_massive_wound")
+			for handler in interrupts:
+				var context := {
+					"wounds_pending": wounds_pending,
+					"attacker_state": attacker
+				}
+				var result: Dictionary = await _resolve_interrupt(handler, defender, context)
+				if result["resolved"]:
+					wounds_pending = result["wounds_modified"] as int
+		var wounds := wounds_pending
 		defender.current_wounds += wounds
 		if _debug_lethal and attacker_is_player and not defender_is_player:
 			defender.current_wounds = defender.max_wounds
@@ -874,6 +886,59 @@ func _tick_statuses(state: CombatantState) -> void:
 		state.active_statuses.erase(s)
 
 # --- End status system helpers ---
+
+# --- Interrupt system helpers (Group A3) ---
+
+func _register_interrupt(state: CombatantState, handler: InterruptHandler) -> void:
+	# No deduplication — two distinct handlers with the same trigger may coexist.
+	state.interrupt_handlers.append(handler)
+
+
+func _find_interrupts(state: CombatantState, trigger: String) -> Array[InterruptHandler]:
+	# Returns all matching handlers that still have charges, sorted by priority ascending.
+	var matches: Array[InterruptHandler] = []
+	for h in state.interrupt_handlers:
+		if h.trigger == trigger and (h.charges > 0 or h.charges == -1):
+			matches.append(h)
+	matches.sort_custom(func(a, b): return a.priority < b.priority)
+	return matches
+
+
+func _consume_interrupt_charge(handler: InterruptHandler) -> void:
+	if handler.charges > 0:
+		handler.charges -= 1
+
+
+func _resolve_interrupt(
+		handler: InterruptHandler,
+		state: CombatantState,
+		context: Dictionary
+) -> Dictionary:
+	## Dispatcher for interrupt handlers. Returns { "wounds_modified": int, "resolved": bool }.
+	## resolved=false means the player declined and the original outcome stands.
+	match handler.handler_id:
+		"meat_for_the_grinder":
+			return await _resolve_meat_for_the_grinder(handler, state, context)
+		_:
+			push_warning("Unknown interrupt handler_id: " + handler.handler_id)
+			return { "wounds_modified": context["wounds_pending"], "resolved": false }
+
+
+func _resolve_meat_for_the_grinder(
+		handler: InterruptHandler,
+		_state: CombatantState,
+		_context: Dictionary
+) -> Dictionary:
+	## Migrated from the previous hardcoded path. Signal/await contract is identical to pre-A3.
+	player_massive_incoming.emit(handler.charges)
+	var use_charge: bool = await _massive_decision_gate
+	if use_charge:
+		_consume_interrupt_charge(handler)
+		log_message.emit("  [color=lime]Meat for the Grinder! Massive Wound degraded to 1 Wound.[/color]")
+		return { "wounds_modified": 1, "resolved": true }
+	return { "wounds_modified": 2, "resolved": true }
+
+# --- End interrupt system helpers ---
 
 func _process_statuses_hook(
 		hook: String,
