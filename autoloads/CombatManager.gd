@@ -323,14 +323,14 @@ func _emit_player_intents() -> void:
 func _begin_round() -> void:
 	_round += 1
 
-	# All guard pools reset at the start of each new round (rules: defense-and-guard.md).
-	_player.reset_guard()
-	for pool in POOL_NAMES:
-		guard_changed.emit(true, -1, pool, 0)
-	for i in _enemies.size():
-		_enemies[i].reset_guard()
-		for pool in POOL_NAMES:
-			guard_changed.emit(false, i, pool, 0)
+	# Start-of-round status hooks (guards are already 0 from _end_of_round).
+	_process_statuses_hook("start_of_round", _player)
+	for enemy_state in _enemies:
+		_process_statuses_hook("start_of_round", enemy_state)
+
+	_tick_statuses(_player)
+	for enemy_state in _enemies:
+		_tick_statuses(enemy_state)
 
 	round_started.emit(_round)
 	log_message.emit("")
@@ -496,7 +496,7 @@ func _resolve_round(net_advantage: int = 0, target_pool: String = "stance", brut
 				return
 
 	# ── Next round ─────────────────────────────────────────────────────────
-	await get_tree().create_timer(0.8).timeout
+	await _end_of_round()
 	_begin_round()
 
 
@@ -559,7 +559,7 @@ func _resolve_round_cantrip(spell: SpellData, target_index: int = 0) -> void:
 				_end_combat()
 				return
 
-	await get_tree().create_timer(0.8).timeout
+	await _end_of_round()
 	_begin_round()
 
 
@@ -671,7 +671,7 @@ func _resolve_round_spell(spell: SpellData, target_index: int = 0) -> void:
 	if escalation_steps > 0:
 		_escalate_fervor(_player, escalation_steps)
 
-	await get_tree().create_timer(0.8).timeout
+	await _end_of_round()
 	_begin_round()
 
 
@@ -747,6 +747,10 @@ func _resolve_attack(attacker_is_player: bool, enemy_index: int, attack_result: 
 	var current_guard: int = defender.get_guard(target_pool)
 	var force_breach := _debug_lethal and attacker_is_player and not defender_is_player
 	if (attack_result.total as int) >= current_guard or force_breach:
+		_process_statuses_hook("on_breach", defender, {
+			"pool": target_pool,
+			"attacker": attacker
+		})
 		var massive := RollEngine.is_massive(
 			attack_result.total as int, current_guard, defensive_size
 		)
@@ -870,6 +874,41 @@ func _tick_statuses(state: CombatantState) -> void:
 		state.active_statuses.erase(s)
 
 # --- End status system helpers ---
+
+func _process_statuses_hook(
+		hook: String,
+		state: CombatantState,
+		context: Dictionary = {}
+) -> void:
+	## Dispatches status effects for the given hook and combatant.
+	## HARD RULE: logic lives here via match on status_id, NEVER inside CombatStatus itself.
+	## .duplicate() prevents mutation of the array if a future case adds/removes statuses mid-loop.
+	for status in state.active_statuses.duplicate():
+		match status.status_id:
+			_:
+				pass  # No processing yet. Cases added in Groups B-D.
+
+
+func _end_of_round() -> void:
+	_process_statuses_hook("end_of_round", _player)
+	for enemy_state in _enemies:
+		_process_statuses_hook("end_of_round", enemy_state)
+
+	_tick_statuses(_player)
+	for enemy_state in _enemies:
+		_tick_statuses(enemy_state)
+
+	# Guard reset: moved here from _begin_round so guards are already 0 when start_of_round hooks fire.
+	_player.reset_guard()
+	for pool in POOL_NAMES:
+		guard_changed.emit(true, -1, pool, 0)
+	for i in _enemies.size():
+		_enemies[i].reset_guard()
+		for pool in POOL_NAMES:
+			guard_changed.emit(false, i, pool, 0)
+
+	await get_tree().create_timer(0.8).timeout
+
 
 ## Passive Max Wounds bonus from Tier: +1 at Tier 2, +1 again at Tier 4 (cumulative +2).
 func _tier_wound_bonus(tier: int) -> int:

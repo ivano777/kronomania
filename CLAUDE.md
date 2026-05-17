@@ -159,29 +159,31 @@ _begin_round()
 
 `_resolve_round*` are GDScript coroutines (use `await`). Calling them without `await` from the `player_chose_*` methods is intentional — they run cooperatively on the main thread, yielding at the timer. `_resolve_attack()` is also a coroutine (conditionally awaits `_massive_decision_resolved` for Meat for the Grinder); all `_resolve_round*` calls to it use `await`.
 
-### Target round loop architecture (in implementation — Group A)
-
-The round loop will be extended to explicit phases. Target structure:
+### Round loop — implemented phases (Group A2)
 
 ```
-START_OF_ROUND
+_begin_round()
   → _process_statuses_hook("start_of_round", _player)
-  → _process_statuses_hook("start_of_round", enemy)
-  → _tick_statuses(_player / enemy)
-PLAYER_ACTION
-  → player_chose_* → _resolve_round_* → _resolve_attack × N
+  → _process_statuses_hook("start_of_round", enemy × N)
+  → _tick_statuses(_player / enemy × N)
+  → emits player_intents_available / player_magic_available
+  → emits player_action_required
+
+player_chose_* → _resolve_round_* → _resolve_attack × N
   → inside _resolve_attack(), after breach confirmed:
-     _process_statuses_hook("on_breach", defender, {pool: target_pool})
-END_OF_ROUND  ← new private method
-  → _process_statuses_hook("end_of_round", _player / enemy)
-  → guard reset (moved here from current location)
-  → await timer
+     _process_statuses_hook("on_breach", defender, {pool, attacker})
+
+await _end_of_round()
+  → _process_statuses_hook("end_of_round", _player / enemy × N)
+  → _tick_statuses(_player / enemy × N)
+  → guard reset for all combatants (+ guard_changed signals)
+  → await 0.8s timer
   → _begin_round()
 ```
 
-`_process_statuses_hook(hook, state, context)` iterates `state.active_statuses`
+`_process_statuses_hook(hook, state, context)` iterates `state.active_statuses.duplicate()`
 and dispatches on `status_id` via an internal match block. Logic lives in the
-dispatcher, NEVER in the CombatStatus resource.
+dispatcher, NEVER in the CombatStatus resource. No cases are active yet (Groups B-D).
 
 ### New architectural resources (in implementation — Group A)
 
@@ -286,6 +288,8 @@ Group 4 implements Fervor / Burnout / Cantrips / True Spells with per-spell `Spe
 | `_end_of_round()` called without visible `await` | Looks like a blocking call | It is a coroutine, must be called with await — same rule as _resolve_round* |
 | `_stat_size()` checks active_statuses before node_levels | Seems to give statuses higher priority than purchased nodes | Intentional — temporary overrides (e.g. Purple Hollow d12) must win over permanent progression |
 | `_add_status` silently replaces duplicates | Looks like a bug swallower | Intentional — applying the same status twice refreshes it, not stacks it |
+| `_process_statuses_hook` iterates `.duplicate()` of `active_statuses` | Unnecessary copy | Prevents array mutation during iteration if a future case adds/removes statuses mid-loop |
+| Guard reset is in `_end_of_round()` not `_begin_round()` | Reset should happen at round start | Intentional — guards are 0 when `start_of_round` hooks fire, which is the correct state for status processing |
 
 ## Game rules summary
 

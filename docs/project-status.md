@@ -81,7 +81,7 @@ New resource `CombatStatus` (data only, zero logic). `CombatantState` gains
 `_tick_statuses`. `_stat_size()` updated to read stat_overrides from active
 statuses before the base value.
 
-**Phase A2 — Phased round loop with hooks**
+**Phase A2 — Phased round loop with hooks** ✓
 The flat round loop becomes explicit phases: START_OF_ROUND →
 PLAYER_ACTION → ON_BREACH → END_OF_ROUND. New method `_end_of_round()`.
 New method `_process_statuses_hook(hook, state, context)`. Hooks exist but
