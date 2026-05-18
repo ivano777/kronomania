@@ -18,7 +18,7 @@ Tracks what is implemented and what remains. Updated after each feature ships.
 - **Enemies**: `enemy_grunt.tres` (T1, d4/d4, VT 10, 2 wounds), `enemy_soldier.tres` (T1, d6/d6, VT 12, 3 wounds), `enemy_knight.tres` (T2, d8/d8, VT 15, 4 wounds, keep 1)
 - **Weapons**: `iron_sword.tres` (tier_cap=2, flat+1, Sharp), `crude_club.tres` (tier_cap=1, Blunt), `greatsword.tres` (tier_cap=2, flat+1, Sharp+TwoHanded)
 - **Nodes (50 total)**: Dominion tree (`dom_core/wounds/martial_arts/melee/ranged/dual_wield/titans_grip/disarm/brutal/meat_grinder/earthshatter`); `neg_core`, `ing_core` (multi-level, 3 levels each); pool-guard training nodes (`neg_stance`, `dom_stamina`, `ing_resolve`); spell schools (`fire_magic_1–4`, `arcane_1–3`); ability nodes (`minor_studies`, `spellcasting`); flavor nodes (`warrior_oath` + 15 under `flavors/`)
-- **Spells**: cantrips — `sparks`, `arcane_touch`; true spells — `fire_orb`, `fireball`, `wall_of_fire`, `meteor`, `arcane_missile`, `mind_spike`, `void_bolt`
+- **Spells**: cantrips — `arcane_bolt`, `arcane_touch`, `sparks`; true spells — `fire_orb`, `fireball`, `wall_of_fire`, `meteor`, `arcane_missile`, `mind_spike`, `void_bolt`
 
 ### UI
 - **BattleScene** — `WorldLayer` (Node2D, combatant sprites/anchors) + `UILayer` (CanvasLayer, HUDs). `AnimatedSprite2D` stubs with ColorRect fallback.
@@ -112,16 +112,17 @@ authored yet — arrays empty on all existing nodes; Group B wires real effects.
 ### ⏳ Group B — Ingenuity Branch: Core and Spellcasting
 Prerequisites: Group A complete.
 
-Full rewrite of the Ingenuity branch. Minor Studies rewritten with new
-cantrips (arcane_bolt, aether_barrier stub, chrono_shift stub).
+Full rewrite of the Ingenuity branch. Minor Studies rewritten (Arcane Bolt
+is already renamed; aether_barrier and chrono_shift are design-blocked —
+see Future section).
 Spellcasting node L1-L3: caster engine, injects Arcane Missile and Arcane
 Mark, adds progressive Keep and SpellOutcomeEffects for spell upgrades.
 Mental Fortress migrated from Dominion to Ingenuity as a generalised
 InterruptHandler.
 
-**Note:** aether_barrier and chrono_shift are created as stub .tres files
-with no special effects. Their full design must be written in
-docs/game-rules/ before functional implementation.
+**Note:** aether_barrier and chrono_shift require design decisions before
+any stub implementation. See Future section for the open design questions
+that must be resolved first.
 
 ---
 
@@ -281,8 +282,10 @@ Full spec: [docs/impl/group-8-sprite-registry.md](impl/group-8-sprite-registry.m
 - **Cumulative Disadvantage** — second+ different pool targeted same turn should stack Disadvantage. Deferred since Group 1.
 - **Hybrid node proportional positioning** — constellation canvas barycentric positioning for cross-tree nodes. Blocked on NEG/ING subtrees being designed.
 - **Active DEF Mode** — player chooses defensive tool/action. Requires game design work on defensive action types per weapon.
-- **aether_barrier cantrip design** — stub .tres created, mechanic undefined. Requires a design session before functional implementation.
-- **chrono_shift cantrip design** — same as above.
+- **aether_barrier cantrip** — concept: defensive cantrip for Minor Studies; mechanic undefined. Blocked on design decision: needs to choose between (a) instant +guard on a pool for one round, (b) CombatStatus shield with duration, or (c) reactive InterruptHandler that triggers on incoming magic. Pick one before implementation.
+- **chrono_shift cantrip** — concept: time-manipulation cantrip for Minor Studies; mechanic undefined. Blocked on design decision: needs to choose between (a) enemy VT temporary modifier, (b) self-buff CombatStatus granting Advantage on next roll, or (c) enemy-skip status preventing one enemy action. Pick one before implementation.
+
+Both items live in the "Cantrip Expansion" backlog — implementation group not assigned. They will be addressed in a dedicated design session, not as part of Group B/C/D.
 - **Ingenuity non-magic subtree** — Resolve Guard and training nodes for Ingenuity have not been designed. Blocked on design decisions.
 - **Cumulative Disadvantage on multiple pools** — deferred since Group 1, remains deferred. Requires `_current_round_targeted_pools` tracking.
 - **Active DEF Mode for magic** — deferred since Group 7.6. Requires design of magic defensive action types.

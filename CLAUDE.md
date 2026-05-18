@@ -241,7 +241,7 @@ Group 4 implements Fervor / Burnout / Cantrips / True Spells with per-spell `Spe
 - **Fervor** — player-only runtime state on `CombatantState`. Track: d4 → d6 → d8 → d10 (`FERVOR_TRACK` const). Cap = `data.ingenuity_size`. Persists across combats via `PlayerProgression.saved_fervor_size`; Long Rest resets to d4, Recovery Scene only clears Burnout.
 - **Escalation** — after a true spell resolves, `_escalate_fervor(_player, steps)` where `steps = primary_dice_maxed_count` (Ingenuity-tagged dice that rolled max, pre-Keep, including discarded) `+ (1 if fervor_maxed)`. Multiple steps possible in a single cast.
 - **Burnout** — blocks `player_chose_spell()`; cantrips remain available. Persists across combats; cleared by Long Rest or Recovery.
-- **Cantrip** — uses `SpellData` (is_cantrip=true). Ingenuity pool, no Fervor die, no escalation. Available during Burnout. Granted via `node.spells` (Minor Studies carries "Cantrip Spark" [`cantrip_spark.tres`] + "Arcane Touch" [`arcane_touch.tres`]; Fire Magic I carries "Sparks" [`sparks.tres`]).
+- **Cantrip** — uses `SpellData` (is_cantrip=true). Ingenuity pool, no Fervor die, no escalation. Available during Burnout. Granted via `node.spells` (Minor Studies carries "Arcane Bolt" [`arcane_bolt.tres`] + "Arcane Touch" [`arcane_touch.tres`]; Fire Magic I carries "Sparks" [`sparks.tres`]).
 - **True spell** — uses `SpellData`. Ingenuity pool + optional aspect dice + real Fervor die. Granted by spell school nodes (Fire Magic II–IV, Arcane I–III).
 
 ### SpellData (implemented)

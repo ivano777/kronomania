@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" path="res://resources/NodeData.gd" id="1_ndscr"]
 [ext_resource type="Script" path="res://resources/NodeLevelData.gd" id="2_ldscr"]
-[ext_resource type="Resource" uid="uid://spellcspark0001" path="res://resources/data/spells/cantrip_spark.tres" id="3_spell1"]
+[ext_resource type="Resource" uid="uid://arcanebolt0001" path="res://resources/data/spells/arcane_bolt.tres" id="3_spell1"]
 [ext_resource type="Resource" uid="uid://arctouch0001" path="res://resources/data/spells/arcane_touch.tres" id="4_spell2"]
 
 [sub_resource type="Resource" id="Level_1"]

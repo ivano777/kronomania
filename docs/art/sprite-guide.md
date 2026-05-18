@@ -86,7 +86,7 @@ assets/sprites/icons/
 | `"Fire Orb"` | `spells/fire_orb.png` |
 | `"Void Bolt"` | `spells/void_bolt.png` |
 | `"Arcane Touch"` | `spells/arcane_touch.png` |
-| `"Cantrip Spark"` | `spells/cantrip_spark.png` |
+| `"Arcane Bolt"` | `spells/arcane_bolt.png` |
 | *(all 9 spells follow the same pattern)* | |
 
 **Constellation nodes** — use `NodeData.node_id` directly (already snake_case, no conversion needed).

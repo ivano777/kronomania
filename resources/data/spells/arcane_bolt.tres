@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="SpellData" format=3 uid="uid://arcanebolt0001"]
+
+[ext_resource type="Script" path="res://resources/SpellData.gd" id="1_spscr"]
+
+[resource]
+script = ExtResource("1_spscr")
+spell_name = "Arcane Bolt"
+description = "A focused bolt of raw arcane force. No Fervor cost; available even during Burnout."
+aspect_stat = ""
+aspect_dice = 0
+target_pool = "stance"
+flat_bonus = 0
+is_cantrip = true
