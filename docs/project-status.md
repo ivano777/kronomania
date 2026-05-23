@@ -17,8 +17,8 @@ Tracks what is implemented and what remains. Updated after each feature ships.
 - **Player**: `player_default.tres` (Tier 1, all d4 base, Iron Sword, bare_hands stub)
 - **Enemies**: `enemy_grunt.tres` (T1, d4/d4, VT 10, 2 wounds), `enemy_soldier.tres` (T1, d6/d6, VT 12, 3 wounds), `enemy_knight.tres` (T2, d8/d8, VT 15, 4 wounds, keep 1)
 - **Weapons**: `iron_sword.tres` (tier_cap=2, flat+1, Sharp), `crude_club.tres` (tier_cap=1, Blunt), `greatsword.tres` (tier_cap=2, flat+1, Sharp+TwoHanded)
-- **Nodes (50 total)**: Dominion tree (`dom_core/wounds/martial_arts/melee/ranged/dual_wield/titans_grip/disarm/brutal/meat_grinder/earthshatter`); `neg_core`, `ing_core` (multi-level, 3 levels each); pool-guard training nodes (`neg_stance`, `dom_stamina`, `ing_resolve`); spell schools (`fire_magic_1–4`, `arcane_1–3`); ability nodes (`minor_studies`, `spellcasting`); flavor nodes (`warrior_oath` + 15 under `flavors/`)
-- **Spells**: cantrips — `arcane_bolt`, `arcane_touch`, `sparks`; true spells — `fire_orb`, `fireball`, `wall_of_fire`, `meteor`, `arcane_missile`, `mind_spike`, `void_bolt`
+- **Nodes (43 total)**: Dominion tree (`dom_core/wounds/martial_arts/melee/ranged/dual_wield/titans_grip/disarm/brutal/meat_grinder/earthshatter`); `neg_core`, `ing_core` (multi-level, 3 levels each); pool-guard training nodes (`neg_stance`, `dom_stamina`, `ing_resolve`); ability nodes (`minor_studies`, `spellcasting` L1–L3); flavor nodes (`warrior_oath` + 15 under `flavors/`)
+- **Spells**: cantrips — `arcane_bolt`, `arcane_touch`; true spells — `arcane_missile`, `arcane_mark`
 
 ### UI
 - **BattleScene** — `WorldLayer` (Node2D, combatant sprites/anchors) + `UILayer` (CanvasLayer, HUDs). `AnimatedSprite2D` stubs with ColorRect fallback.
@@ -50,8 +50,8 @@ Advantage/Disadvantage (`net_advantage` on `RollEngine`; net ≤ 0 → Desperati
 ### ✓ Group 4 — Magic system
 Fervor (d4→d6→d8→d10, cap = ingenuity_size, escalates on max-roll) + Burnout (blocks true spells). Cantrips (`SpellData.is_cantrip=true`, Minor Studies gated) + True spells (aspect dice + Fervor die, mixed pools, per-spell escalation).
 
-### ✓ Group 4.5 — Spell school system
-Core stat nodes with compound prereqs + `_stat_size()` helper. `SpellBonusEffect` resource; Fire Magic I–IV + Arcane I–III spell schools; tag-matched bonuses applied at spell resolution.
+### ✓ Group 4.5 — Spell school system (pipeline only; school nodes removed in B2)
+Core stat nodes with compound prereqs + `_stat_size()` helper. `SpellBonusEffect` resource (`pool`/`keep`/`flat` bonus types); tag- and spell_id-matched bonuses applied at spell resolution. Original Fire Magic I–IV + Arcane I–III school nodes removed in Phase B2; ideas archived in `docs/game-rules/appendices/legacy-archive.md`.
 
 ### ✓ Group 4.6 — Constellation Tier Gating
 `required_tier` on `NodeData`. Tier check in `can_upgrade()`. Dimmed locked-by-tier nodes in Constellation UI.
@@ -104,21 +104,31 @@ numerical upgrades. `CombatantState` gains `pending_guard_debuffs: Dictionary`
 (consumed on next guard roll). Round-scoped `_current_round_player_breaches`
 on `CombatManager` tracks which pools the player breached each round.
 Processing via `_apply_spell_outcome_effects()` called from both
-`_resolve_round_spell()` and `_resolve_round_cantrip()`. No outcome_effects
-authored yet — arrays empty on all existing nodes; Group B wires real effects.
+`_resolve_round_spell()` and `_resolve_round_cantrip()`. `SpellBonusEffect`
+also gains `bonus_type="flat"` (wired at B2). Spellcasting L2/L3 carry
+the first live `outcome_effects` entries (Arcane Mark breach debuffs).
 
 ---
 
 ### ⏳ Group B — Ingenuity Branch: Core and Spellcasting
 Prerequisites: Group A complete.
 
-Full rewrite of the Ingenuity branch. Minor Studies rewritten (Arcane Bolt
-is already renamed; aether_barrier and chrono_shift are design-blocked —
-see Future section).
-Spellcasting node L1-L3: caster engine, injects Arcane Missile and Arcane
-Mark, adds progressive Keep and SpellOutcomeEffects for spell upgrades.
-Mental Fortress migrated from Dominion to Ingenuity as a generalised
-InterruptHandler.
+**Phase B1 ✓ — cantrip_spark renamed to arcane_bolt** (refactor only)
+
+**Phase B2 ✓ — Spellcasting L1-L3 (Strada A — Arcane branch)**
+Legacy spell schools (Fire Magic I–IV, Arcane I–III) and their spells
+(sparks, fire_orb, fireball, wall_of_fire, meteor, mind_spike, void_bolt)
+removed. Design ideas preserved in
+`docs/game-rules/appendices/legacy-archive.md`.
+`SpellBonusEffect` gains `bonus_type="flat"` (third valid type).
+Spellcasting node expanded to L1-L3:
+- L1: grants Arcane Missile + Arcane Mark, unlocks Fervor
+- L2: arcane Keep 2, Arcane Missile +1 flat, Arcane Mark breach → Stance −2
+- L3: arcane Keep 3, Arcane Missile +2 flat, Arcane Mark breach + Stance −1
+  keep (Frattura Totale: both L2 and L3 debuffs accumulate and fire together)
+
+**Remaining B work:** Minor Studies cantrip expansion (aether_barrier,
+chrono_shift design-blocked — see Future), Mental Fortress migration to ING.
 
 **Note:** aether_barrier and chrono_shift require design decisions before
 any stub implementation. See Future section for the open design questions

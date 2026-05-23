@@ -241,8 +241,8 @@ Group 4 implements Fervor / Burnout / Cantrips / True Spells with per-spell `Spe
 - **Fervor** — player-only runtime state on `CombatantState`. Track: d4 → d6 → d8 → d10 (`FERVOR_TRACK` const). Cap = `data.ingenuity_size`. Persists across combats via `PlayerProgression.saved_fervor_size`; Long Rest resets to d4, Recovery Scene only clears Burnout.
 - **Escalation** — after a true spell resolves, `_escalate_fervor(_player, steps)` where `steps = primary_dice_maxed_count` (Ingenuity-tagged dice that rolled max, pre-Keep, including discarded) `+ (1 if fervor_maxed)`. Multiple steps possible in a single cast.
 - **Burnout** — blocks `player_chose_spell()`; cantrips remain available. Persists across combats; cleared by Long Rest or Recovery.
-- **Cantrip** — uses `SpellData` (is_cantrip=true). Ingenuity pool, no Fervor die, no escalation. Available during Burnout. Granted via `node.spells` (Minor Studies carries "Arcane Bolt" [`arcane_bolt.tres`] + "Arcane Touch" [`arcane_touch.tres`]; Fire Magic I carries "Sparks" [`sparks.tres`]).
-- **True spell** — uses `SpellData`. Ingenuity pool + optional aspect dice + real Fervor die. Granted by spell school nodes (Fire Magic II–IV, Arcane I–III).
+- **Cantrip** — uses `SpellData` (is_cantrip=true). Ingenuity pool, no Fervor die, no escalation. Available during Burnout. Granted via `node.spells` (Minor Studies carries "Arcane Bolt" [`arcane_bolt.tres`] + "Arcane Touch" [`arcane_touch.tres`]).
+- **True spell** — uses `SpellData`. Ingenuity pool + optional aspect dice + real Fervor die. Granted by Spellcasting L1+ (Arcane Missile + Arcane Mark at L1).
 
 ### SpellData (implemented)
 
@@ -261,10 +261,10 @@ Group 4 implements Fervor / Burnout / Cantrips / True Spells with per-spell `Spe
 - Core nodes (`dom_core` L1–L3, `neg_core` L1–L3, `ing_core` L1–L3) grant stat size upgrades via `effect_type="stat_size_<stat>"` and `effect_value`.
 - `CombatManager._stat_size(state, stat)` — reads base from `CombatantData`, returns highest `effect_value` across all purchased `NodeLevelData` entries for `"stat_size_<stat>"`.
 
-**Phase B — Spell schools (implemented):**
-- `SpellBonusEffect` resource (`resources/SpellBonusEffect.gd`): `tag: String`, `bonus_type: "pool"|"keep"`, `value: int`, `stat: String`, `spell_id: String` (optional per-spell filter; empty = tag matching, non-empty = name match, overrides tag check).
-- School nodes Fire Magic I–IV and Arcane I–III grant spells via `levels_data[0].spells`. Fire Magic II adds fire pool +1, Fire Magic IV adds fire keep +1 via `bonus_effects` on the `NodeLevelData`.
-- `CombatManager._resolve_round_spell()` sums matching `bonus_effects`: a bonus applies if `spell_id` matches the spell's name (non-empty), or `tag` matches one of the spell's tags (empty `spell_id`).
+**Phase B — SpellBonusEffect pipeline (implemented):**
+- `SpellBonusEffect` resource (`resources/SpellBonusEffect.gd`): `tag: String`, `bonus_type: "pool"|"keep"|"flat"`, `value: int`, `stat: String`, `spell_id: String` (optional per-spell filter; empty = tag matching, non-empty = name match, overrides tag check).
+- `Spellcasting` L2/L3 inject bonus_effects: L2 adds `tag="arcane", keep+1` + `spell_id="Arcane Missile", flat+1`; L3 stacks another `keep+1` and `flat+1`. Keep bonuses are additive with L3 reaching grade 2 (keep 3 dice).
+- `CombatManager._resolve_round_spell()` sums matching `bonus_effects`: a bonus applies if `spell_id` matches the spell's name (non-empty), or `tag` matches one of the spell's tags (empty `spell_id`). Three summed locals: `spell_pool_bonus`, `spell_keep_bonus`, `spell_flat_bonus`.
 
 **Multi-level Node Schema (implemented — Group 4.8 Phase A):**
 - `NodeData` fields: `node_id: String`, `display_name: String`, `category: String`, `base_description: String`, `icon: Texture2D`, `max_levels: int`, `levels_data: Array[NodeLevelData]`.
@@ -365,12 +365,12 @@ The rules live in `docs/game-rules/`. The implementation must match them exactly
 | Breach | `attack_total >= guard` (reaching exactly 0 is a breach) |
 | Wounds | 1 on breach; 2 if Massive: `(attack - guard) > defensive_size` |
 | Defeat | `wounds >= max_wounds` |
-| Cantrip | Ingenuity die, Tier pool, no Fervor die, no escalation, available during Burnout; spell granted by Minor Studies or school nodes (`SpellData.is_cantrip=true`) |
-| True spell | Ingenuity + optional aspect dice + real Fervor die; spell granted by school node; escalation = `primary_dice_maxed_count` (Ingenuity-tagged dice maxed pre-Keep, including discarded) `+ (1 if fervor_maxed)` |
+| Cantrip | Ingenuity die, Tier pool, no Fervor die, no escalation, available during Burnout; granted via `node.spells` (Minor Studies: Arcane Bolt, Arcane Touch) (`SpellData.is_cantrip=true`) |
+| True spell | Ingenuity + optional aspect dice + real Fervor die; granted by Spellcasting L1+ (Arcane Missile vs Stance, Arcane Mark vs Resolve); escalation = `primary_dice_maxed_count` (Ingenuity-tagged dice maxed pre-Keep, including discarded) `+ (1 if fervor_maxed)` |
 | Fervor cap | = `ingenuity_size` die face; caster may act at cap; escalating **beyond** cap triggers Burnout |
 | Burnout | Blocks true spells; cantrips unaffected; persists across combats. Cleared by Long Rest (also resets Fervor) or Recovery Scene (Burnout only). |
 | Stat sizes | Base from `CombatantData`; upgraded by Core nodes (mechanic wired in Phase A of spell school feature) |
-| Spell schools | Fire Magic I–IV + Arcane I–III; `SpellBonusEffect` pool/keep bonuses applied at spell resolution (implemented) |
+| Spellcasting L1-L3 | L1: grants Arcane Missile + Arcane Mark, unlocks Fervor. L2: all arcane Keep 2, Arcane Missile +1 flat, Arcane Mark breach → enemy Stance flat −2. L3: all arcane Keep 3, Arcane Missile +2 flat total, Arcane Mark breach also → enemy Stance keep −1 (Frattura Totale). |
 | Tier advancement | Slot-budget model: **5 combat slots + 2 Flavor slots** per tier; spending both advances the tier and resets counters. **Core nodes cost 2 combat slots** (Training / Ability cost 1; Flavor costs 1 from the Flavor budget). `PlayerProgression.tier_combat_spent` / `tier_flavor_spent` are public vars. |
 | Passive wounds | +1 Max Wounds at Tier 2, +1 at Tier 4 (cumulative +2). Applied at `start_combat()` via `_tier_wound_bonus(tier)`; base `.tres` files never mutated. |
 | Player base Dominion | d4 (base in `player_default.tres`). `dom_core` L1→d6, L2→d8, L3→d10 via `_stat_size()`. |

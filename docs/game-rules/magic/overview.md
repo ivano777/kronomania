@@ -17,17 +17,9 @@ Additional cantrips may be granted by spell school nodes.
 Cantrips do not require the Spellcasting node.
 
 ### True Spellcasting Access
-The **Spellcasting** node (prerequisite: Minor Studies) unlocks the real Fervor die and the ability to cast true spells.
-True spells are not granted by the Spellcasting node itself — they are granted by **spell school nodes**.
+The **Spellcasting** node (L1-L3, prerequisite: Minor Studies) unlocks the real Fervor die and directly grants true spells:
+- **L1**: grants Arcane Missile (vs Stance) and Arcane Mark (vs Resolve)
+- **L2**: all arcane spells gain Keep 2; Arcane Missile +1 flat; Arcane Mark breach → enemy Stance flat −2
+- **L3**: all arcane spells gain Keep 3; Arcane Missile +2 flat total; Arcane Mark breach also → enemy Stance keep −1 (Frattura Totale)
 
-### Spell Schools
-Spell schools are tiered node chains (e.g. Fire Magic I → II → III → IV).
-Each tier grants:
-- one or more **SpellData** entries (spells unlocked on purchase)
-- optional **bonus effects** applying to spells with matching tags (e.g. "+1 pool to fire-tagged spells")
-
-Prerequisites for school tiers combine:
-- the previous tier of the same school
-- specific **Core stat nodes** (e.g. Dominion d8 required for Fire Magic III)
-
-A character without the Spellcasting node cannot cast true spells from school nodes, even if a school node is unlocked.
+Progressive keep bonuses are applied via `SpellBonusEffect` entries on each node level and stack additively.

@@ -6,8 +6,8 @@ extends Resource
 ## School tag that must appear in SpellData.tags for this bonus to apply.
 @export var tag: String = ""
 
-## "pool" adds dice to the roll pool; "keep" adds to the keep count.
-@export_enum("pool", "keep") var bonus_type: String = "pool"
+## "pool" adds dice to the roll pool; "keep" adds to the keep count; "flat" adds post-keep flat bonus.
+@export_enum("pool", "keep", "flat") var bonus_type: String = "pool"
 
 ## Amount to add.
 @export_range(1, 4) var value: int = 1

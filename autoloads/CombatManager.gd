@@ -625,6 +625,7 @@ func _resolve_round_spell(spell: SpellData, target_index: int = 0) -> void:
 	# Collect school bonus effects for spells matching any of this spell's tags.
 	var spell_pool_bonus := 0
 	var spell_keep_bonus := 0
+	var spell_flat_bonus := 0
 	for node in _player.node_levels.keys():
 		var nd: NodeData = node as NodeData
 		if nd == null:
@@ -642,19 +643,23 @@ func _resolve_round_spell(spell: SpellData, target_index: int = 0) -> void:
 						spell_pool_bonus += be.value
 					elif be.bonus_type == "keep":
 						spell_keep_bonus += be.value
-	if spell_pool_bonus > 0 or spell_keep_bonus > 0:
+					elif be.bonus_type == "flat":
+						spell_flat_bonus += be.value
+	if spell_pool_bonus > 0 or spell_keep_bonus > 0 or spell_flat_bonus > 0:
 		var parts: Array = []
 		if spell_pool_bonus > 0:
 			parts.append("+%d pool" % spell_pool_bonus)
 		if spell_keep_bonus > 0:
 			parts.append("+%d keep" % spell_keep_bonus)
+		if spell_flat_bonus > 0:
+			parts.append("+%d flat" % spell_flat_bonus)
 		log_message.emit("  [color=yellow]School bonus: %s[/color]" % ", ".join(parts))
 
 	var p_atk := RollEngine.resolve(
 		_effective_tier(_player, _get_action_modifier(_player, "strike")) + spell_pool_bonus,
 		_stat_size(_player, "ingenuity"),
 		_training_keep_grade(_player) + spell_keep_bonus,
-		spell.flat_bonus, _pool_bonus(_player), _player.fervor_size,
+		spell.flat_bonus + spell_flat_bonus, _pool_bonus(_player), _player.fervor_size,
 		aspect_stat_size, spell.aspect_dice
 	)
 	log_message.emit(_fmt_spell_attack(_player.data.combatant_name, p_atk))

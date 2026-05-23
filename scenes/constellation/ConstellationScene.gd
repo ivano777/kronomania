@@ -43,10 +43,7 @@ const _DOMINION_SUBTREE: Dictionary = {
 	"dom_earthshatter": true, "dom_stamina": true
 }
 const _INGENUITY_SUBTREE: Dictionary = {
-	"minor_studies": true, "spellcasting": true,
-	"fire_magic_1": true, "fire_magic_2": true,
-	"fire_magic_3": true, "fire_magic_4": true,
-	"arcane_1": true, "arcane_2": true, "arcane_3": true
+	"minor_studies": true, "spellcasting": true
 }
 const _NODE_POSITIONS: Dictionary = {
 	# Always-visible triangle vertices + centre
@@ -68,16 +65,9 @@ const _NODE_POSITIONS: Dictionary = {
 	"dom_titans_grip":  Vector2(610, -300),
 	"dom_brutal":       Vector2(610, -430),
 	"dom_earthshatter": Vector2(610, -560),
-	# ING subtree — expands LEFTWARD (negative X) from ing_core, two-row grid
+	# ING subtree — expands LEFTWARD (negative X) from ing_core
 	"minor_studies":    Vector2(-110, 620),
-	"fire_magic_1":     Vector2(-260, 590),
-	"spellcasting":     Vector2(-260, 670),
-	"fire_magic_2":     Vector2(-420, 590),
-	"arcane_1":         Vector2(-420, 670),
-	"fire_magic_3":     Vector2(-580, 590),
-	"arcane_2":         Vector2(-580, 670),
-	"fire_magic_4":     Vector2(-740, 590),
-	"arcane_3":         Vector2(-740, 670),
+	"spellcasting":     Vector2(-260, 620),
 }
 
 const _VERTEX_NAMES: Dictionary = {

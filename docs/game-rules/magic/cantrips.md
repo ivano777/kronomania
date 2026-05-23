@@ -9,8 +9,7 @@ A character needs **Minor Studies** (or the **Spellcasting** node) to access the
 
 ## Known Cantrips
 Cantrips are granted by nodes, not by a formula:
-- **Minor Studies** directly grants a set of generic cantrips on unlock.
-- **Spell school nodes** may grant school-specific cantrips (tagged accordingly).
+- **Minor Studies** directly grants the generic cantrips on unlock: Arcane Bolt (vs Stance) and Arcane Touch (vs Resolve).
 
 A character knows all cantrips granted by their unlocked nodes. There is no slot limit in the current prototype.
 

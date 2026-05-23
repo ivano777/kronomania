@@ -1,11 +1,11 @@
-[gd_resource type="Resource" script_class="SpellData" format=3 uid="uid://mindspike001"]
+[gd_resource type="Resource" script_class="SpellData" format=3 uid="uid://arcane_mark01"]
 
 [ext_resource type="Script" path="res://resources/SpellData.gd" id="1_spscr"]
 
 [resource]
 script = ExtResource("1_spscr")
-spell_name = "Mind Spike"
-description = "A sharp psychic needle that bypasses physical defence and strikes at Resolve."
+spell_name = "Arcane Mark"
+description = "A psychic brand. Pressures the mind; when the mind breaks, the body's defenses falter."
 aspect_stat = ""
 aspect_dice = 0
 target_pool = "resolve"
