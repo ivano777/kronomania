@@ -91,6 +91,7 @@ func _ready() -> void:
 	_round_hud.cantrip_selected.connect(_on_cantrip_selected)
 	_round_hud.spell_selected.connect(_on_spell_selected)
 	_round_hud.wound_degrade_chosen.connect(_on_wound_degrade_chosen)
+	_round_hud.burnout_prevent_chosen.connect(_on_burnout_prevent_chosen)
 	_round_hud.auto_attack_requested.connect(_on_auto_attack_requested)
 
 	# Connect CombatManager signals.
@@ -104,6 +105,7 @@ func _ready() -> void:
 	CombatManager.player_magic_available.connect(_on_player_magic_available)
 	CombatManager.fervor_changed.connect(_on_fervor_changed)
 	CombatManager.player_massive_incoming.connect(_on_player_massive_incoming)
+	CombatManager.player_burnout_imminent.connect(_on_player_burnout_imminent)
 	CombatManager.player_defense_incoming.connect(_on_defense_incoming)
 	CombatManager.player_defense_item_choice.connect(_on_defense_item_choice)
 
@@ -222,6 +224,10 @@ func _on_player_massive_incoming(charges_left: int) -> void:
 	_round_hud.show_massive_prompt(charges_left)
 
 
+func _on_player_burnout_imminent(charges_left: int) -> void:
+	_round_hud.show_burnout_prompt(charges_left)
+
+
 func _on_defense_incoming(attacker_name: String, attack_total: int, target_pool: String) -> void:
 	_round_hud.show_defense_overlay(attacker_name, attack_total, target_pool)
 
@@ -232,6 +238,10 @@ func _on_defense_item_choice(options: Array) -> void:
 
 func _on_wound_degrade_chosen(use_charge: bool) -> void:
 	CombatManager.player_chose_degrade_wound(use_charge)
+
+
+func _on_burnout_prevent_chosen(use_charge: bool) -> void:
+	CombatManager.player_chose_prevent_burnout(use_charge)
 
 
 func _on_auto_attack_requested() -> void:
@@ -275,6 +285,7 @@ func _teardown_signals() -> void:
 	CombatManager.player_magic_available.disconnect(_on_player_magic_available)
 	CombatManager.fervor_changed.disconnect(_on_fervor_changed)
 	CombatManager.player_massive_incoming.disconnect(_on_player_massive_incoming)
+	CombatManager.player_burnout_imminent.disconnect(_on_player_burnout_imminent)
 	CombatManager.player_defense_incoming.disconnect(_on_defense_incoming)
 	CombatManager.player_defense_item_choice.disconnect(_on_defense_item_choice)
 	if _dbg_fervor_disp:

@@ -7,6 +7,7 @@ signal strike_confirmed(pool: String, brutal_trade: bool, source_weapon: Equipme
 signal cantrip_selected(spell: SpellData)
 signal spell_selected(spell: SpellData)
 signal wound_degrade_chosen(use_charge: bool)
+signal burnout_prevent_chosen(use_charge: bool)
 signal auto_attack_requested()
 
 @onready var _round_label:  Label         = $RoundLabel
@@ -37,6 +38,10 @@ var _def_mode_btn: Button = null
 var _massive_overlay: PanelContainer
 var _massive_spend_btn: Button
 
+# Lucidity L2 Burnout prompt overlay (appended to this VBox, below the log).
+var _burnout_overlay: PanelContainer
+var _burnout_spend_btn: Button
+
 
 func _ready() -> void:
 	_massive_overlay = PanelContainer.new()
@@ -54,6 +59,27 @@ func _ready() -> void:
 	overlay_vbox.add_child(accept_btn)
 	_massive_overlay.add_child(overlay_vbox)
 	add_child(_massive_overlay)
+	# Lucidity L2 Burnout prompt overlay — mirrors massive overlay pattern.
+	_burnout_overlay = PanelContainer.new()
+	_burnout_overlay.visible = false
+	var burnout_vbox := VBoxContainer.new()
+	var burnout_label := Label.new()
+	burnout_label.text = "BURNOUT IMMINENT!"
+	burnout_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	burnout_vbox.add_child(burnout_label)
+	var burnout_desc := Label.new()
+	burnout_desc.text = "Spend Lucidity charge to avert it?\n(Fervor stays at the edge.)"
+	burnout_desc.autowrap_mode = TextServer.AUTOWRAP_WORD
+	burnout_vbox.add_child(burnout_desc)
+	_burnout_spend_btn = Button.new()
+	_burnout_spend_btn.pressed.connect(func() -> void: _on_burnout_choice(true))
+	burnout_vbox.add_child(_burnout_spend_btn)
+	var burnout_accept_btn := Button.new()
+	burnout_accept_btn.text = "Let it burn"
+	burnout_accept_btn.pressed.connect(func() -> void: _on_burnout_choice(false))
+	burnout_vbox.add_child(burnout_accept_btn)
+	_burnout_overlay.add_child(burnout_vbox)
+	add_child(_burnout_overlay)
 	# Mode strip — insert before ActionPanel so it renders between PhaseLabel and the action area.
 	var mode_strip := HBoxContainer.new()
 	_atk_mode_btn = Button.new()
@@ -185,6 +211,16 @@ func show_massive_prompt(charges_left: int) -> void:
 	_clear_action_panel()
 	_massive_spend_btn.text = "Meat for the Grinder — spend charge (%d left)" % charges_left
 	_massive_overlay.visible = true
+
+
+## Show the Lucidity L2 Burnout-aversion prompt; clears the action panel first.
+## Fires mid-resolution (inside _escalate_fervor, during _resolve_round_spell),
+## matching the same UI state as the massive prompt during _resolve_attack.
+func show_burnout_prompt(charges_left: int) -> void:
+	_brutal_toggle = null
+	_clear_action_panel()
+	_burnout_spend_btn.text = "Avert Burnout — spend Lucidity charge (%d left)" % charges_left
+	_burnout_overlay.visible = true
 
 
 func add_log(text: String) -> void:
@@ -443,6 +479,11 @@ func _confirm_strike(pool: String) -> void:
 func _on_massive_choice(use_charge: bool) -> void:
 	_massive_overlay.visible = false
 	wound_degrade_chosen.emit(use_charge)
+
+
+func _on_burnout_choice(use_charge: bool) -> void:
+	_burnout_overlay.visible = false
+	burnout_prevent_chosen.emit(use_charge)
 
 
 func _toggle_atk_mode() -> void:

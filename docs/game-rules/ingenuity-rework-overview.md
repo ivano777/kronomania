@@ -39,10 +39,12 @@ _Changelog: Mental Fortress node removed; anti-Burnout intent absorbed into Luci
   L1 ✓ (Tier 1): proactive action — lower Fervor by 1 step, costs the
   turn, unlimited. Implemented: `ability_lucidity.tres` L1, "lucidity"
   intent in CombatManager/RoundHUD, `player_chose_lucidity()` public method.
-  L2 ⏳ (Tier 3): reactive — when escalation would cause Burnout, spend a
+  L2 ✓ (Tier 3): reactive — when escalation would cause Burnout, spend a
   charge to cancel it. One identity (control your own magic), two depths
-  (manage early, resist collapse late). L2 uses an InterruptHandler in
-  _escalate_fervor (B3b).
+  (manage early, resist collapse late). L2 uses an InterruptHandler registered
+  in start_combat; _escalate_fervor is now a coroutine; _try_prevent_burnout
+  is the dedicated bool-returning path (separate from the wounds-shaped
+  _resolve_interrupt dispatcher). Fully implemented: B3b.
 
 ### Tier 3-4 — Apex and Hybrids
 - `purple_hollow` (L1): suicide trance with temporary d12

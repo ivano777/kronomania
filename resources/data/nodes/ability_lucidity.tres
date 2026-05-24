@@ -18,7 +18,8 @@ level_index = 2
 cost = 1
 required_tier = 3
 prerequisites = [{"node_id": "lucidity", "required_level": 1}]
-level_effect_description = "(Reactive Burnout resistance — coming in a later update.)"
+level_effect_description = "Reactive: once per combat, when Fervor would cause Burnout, you may spend a charge to avert it. Fervor stays at the edge — this buys a reprieve, not relief."
+effect_type = "lucidity_prevent_burnout"
 
 [resource]
 script = ExtResource("1_ndscr")

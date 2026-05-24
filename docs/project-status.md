@@ -110,7 +110,7 @@ the first live `outcome_effects` entries (Arcane Mark breach debuffs).
 
 ---
 
-### ⏳ Group B — Ingenuity Branch: Core and Spellcasting
+### ✓ Group B — Ingenuity Branch: Core and Spellcasting
 Prerequisites: Group A complete.
 
 **Phase B1 ✓ — cantrip_spark renamed to arcane_bolt** (refactor only)
@@ -130,14 +130,18 @@ Spellcasting node expanded to L1-L3:
 **Phase B3a ✓ — Lucidity L1 (proactive Fervor cooling)**
 Node `ability_lucidity.tres` (max_levels=2, L2 placeholder non-functional).
 L1: new "lucidity" intent, available when Lucidity L1 purchased and Fervor > d4.
-`player_chose_lucidity()` calls `_escalate_fervor(_player, -1)`, ends the round.
+`player_chose_lucidity()` calls `await _escalate_fervor(_player, -1)`, ends the round.
 `_escalate_fervor` extended to support negative steps: Burnout check and cap clamp
 gated to `steps > 0`; negative steps use `clampi` floor and raw track position.
 
-**Phase B3b ⏳ — Lucidity L2 (reactive anti-Burnout interrupt)**
-L2 (required_tier 3): reactive InterruptHandler inside _escalate_fervor;
-spend a charge to cancel an imminent Burnout. Extends the A3 interrupt system to a
-new fire point (_escalate_fervor, which becomes a coroutine). This is the NEXT phase.
+**Phase B3b ✓ — Lucidity L2 (reactive anti-Burnout interrupt)**
+L2 (required_tier 3): InterruptHandler ("lucidity_prevent_burnout", trigger="on_burnout",
+priority=10, 1 charge/combat) registered in `start_combat`. `_escalate_fervor` is now a
+coroutine; when a positive step would cause Burnout, `_try_prevent_burnout` is awaited —
+a dedicated bool-returning path separate from the wounds-shaped `_resolve_interrupt`
+dispatcher. Player prompted via `player_burnout_imminent` / `_burnout_decision_gate`
+signals. Precarious-truce design: Burnout averted but Fervor stays at cap. Lucidity is
+now fully implemented (L1 + L2).
 
 **Remaining B work:** Minor Studies cantrip expansion (aether_barrier,
 chrono_shift design-blocked — see Future).

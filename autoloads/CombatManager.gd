@@ -74,6 +74,11 @@ signal player_defense_item_choice(options: Array)
 ## Internal coroutine gate: resolved when the player selects a defense item.
 signal _defense_item_chosen(mod: ActionModifier)
 
+## Emitted when an imminent Burnout can be cancelled by a Lucidity L2 charge.
+signal player_burnout_imminent(charges_left: int)
+## Internal gate awaited by _try_prevent_burnout; resolved when player decides.
+signal _burnout_decision_gate(use_charge: bool)
+
 
 # ── Runtime state ─────────────────────────────────────────────────────────────
 
@@ -202,6 +207,16 @@ func start_combat(player_data: CombatantData, enemies_data: Array) -> void:
 		mftg_handler.priority = 20
 		mftg_handler.source_node_id = "dom_meat_grinder"
 		_register_interrupt(_player, mftg_handler)
+	# Lucidity L2: reactive anti-Burnout interrupt (1 charge per combat).
+	if PlayerProgression.get_node_level_by_id("lucidity") >= 2:
+		var lucidity_handler := InterruptHandler.new()
+		lucidity_handler.handler_id = "lucidity_prevent_burnout"
+		lucidity_handler.trigger = "on_burnout"
+		lucidity_handler.target = "self"
+		lucidity_handler.charges = 1
+		lucidity_handler.priority = 10
+		lucidity_handler.source_node_id = "lucidity"
+		_register_interrupt(_player, lucidity_handler)
 	_player.space_domination_active = _has_effect_type(_player, "space_domination")
 	_player.current_wounds = mini(PlayerProgression.saved_wounds, _player.max_wounds)
 	wounds_changed.emit(true, -1, _player.current_wounds, _player.max_wounds)
@@ -293,6 +308,11 @@ func player_chose_degrade_wound(use_charge: bool) -> void:
 	_massive_decision_gate.emit(use_charge)
 
 
+## Called by RoundHUD (via BattleScene) when the player responds to the Lucidity L2 Burnout prompt.
+func player_chose_prevent_burnout(use_charge: bool) -> void:
+	_burnout_decision_gate.emit(use_charge)
+
+
 ## Called by RoundHUD when the player clicks OK on the DEF Observe overlay.
 func player_acknowledged_defense() -> void:
 	_defense_acknowledged.emit()
@@ -312,7 +332,7 @@ func player_chose_lucidity() -> void:
 		return
 	_waiting_for_player = false
 	log_message.emit("[color=cyan]Lucidity: you steady your mind and cool the Fervor.[/color]")
-	_escalate_fervor(_player, -1)
+	await _escalate_fervor(_player, -1)
 	await _end_of_round()
 	_begin_round()
 
@@ -752,7 +772,7 @@ func _resolve_round_spell(spell: SpellData, target_index: int = 0) -> void:
 	var fervor_maxed: bool = p_atk.fervor_maxed as bool
 	var escalation_steps: int = (p_atk.primary_dice_maxed_count as int) + (1 if fervor_maxed else 0)
 	if escalation_steps > 0:
-		_escalate_fervor(_player, escalation_steps)
+		await _escalate_fervor(_player, escalation_steps)
 
 	await _end_of_round()
 	_begin_round()
@@ -1025,6 +1045,26 @@ func _resolve_meat_for_the_grinder(
 		log_message.emit("  [color=lime]Meat for the Grinder! Massive Wound degraded to 1 Wound.[/color]")
 		return { "wounds_modified": 1, "resolved": true }
 	return { "wounds_modified": 2, "resolved": true }
+
+
+## Lucidity L2 anti-Burnout interrupt. Returns true if Burnout was prevented.
+## Separate from _resolve_interrupt (which is wounds-shaped, for _resolve_attack);
+## this fires inside _escalate_fervor and concerns a bool, not wound counts.
+## Only the player can have Lucidity; enemies never trigger this path.
+func _try_prevent_burnout(state: CombatantState) -> bool:
+	if state != _player:
+		return false
+	var handlers := _find_interrupts(state, "on_burnout")
+	if handlers.is_empty():
+		return false
+	var handler := handlers[0]  # priority-sorted; only one anti-Burnout handler exists
+	player_burnout_imminent.emit(handler.charges)
+	var use_charge: bool = await _burnout_decision_gate
+	if use_charge:
+		_consume_interrupt_charge(handler)
+		log_message.emit("  [color=cyan]Lucidity holds! You wrench your mind back from the brink — Burnout averted (Fervor stays at the edge).[/color]")
+		return true
+	return false
 
 # --- End interrupt system helpers ---
 
@@ -1434,9 +1474,12 @@ func _escalate_fervor(state: CombatantState, steps: int) -> void:
 	else:
 		log_message.emit("  [color=magenta]Fervor at maximum track position (d%d).[/color]" % new_size)
 	# Burnout only on escalation: cooling never triggers it regardless of the current position.
+	# Lucidity L2: offer the player a chance to cancel the imminent Burnout.
 	if steps > 0 and raw_new_idx > cap_idx and not state.is_burned_out:
-		state.is_burned_out = true
-		log_message.emit("[color=orange][b]BURNOUT![/b] Fervor surged beyond control. True spells blocked until next combat.[/color]")
+		var prevented := await _try_prevent_burnout(state)
+		if not prevented:
+			state.is_burned_out = true
+			log_message.emit("[color=orange][b]BURNOUT![/b] Fervor surged beyond control. True spells blocked until next combat.[/color]")
 	# Escalation caps Fervor at the ingenuity die; cooling uses the raw track position.
 	state.fervor_size = mini(new_size, cap) if steps > 0 else new_size
 	fervor_changed.emit(state == _player, state.fervor_size, cap, state.is_burned_out)

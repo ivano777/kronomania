@@ -137,7 +137,7 @@ docs/               # project-status.md (roadmap), project-index.md (generated c
 
 Signatures and signals are in `docs/project-index.md`. Architectural gotchas:
 - **`RollEngine`** — stateless. Returns `Dictionary`; always cast values with `as int` / `as Array` — the type inferencer cannot infer through `Dictionary`. `resolve()` accepts optional `fervor_size` (additive post-Keep Fervor die), `aspect_stat_size` and `aspect_count` (for mixed-pool spells), `post_keep_bonus_size` (additive post-Keep bonus die, e.g. Earthshatter). Returns `primary_dice_maxed_count` (Fervor escalation) and `post_keep_bonus_roll` (Earthshatter die result).
-- **`CombatManager`** — all output via signals; nothing returned. Disconnect all signals before `reload_current_scene()`. Signals: `player_intents_available(intents: Array[String])`, `fervor_changed(is_player, fervor_size, fervor_cap, is_burned_out)`, `player_magic_available(can_cantrip, can_cast_spell)`, `player_massive_incoming(charges_left)`, `player_defense_incoming(attacker_name, attack_total, target_pool)`, `player_defense_item_choice(options: Array)`. Public methods: `start_combat(player_data: CombatantData, enemies_data: Array)`, `player_chose_strike(net_advantage, target_pool, brutal_trade, target_index: int = 0, source_weapon: EquipmentData = null)`, `player_chose_cantrip(spell: SpellData, target_index: int = 0)`, `player_chose_spell(spell: SpellData, target_index: int = 0)`, `player_chose_degrade_wound(use_charge: bool)`, `player_acknowledged_defense()`, `player_chose_defense_item(mod: ActionModifier)`, `player_chose_lucidity()` (Lucidity L1: lower Fervor by 1 step, ends the round; no-op if `_can_use_lucidity()` returns false), `player_auto_execute_attack(target_index: int = 0, net_advantage: int = 0)`, `reset_item_charges(rest_type: String)` (called by DungeonManager on rest), `debug_set_fervor(size, burned_out)`, `debug_refill_hp()`, `debug_set_immortal(enabled: bool)`, `debug_set_lethal(enabled: bool)`, `debug_set_player_off_hand(weapon: EquipmentData)`, `get_player_bare_hands_modifier(action_key: String) → ActionModifier`, `get_player_attack_preview() → int`. Key helpers: `_get_action_modifier(state, action_key) → ActionModifier` (weapon → bare_hands → zero stub), `_effective_tier(state, mod: ActionModifier = null)` (mod.tier_cap=0 = uncapped), `_attack_flat(state)` / `_guard_flat(state)` / `_pool_bonus(state, action_key="strike")` all delegate to `_get_action_modifier`.
+- **`CombatManager`** — all output via signals; nothing returned. Disconnect all signals before `reload_current_scene()`. Signals: `player_intents_available(intents: Array[String])`, `fervor_changed(is_player, fervor_size, fervor_cap, is_burned_out)`, `player_magic_available(can_cantrip, can_cast_spell)`, `player_massive_incoming(charges_left)`, `player_burnout_imminent(charges_left)` (Lucidity L2: emitted when Burnout is about to be set, before `_burnout_decision_gate` is awaited), `player_defense_incoming(attacker_name, attack_total, target_pool)`, `player_defense_item_choice(options: Array)`. Internal gates (coroutine sync): `_massive_decision_gate(use_charge: bool)`, `_burnout_decision_gate(use_charge: bool)`. Public methods: `start_combat(player_data: CombatantData, enemies_data: Array)`, `player_chose_strike(net_advantage, target_pool, brutal_trade, target_index: int = 0, source_weapon: EquipmentData = null)`, `player_chose_cantrip(spell: SpellData, target_index: int = 0)`, `player_chose_spell(spell: SpellData, target_index: int = 0)`, `player_chose_degrade_wound(use_charge: bool)`, `player_chose_prevent_burnout(use_charge: bool)` (Lucidity L2: resolves the `_burnout_decision_gate`; emit true to avert Burnout, false to let it proceed), `player_acknowledged_defense()`, `player_chose_defense_item(mod: ActionModifier)`, `player_chose_lucidity()` (Lucidity L1: lower Fervor by 1 step, ends the round; no-op if `_can_use_lucidity()` returns false), `player_auto_execute_attack(target_index: int = 0, net_advantage: int = 0)`, `reset_item_charges(rest_type: String)` (called by DungeonManager on rest), `debug_set_fervor(size, burned_out)`, `debug_refill_hp()`, `debug_set_immortal(enabled: bool)`, `debug_set_lethal(enabled: bool)`, `debug_set_player_off_hand(weapon: EquipmentData)`, `get_player_bare_hands_modifier(action_key: String) → ActionModifier`, `get_player_attack_preview() → int`. Key helpers: `_get_action_modifier(state, action_key) → ActionModifier` (weapon → bare_hands → zero stub), `_effective_tier(state, mod: ActionModifier = null)` (mod.tier_cap=0 = uncapped), `_attack_flat(state)` / `_guard_flat(state)` / `_pool_bonus(state, action_key="strike")` all delegate to `_get_action_modifier`.
 - **`PlayerProgression`** — constellation state; read by `CombatManager` at `start_combat()`. `ALL_NODES` catalog (now includes 11 Dominion nodes; old core_dominion_1/2 replaced by dom_core). `get_known_spells()` and `get_known_cantrips()` iterate all purchased `node_levels`, collect from `levels_data[0..level-1].spells`. `get_node_level_by_id(id)` looks up a node by string ID and returns its current level (0 if absent). **Fervor persistence** (Group 5): `saved_fervor_size` / `saved_is_burned_out` / `saved_wounds` fields written by `CombatManager._end_combat()`, read by `start_combat()` (`saved_wounds` carries wounds between chained encounters). `combat_prefs: CombatPreferences` — persisted action defaults and mode flags; instantiated fresh in `reset()`, serialized/deserialized with save data. Methods: `reset()`, `apply_long_rest()` (reset fervor + clear burnout), `apply_short_rest()` (−1 wound, −1 fervor step, clear burnout), `apply_recovery()` (clear burnout only), `grant_points(n)`, `equip_main_hand(w)`, `equip_off_hand(w)`, `debug_set_points(n)`, `debug_set_tier(t)`.
 - **`DungeonManager`** — run state: `start_run()`, `current_enemies() → Array`, `on_victory()` (grants 1 point + advances index), `on_defeat()`, `has_next_enemy()`, `is_run_complete()`, `was_last_fight_chained()`, `enemies_cleared()`, `enemies_total()`. Hard-coded 8-encounter sequence: [1] Grunt, [2] Grunt→Grunt, [3] Grunt+Grunt, [4] Soldier, [5] Grunt→Grunt+Soldier, [6] Grunt+Grunt+Grunt, [7] Grunt+Soldier→Soldier+Soldier, [8] Knight (solo).
 
@@ -186,27 +186,32 @@ Stat overrides: `_stat_size(state, stat)` reads `status.stat_overrides[stat]` be
 
 ### Interrupt system
 
-`InterruptHandler` is a reactive hook fired inside `_resolve_attack()` before final outcome
-application. Handlers are registered per `CombatantState` at `start_combat()` based on
-purchased nodes. Each handler has a trigger (currently only `"on_massive_wound"`), charges,
-and priority.
+`InterruptHandler` is a reactive hook fired at specific points in the round loop. Handlers are
+registered per `CombatantState` at `start_combat()` based on purchased nodes. Each handler has
+a trigger, charges, and priority.
 
-Flow:
-1. `_resolve_attack()` detects a triggerable event (e.g. wound is Massive and defender is player)
-2. `_find_interrupts(state, trigger)` returns matching handlers sorted by priority ascending
-3. For each handler in order, `_resolve_interrupt()` dispatches to the handler-specific method
-4. The handler may emit signals, await player input, modify the outcome, and consume a charge
-5. The next handler (if any) sees the outcome already modified by the previous
+**Two fire points — two separate dispatch paths:**
+
+1. **`_resolve_attack()` path** (trigger `"on_massive_wound"`) — wounds-shaped dispatcher.
+   - Detects the triggerable event, calls `_find_interrupts(state, trigger)`, then for each
+     handler calls `await _resolve_interrupt(handler, state, context)`.
+   - `_resolve_interrupt` returns `{ "wounds_modified": int, "resolved": bool }`.
+   - `Meat for the Grinder` is the active handler on this path.
+   - Adding new attack-path handlers: add a case in `_resolve_interrupt()`, implement
+     `_resolve_<handler_name>()`, register in `start_combat()`, update priority table.
+
+2. **`_escalate_fervor()` path** (trigger `"on_burnout"`) — bool-shaped dedicated resolver.
+   - When Burnout would be set, calls `await _try_prevent_burnout(state)` directly.
+   - `_try_prevent_burnout` emits `player_burnout_imminent`, awaits `_burnout_decision_gate`,
+     consumes the charge, and returns `true` if Burnout is prevented, `false` otherwise.
+   - Does NOT go through `_resolve_interrupt` — the return shape is a bool, not wounds.
+   - `Lucidity L2` is the active handler on this path.
 
 Priority table (lower = processed first):
-- Lucidity L2 (anti-Burnout) = 10 (reserved; fires in _escalate_fervor, not _resolve_attack)
-- Meat for the Grinder: 20
+- Lucidity L2 (anti-Burnout, trigger="on_burnout", fires in `_escalate_fervor`): 10
+- Meat for the Grinder (trigger="on_massive_wound", fires in `_resolve_attack`): 20
 
-Adding a new handler:
-1. Add a case in `_resolve_interrupt()` dispatching by `handler_id`
-2. Implement `_resolve_<handler_name>()` with the signal/await contract
-3. Register in `start_combat()` based on the relevant node level
-4. Update the priority table above and in CLAUDE.md
+The two triggers never contend — they fire at different points in the round loop.
 
 ### New architectural resources (Group A — fully implemented; unblocks Group B)
 
@@ -215,11 +220,10 @@ zero functional methods. Fields: `status_id`, `duration_rounds`
 (-1 = permanent), `stat_overrides: Dictionary`, `escalation_threshold: int`,
 `source_node_id: String`.
 
-**InterruptHandler** — reactive interrupt during _resolve_attack(). Fields:
-`handler_id`, `trigger` ("on_massive_wound" | "on_lethal_wound" | "on_wound"),
-`target` ("self" | "enemy"), `charges`, `priority`.
-Priority table: Lucidity L2 (anti-Burnout) = 10 (reserved; fires in _escalate_fervor, not _resolve_attack), Meat for the Grinder = 20.
-Rule: the second handler sees the outcome already modified by the first.
+**InterruptHandler** — reactive interrupt at specific round-loop points. Fields:
+`handler_id`, `trigger` ("on_massive_wound" | "on_burnout"), `target` ("self" | "enemy"), `charges`, `priority`.
+Priority table: Lucidity L2 anti-Burnout = 10 (fires in `_escalate_fervor` via `_try_prevent_burnout`), Meat for the Grinder = 20 (fires in `_resolve_attack` via `_resolve_interrupt`).
+Two dispatch paths: `on_massive_wound` → wounds-shaped `_resolve_interrupt`; `on_burnout` → bool-shaped `_try_prevent_burnout`. Rule (attack path only): the second handler sees the outcome already modified by the first.
 
 **SpellOutcomeEffect** — post-resolution spell effect. Fields: `spell_id`,
 `trigger` ("on_hit" | "on_breach" | "on_cast" | "on_detonate"), `target`,
@@ -239,7 +243,7 @@ Rule: the second handler sees the outcome already modified by the first.
 Group 4 implements Fervor / Burnout / Cantrips / True Spells with per-spell `SpellData`:
 
 - **Fervor** — player-only runtime state on `CombatantState`. Track: d4 → d6 → d8 → d10 (`FERVOR_TRACK` const). Cap = `data.ingenuity_size`. Persists across combats via `PlayerProgression.saved_fervor_size`; Long Rest resets to d4, Recovery Scene only clears Burnout.
-- **Escalation** — after a true spell resolves, `_escalate_fervor(_player, steps)` where `steps = primary_dice_maxed_count` (Ingenuity-tagged dice that rolled max, pre-Keep, including discarded) `+ (1 if fervor_maxed)`. Multiple steps possible in a single cast.
+- **Escalation** — after a true spell resolves, `await _escalate_fervor(_player, steps)` where `steps = primary_dice_maxed_count` (Ingenuity-tagged dice that rolled max, pre-Keep, including discarded) `+ (1 if fervor_maxed)`. Multiple steps possible in a single cast. `_escalate_fervor` is a coroutine: when a positive step would set `is_burned_out=true`, it awaits `_try_prevent_burnout` (Lucidity L2 interrupt path) before committing Burnout. Both call sites (`player_chose_lucidity` and `_resolve_round_spell`) use `await`. The cooling path (negative steps) never triggers the interrupt and returns immediately.
 - **Burnout** — blocks `player_chose_spell()`; cantrips remain available. Persists across combats; cleared by Long Rest or Recovery.
 - **Cantrip** — uses `SpellData` (is_cantrip=true). Ingenuity pool, no Fervor die, no escalation. Available during Burnout. Granted via `node.spells` (Minor Studies carries "Arcane Bolt" [`arcane_bolt.tres`] + "Arcane Touch" [`arcane_touch.tres`]).
 - **True spell** — uses `SpellData`. Ingenuity pool + optional aspect dice + real Fervor die. Granted by Spellcasting L1+ (Arcane Missile + Arcane Mark at L1).
@@ -350,6 +354,8 @@ Flow at spell resolution (`_resolve_round_spell`, `_resolve_round_cantrip`):
 | `SpellBonusEffect` with `spell_id` set matches OR-style with tag | Looks like permissive matching | Intentional — when `spell_id` is non-empty it is a name filter; when empty the existing tag-based matching applies; both being true simultaneously is harmless (summed once) |
 | `"hit"/"breach"` in spell outcome dict can be false even when attack_total >= guard | Looks like a bug | Intentional — they mean "this spell caused the round's FIRST breach on its target_pool"; a spell hitting an already-breached pool yields false. Pure per-spell breach detection is deferred to Group B. |
 | `_escalate_fervor` accepts negative steps | Looks like only-escalation code | Lucidity L1 lowers Fervor via negative steps; `clampi` floors at index 0; Burnout check and cap clamp are gated to `steps > 0` only. |
+| `_escalate_fervor` is a coroutine (contains `await`) | Looks like a sync helper | It awaits `_try_prevent_burnout` on the positive-step Burnout path (Lucidity L2 interrupt); both call sites (`player_chose_lucidity`, `_resolve_round_spell`) use `await`. The cooling path (steps=-1) never hits `await` in practice and returns immediately. |
+| `_try_prevent_burnout` is separate from `_resolve_interrupt` | Looks like duplicated interrupt logic | Intentional — `_resolve_interrupt` is wounds-shaped (`{ wounds_modified, resolved }`), used by the `_resolve_attack` path. `_try_prevent_burnout` is bool-shaped and fires inside `_escalate_fervor`, a different fire point. Forcing them through the same dispatcher would require changing the return contract. |
 
 ## Game rules summary
 
@@ -380,6 +386,7 @@ The rules live in `docs/game-rules/`. The implementation must match them exactly
 | Earthshatter | Post-keep Dominion die added to Stance physical attacks when `dom_earthshatter` is purchased. Passed as `post_keep_bonus_size` to `RollEngine.resolve()`. |
 | Meat for the Grinder | Registered as an `InterruptHandler` (`handler_id="meat_for_the_grinder"`, `trigger="on_massive_wound"`, `priority=20`) at `start_combat()` via `_register_interrupt`. When a Massive Wound would hit the player, `_find_interrupts` fires the handler, which emits `player_massive_incoming` and awaits `_massive_decision_gate`; player can spend a charge → 1 Wound instead of 2. |
 | Wounds Training | `dom_wounds` NodeLevelData entries (effect_type="training_wounds", effect_value=1 each) summed by `_wounds_node_bonus()` at `start_combat()`. |
-| Lucidity L1 | Proactive action: lower Fervor by 1 step, costs the turn, unlimited uses. Hidden when Fervor is already at d4 (`_can_use_lucidity()` check). Calls `_escalate_fervor(_player, -1)`; negative steps skip Burnout check and cap clamp. |
+| Lucidity L1 | Proactive action: lower Fervor by 1 step, costs the turn, unlimited uses. Hidden when Fervor is already at d4 (`_can_use_lucidity()` check). Calls `await _escalate_fervor(_player, -1)`; negative steps skip Burnout check and cap clamp. |
+| Lucidity L2 | Reactive interrupt: when a positive escalation step would cause Burnout, the player is prompted (`player_burnout_imminent`) to spend 1 charge per combat. If spent, Burnout is cancelled but **Fervor stays at the cap** (precarious-truce — next escalation will threaten Burnout again). Implemented as `InterruptHandler` (`handler_id="lucidity_prevent_burnout"`, `trigger="on_burnout"`, `priority=10`) registered at `start_combat()`; dispatched by `_try_prevent_burnout()` inside `_escalate_fervor()`, NOT through `_resolve_interrupt` (which is wounds-shaped). |
 
-Next unimplemented items: Phase B3b — Lucidity L2 (reactive anti-Burnout interrupt); then Group C.
+Next unimplemented items: Group C — Ingenuity Disciplines.

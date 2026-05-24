@@ -6,8 +6,9 @@ class_name InterruptHandler extends Resource
 
 @export var handler_id: String = ""
 
-## Trigger event. Currently supported: "on_massive_wound".
-## Future (Group B3): "on_lethal_wound", "on_wound".
+## Trigger event.
+## Triggers in use: "on_massive_wound" (Meat for the Grinder, in _resolve_attack),
+## "on_burnout" (Lucidity L2, in _escalate_fervor).
 @export var trigger: String = ""
 
 ## Who this handler protects. "self" = the combatant carrying the handler.
