@@ -127,8 +127,17 @@ Spellcasting node expanded to L1-L3:
 - L3: arcane Keep 3, Arcane Missile +2 flat, Arcane Mark breach + Stance −1
   keep (Frattura Totale: both L2 and L3 debuffs accumulate and fire together)
 
+**Phase B3 (redefined) — Lucidity (cross-tier anti-Burnout node)** ⏳
+Single node, two levels at different tiers. L1 (required_tier 1-2):
+proactive action lowering Fervor by 1 step, costs the turn, unlimited.
+L2 (required_tier 3): reactive InterruptHandler inside _escalate_fervor;
+spend a charge to cancel an imminent Burnout. L1 uses the action/intent
+system + item_action_charges; L2 extends the A3 interrupt system to a
+new fire point (_escalate_fervor, which becomes a coroutine). This is
+the NEXT phase. Group C follows.
+
 **Remaining B work:** Minor Studies cantrip expansion (aether_barrier,
-chrono_shift design-blocked — see Future), Mental Fortress migration to ING.
+chrono_shift design-blocked — see Future).
 
 **Note:** aether_barrier and chrono_shift require design decisions before
 any stub implementation. See Future section for the open design questions
@@ -151,8 +160,6 @@ Four specialised disciplines using all Group A systems:
 ### ⏳ Group D — Ingenuity Branch: Late Game and Hybrids
 Prerequisites: Group C complete.
 
-- Lucidity (L1-L2): action to decrement Fervor by 1 step,
-  uses existing item_action_charges
 - Purple Hollow (L1): suicide trance, CombatStatus with stat_override
   ingenuity_size=12 and escalation_threshold=10, consequences on expiry
 - Blood Channeling (Dom+Ing hybrid): cast during Burnout with self-damage
@@ -300,3 +307,5 @@ Both items live in the "Cantrip Expansion" backlog — implementation group not 
 - **Cumulative Disadvantage on multiple pools** — deferred since Group 1, remains deferred. Requires `_current_round_targeted_pools` tracking.
 - **Active DEF Mode for magic** — deferred since Group 7.6. Requires design of magic defensive action types.
 - **Cantrip count cap** — all purchased cantrips always available. "Known slots" formula not designed.
+- **Meat for the Grinder relocation/reframe** — currently dom_meat_grinder on Dominion. Planned to be reframed as a Dominion/Negation hybrid defensive node (physical damage mitigation identity). Mechanic stays (Massive 2→1 via charge); only its tree placement/identity changes. Not scheduled — future task.
+- **Magic defense (Negation/Ingenuity hybrid)** — the defensive identity for casters. Design direction only; mechanic undefined. Distinct from Dominion's "absorb the blow" — should feel like prevention/manipulation/evasion, not damage soak. Blocked on design session.

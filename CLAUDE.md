@@ -199,7 +199,7 @@ Flow:
 5. The next handler (if any) sees the outcome already modified by the previous
 
 Priority table (lower = processed first):
-- Mental Fortress (B3): 10
+- Lucidity L2 (anti-Burnout) = 10 (reserved; fires in _escalate_fervor, not _resolve_attack)
 - Meat for the Grinder: 20
 
 Adding a new handler:
@@ -218,7 +218,7 @@ zero functional methods. Fields: `status_id`, `duration_rounds`
 **InterruptHandler** — reactive interrupt during _resolve_attack(). Fields:
 `handler_id`, `trigger` ("on_massive_wound" | "on_lethal_wound" | "on_wound"),
 `target` ("self" | "enemy"), `charges`, `priority`.
-Priority table: Mental Fortress = 10, Meat for the Grinder = 20.
+Priority table: Lucidity L2 (anti-Burnout) = 10 (reserved; fires in _escalate_fervor, not _resolve_attack), Meat for the Grinder = 20.
 Rule: the second handler sees the outcome already modified by the first.
 
 **SpellOutcomeEffect** — post-resolution spell effect. Fields: `spell_id`,
@@ -333,7 +333,7 @@ Flow at spell resolution (`_resolve_round_spell`, `_resolve_round_cantrip`):
 | `_process_statuses_hook` with potential `await` | Adds latency to the round loop | Required for future statuses that need player input |
 | `CombatStatus` with no methods | Nearly empty resource | Intentional — logic lives in the dispatcher, not in the data |
 | `_apply_wounds` bypassing interrupts in some contexts | Appears to ignore the interrupt system | Intentional for self-damage (blood_channeling) and hex damage — documented in code |
-| InterruptHandler priority 10/20 | Apparently arbitrary numbers | Mental Fortress (10) before MftG (20) — deliberate design order, do not change |
+| InterruptHandler priority 10/20 | Apparently arbitrary numbers | Lucidity L2 (10, reserved, fires in _escalate_fervor) before MftG (20) — deliberate design order, do not change |
 | `_end_of_round()` called without visible `await` | Looks like a blocking call | It is a coroutine, must be called with await — same rule as _resolve_round* |
 | `_stat_size()` checks active_statuses before node_levels | Seems to give statuses higher priority than purchased nodes | Intentional — temporary overrides (e.g. Purple Hollow d12) must win over permanent progression |
 | `_add_status` silently replaces duplicates | Looks like a bug swallower | Intentional — applying the same status twice refreshes it, not stacks it |
