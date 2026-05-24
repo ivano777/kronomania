@@ -127,14 +127,17 @@ Spellcasting node expanded to L1-L3:
 - L3: arcane Keep 3, Arcane Missile +2 flat, Arcane Mark breach + Stance −1
   keep (Frattura Totale: both L2 and L3 debuffs accumulate and fire together)
 
-**Phase B3 (redefined) — Lucidity (cross-tier anti-Burnout node)** ⏳
-Single node, two levels at different tiers. L1 (required_tier 1-2):
-proactive action lowering Fervor by 1 step, costs the turn, unlimited.
+**Phase B3a ✓ — Lucidity L1 (proactive Fervor cooling)**
+Node `ability_lucidity.tres` (max_levels=2, L2 placeholder non-functional).
+L1: new "lucidity" intent, available when Lucidity L1 purchased and Fervor > d4.
+`player_chose_lucidity()` calls `_escalate_fervor(_player, -1)`, ends the round.
+`_escalate_fervor` extended to support negative steps: Burnout check and cap clamp
+gated to `steps > 0`; negative steps use `clampi` floor and raw track position.
+
+**Phase B3b ⏳ — Lucidity L2 (reactive anti-Burnout interrupt)**
 L2 (required_tier 3): reactive InterruptHandler inside _escalate_fervor;
-spend a charge to cancel an imminent Burnout. L1 uses the action/intent
-system + item_action_charges; L2 extends the A3 interrupt system to a
-new fire point (_escalate_fervor, which becomes a coroutine). This is
-the NEXT phase. Group C follows.
+spend a charge to cancel an imminent Burnout. Extends the A3 interrupt system to a
+new fire point (_escalate_fervor, which becomes a coroutine). This is the NEXT phase.
 
 **Remaining B work:** Minor Studies cantrip expansion (aether_barrier,
 chrono_shift design-blocked — see Future).

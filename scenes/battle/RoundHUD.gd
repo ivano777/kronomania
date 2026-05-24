@@ -101,6 +101,9 @@ func show_intents(intents: Array[String]) -> void:
 			"magic":
 				btn.text = "✦  Magic"
 				btn.pressed.connect(_on_intent_magic)
+			"lucidity":
+				btn.text = "🧘  Lucidity (cool Fervor)"
+				btn.pressed.connect(_on_intent_lucidity)
 			"item":
 				btn.text = "⊕  Item  (coming soon)"
 				btn.disabled = true
@@ -220,6 +223,11 @@ func _on_intent_attack() -> void:
 func _on_intent_magic() -> void:
 	_current_intent = "magic"
 	_show_tool_panel("magic")
+
+
+func _on_intent_lucidity() -> void:
+	disable_actions()
+	CombatManager.player_chose_lucidity()
 
 
 # ── Tool layer ────────────────────────────────────────────────────────────────

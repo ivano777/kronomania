@@ -36,11 +36,13 @@ _Changelog: Mental Fortress node removed; anti-Burnout intent absorbed into Luci
 
 ### Tier 1 to Tier 3 — Cross-tier
 - `lucidity` (cross-tier, L1-L2): the caster's Fervor self-control node.
-  L1 (Tier 1-2): proactive action — lower Fervor by 1 step, costs the
-  turn, unlimited. L2 (Tier 3): reactive — when escalation would cause
-  Burnout, spend a charge to cancel it. One identity (control your own
-  magic), two depths (manage early, resist collapse late). L1 uses the
-  action system; L2 uses an InterruptHandler in _escalate_fervor.
+  L1 ✓ (Tier 1): proactive action — lower Fervor by 1 step, costs the
+  turn, unlimited. Implemented: `ability_lucidity.tres` L1, "lucidity"
+  intent in CombatManager/RoundHUD, `player_chose_lucidity()` public method.
+  L2 ⏳ (Tier 3): reactive — when escalation would cause Burnout, spend a
+  charge to cancel it. One identity (control your own magic), two depths
+  (manage early, resist collapse late). L2 uses an InterruptHandler in
+  _escalate_fervor (B3b).
 
 ### Tier 3-4 — Apex and Hybrids
 - `purple_hollow` (L1): suicide trance with temporary d12

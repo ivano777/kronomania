@@ -22,6 +22,7 @@ const ALL_NODES: Array = [
 	preload("res://resources/data/nodes/ingenuity/ing_resolve.tres"),
 	preload("res://resources/data/nodes/ability_minor_studies.tres"),
 	preload("res://resources/data/nodes/ability_spellcasting.tres"),
+	preload("res://resources/data/nodes/ability_lucidity.tres"),
 	preload("res://resources/data/nodes/flavor_warrior_oath.tres"),
 	preload("res://resources/data/nodes/flavors/flavor_exile_brand.tres"),
 	preload("res://resources/data/nodes/flavors/flavor_blood_debt.tres"),

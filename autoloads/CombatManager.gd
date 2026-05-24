@@ -303,6 +303,20 @@ func player_chose_defense_item(mod: ActionModifier) -> void:
 	_defense_item_chosen.emit(mod)
 
 
+## Player chose the Lucidity action: lower Fervor by 1 step and end the round.
+func player_chose_lucidity() -> void:
+	if not _waiting_for_player:
+		return
+	if not _can_use_lucidity():
+		push_warning("player_chose_lucidity called when not usable")
+		return
+	_waiting_for_player = false
+	log_message.emit("[color=cyan]Lucidity: you steady your mind and cool the Fervor.[/color]")
+	_escalate_fervor(_player, -1)
+	await _end_of_round()
+	_begin_round()
+
+
 ## Debug only — override Fervor state at runtime.
 func debug_set_fervor(new_fervor_size: int, burned_out: bool) -> void:
 	if _player:
@@ -334,8 +348,18 @@ func _emit_player_intents() -> void:
 	var intents: Array[String] = ["attack"]
 	if _player.has_minor_studies or _player.has_spellcasting:
 		intents.append("magic")
+	if _can_use_lucidity():
+		intents.append("lucidity")
 	intents.append("item")
 	player_intents_available.emit(intents)
+
+
+func _can_use_lucidity() -> bool:
+	# Available only if Lucidity L1 is purchased AND Fervor is above the minimum.
+	# Lowering from d4 is a no-op — hide the intent to prevent wasting a turn.
+	if not _has_effect_type(_player, "lucidity_lower_fervor"):
+		return false
+	return _player.fervor_size > FERVOR_TRACK[0]
 
 
 func _begin_round() -> void:
@@ -1387,9 +1411,9 @@ func _defense_keep_grade(state: CombatantState, pool: String) -> int:
 	return _node_effect_max(state, pool + "_keep")
 
 
-## Steps Fervor up by `steps` track positions. Triggers Burnout if escalation
-## would push the index past the cap's slot in FERVOR_TRACK — including the
-## d10/d10 ceiling case where new_size == cap but steps remain (magic/fervor.md).
+## Steps Fervor by `steps` track positions (positive = escalate, negative = cool).
+## Burnout fires only on escalation (positive steps) when raw_new_idx exceeds cap_idx.
+## Negative steps (Lucidity L1 cooling) never trigger Burnout and skip the cap clamp.
 func _escalate_fervor(state: CombatantState, steps: int) -> void:
 	var cap: int = _stat_size(state, "ingenuity")
 	var cap_idx: int = FERVOR_TRACK.find(cap)
@@ -1400,16 +1424,21 @@ func _escalate_fervor(state: CombatantState, steps: int) -> void:
 		idx = 0
 	var prev_size: int = FERVOR_TRACK[idx]
 	var raw_new_idx: int = idx + steps
-	var clamped_idx: int = mini(raw_new_idx, FERVOR_TRACK.size() - 1)
+	# Negative steps are floored at index 0; positive steps are ceilinged at FERVOR_TRACK.size()-1.
+	var clamped_idx: int = clampi(raw_new_idx, 0, FERVOR_TRACK.size() - 1)
 	var new_size: int = FERVOR_TRACK[clamped_idx]
-	if new_size != prev_size:
+	if steps < 0 and new_size < prev_size:
+		log_message.emit("  [color=cyan]Fervor cooled: d%d → d%d. Safer, but next casts are weaker.[/color]" % [prev_size, new_size])
+	elif new_size != prev_size:
 		log_message.emit("  [color=magenta]Fervor escalates: d%d → d%d[/color]" % [prev_size, new_size])
 	else:
 		log_message.emit("  [color=magenta]Fervor at maximum track position (d%d).[/color]" % new_size)
-	if raw_new_idx > cap_idx and not state.is_burned_out:
+	# Burnout only on escalation: cooling never triggers it regardless of the current position.
+	if steps > 0 and raw_new_idx > cap_idx and not state.is_burned_out:
 		state.is_burned_out = true
 		log_message.emit("[color=orange][b]BURNOUT![/b] Fervor surged beyond control. True spells blocked until next combat.[/color]")
-	state.fervor_size = mini(new_size, cap)
+	# Escalation caps Fervor at the ingenuity die; cooling uses the raw track position.
+	state.fervor_size = mini(new_size, cap) if steps > 0 else new_size
 	fervor_changed.emit(state == _player, state.fervor_size, cap, state.is_burned_out)
 
 
