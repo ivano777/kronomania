@@ -29,7 +29,13 @@ _Changelog: Mental Fortress node removed; anti-Burnout intent absorbed into Luci
   that upgrade spells with node level
 
 ### Tier 2-3 — Disciplines (horizontal choice)
-- `mind_detonation` (L1-L2): delayed effect via CombatStatus
+- `mind_detonation` (L1-L2) ✓ — Phase C1. Placement scratch (pool=1, Ingenuity
+  die, training keep, Fervor die, no SpellBonusEffect bonuses) applies
+  `mind_detonation_primed` (duration=3, frozen `fervor_at_prime`). Phase 2.1
+  (post player-attack, all round types): detonates via `_detonate_mind_bomb` →
+  `_resolve_attack(true, …, "resolve")` if Stance was breached; uses frozen
+  Fervor + explosion bonuses from `_collect_spell_bonuses`. No Fervor escalation.
+  L2 (tier≥3, prereq ing_core L3): +1 explosion keep.
 - `chrono_tinkering` (L1): skip next guard roll on one pool
 - `echoing_mind` (L1): end_of_round echo for spells with tag "echo"
 - `hex_mastery` (L1): persistent CombatStatus, +1 wound on every breach

@@ -537,6 +537,10 @@ func _resolve_round(net_advantage: int = 0, target_pool: String = "stance", brut
 	if not target.is_defeated:
 		await _resolve_attack(true, target_index, p_atk, target_pool)
 
+	# Phase 2.1 — post player-attack: detonate any primed mind-bomb if Stance was breached.
+	if not target.is_defeated:
+		await _check_mind_detonation(target, target_index)
+
 	if _all_enemies_defeated():
 		_end_combat()
 		return
@@ -617,6 +621,10 @@ func _resolve_round_cantrip(spell: SpellData, target_index: int = 0) -> void:
 			"round_breaches": _current_round_player_breaches.duplicate()
 		})
 
+	# Phase 2.1 — post player-attack: detonate any primed mind-bomb if Stance was breached.
+	if not target.is_defeated:
+		await _check_mind_detonation(target, target_index)
+
 	if _all_enemies_defeated():
 		_end_combat()
 		return
@@ -666,46 +674,38 @@ func _resolve_round_spell(spell: SpellData, target_index: int = 0) -> void:
 		target.data.combatant_name
 	])
 
-	# Collect school bonus effects for spells matching any of this spell's tags.
-	var spell_pool_bonus := 0
-	var spell_keep_bonus := 0
-	var spell_flat_bonus := 0
-	for node in _player.node_levels.keys():
-		var nd: NodeData = node as NodeData
-		if nd == null:
-			continue
-		var lvl: int = _player.node_levels[node]
-		for i in range(mini(lvl, nd.levels_data.size())):
-			for be in nd.levels_data[i].bonus_effects:
-				var _be_matches: bool
-				if be.spell_id != "":
-					_be_matches = be.spell_id == spell.spell_name
-				else:
-					_be_matches = spell.tags.has(be.tag)
-				if _be_matches:
-					if be.bonus_type == "pool":
-						spell_pool_bonus += be.value
-					elif be.bonus_type == "keep":
-						spell_keep_bonus += be.value
-					elif be.bonus_type == "flat":
-						spell_flat_bonus += be.value
-	if spell_pool_bonus > 0 or spell_keep_bonus > 0 or spell_flat_bonus > 0:
-		var parts: Array = []
-		if spell_pool_bonus > 0:
-			parts.append("+%d pool" % spell_pool_bonus)
-		if spell_keep_bonus > 0:
-			parts.append("+%d keep" % spell_keep_bonus)
-		if spell_flat_bonus > 0:
-			parts.append("+%d flat" % spell_flat_bonus)
-		log_message.emit("  [color=yellow]School bonus: %s[/color]" % ", ".join(parts))
-
-	var p_atk := RollEngine.resolve(
-		_effective_tier(_player, _get_action_modifier(_player, "strike")) + spell_pool_bonus,
-		_stat_size(_player, "ingenuity"),
-		_training_keep_grade(_player) + spell_keep_bonus,
-		spell.flat_bonus + spell_flat_bonus, _pool_bonus(_player), _player.fervor_size,
-		aspect_stat_size, spell.aspect_dice
-	)
+	# Mind Detonation placement scratch: 1 Ingenuity die, no SpellBonusEffect bonuses.
+	# Bonuses (+pool, +keep) are reserved for the explosion built in _detonate_mind_bomb.
+	# All other spells: collect school bonuses via _collect_spell_bonuses and apply to roll.
+	var p_atk: Dictionary
+	if spell.spell_name == "Mind Detonation":
+		p_atk = RollEngine.resolve(
+			1,
+			_stat_size(_player, "ingenuity"),
+			_training_keep_grade(_player),
+			0, _pool_bonus(_player), _player.fervor_size, 0, 0
+		)
+	else:
+		var bonuses := _collect_spell_bonuses(spell)
+		var spell_pool_bonus: int = bonuses["pool"] as int
+		var spell_keep_bonus: int = bonuses["keep"] as int
+		var spell_flat_bonus: int = bonuses["flat"] as int
+		if spell_pool_bonus > 0 or spell_keep_bonus > 0 or spell_flat_bonus > 0:
+			var parts: Array = []
+			if spell_pool_bonus > 0:
+				parts.append("+%d pool" % spell_pool_bonus)
+			if spell_keep_bonus > 0:
+				parts.append("+%d keep" % spell_keep_bonus)
+			if spell_flat_bonus > 0:
+				parts.append("+%d flat" % spell_flat_bonus)
+			log_message.emit("  [color=yellow]School bonus: %s[/color]" % ", ".join(parts))
+		p_atk = RollEngine.resolve(
+			_effective_tier(_player, _get_action_modifier(_player, "strike")) + spell_pool_bonus,
+			_stat_size(_player, "ingenuity"),
+			_training_keep_grade(_player) + spell_keep_bonus,
+			spell.flat_bonus + spell_flat_bonus, _pool_bonus(_player), _player.fervor_size,
+			aspect_stat_size, spell.aspect_dice
+		)
 	log_message.emit(_fmt_spell_attack(_player.data.combatant_name, p_atk))
 
 	var p_total: int = p_atk.total as int
@@ -746,6 +746,23 @@ func _resolve_round_spell(spell: SpellData, target_index: int = 0) -> void:
 			"target_pool": spell.target_pool,
 			"round_breaches": _current_round_player_breaches.duplicate()
 		})
+
+	# Mind Detonation: freeze params into the primed status right after the placement scratch.
+	if spell.spell_name == "Mind Detonation" and not target.is_defeated:
+		var bomb := CombatStatus.new()
+		bomb.status_id = "mind_detonation_primed"
+		bomb.duration_rounds = 3
+		bomb.source_node_id = "mind_detonation"
+		bomb.stat_overrides = {
+			"fervor_at_prime": _player.fervor_size,
+			"md_level": PlayerProgression.get_node_level_by_id("mind_detonation"),
+		}
+		_add_status(target, bomb)
+		log_message.emit("[color=purple]A psychic charge is set in %s's mind...[/color]" % target.data.combatant_name)
+
+	# Phase 2.1 — post player-attack: detonate any primed mind-bomb if Stance was breached.
+	if not target.is_defeated:
+		await _check_mind_detonation(target, target_index)
 
 	if _all_enemies_defeated():
 		_end_combat()
@@ -992,6 +1009,8 @@ func _tick_statuses(state: CombatantState) -> void:
 			expired.append(s)
 	for s in expired:
 		state.active_statuses.erase(s)
+		if s.status_id == "mind_detonation_primed":
+			log_message.emit("[color=purple]The mind-bomb goes inert. Stance was never broken.[/color]")
 
 # --- End status system helpers ---
 
@@ -1177,6 +1196,75 @@ func _add_pending_guard_debuff(state: CombatantState, pool: String, kind: String
 
 # --- End spell outcome effect helpers ---
 
+# --- Mind Detonation helpers (Group C1) ---
+
+## Collects pool/keep/flat SpellBonusEffect bonuses for a spell across all purchased nodes.
+## Shared by _resolve_round_spell (cast path) and _detonate_mind_bomb (explosion path).
+func _collect_spell_bonuses(spell: SpellData) -> Dictionary:
+	var pool_bonus := 0
+	var keep_bonus := 0
+	var flat_bonus := 0
+	for node in PlayerProgression.node_levels:
+		var nd: NodeData = node as NodeData
+		if nd == null:
+			continue
+		var lvl: int = PlayerProgression.node_levels[node] as int
+		for i in range(mini(lvl, nd.levels_data.size())):
+			for be in nd.levels_data[i].bonus_effects:
+				var matches: bool
+				if be.spell_id != "":
+					matches = be.spell_id == spell.spell_name
+				else:
+					matches = spell.tags.has(be.tag)
+				if matches:
+					match be.bonus_type:
+						"pool": pool_bonus += be.value
+						"keep": keep_bonus += be.value
+						"flat": flat_bonus += be.value
+	return {"pool": pool_bonus, "keep": keep_bonus, "flat": flat_bonus}
+
+
+## Phase 2.1 check: fires if the enemy carries mind_detonation_primed and their Stance
+## was breached this round. Called after the player's Phase 2 attack in all round types.
+## KNOWN SIMPLIFICATION: uses global _current_round_player_breaches["stance"], not per-enemy.
+## If multiple enemies are primed, any Stance breach in the round triggers all primed bombs.
+func _check_mind_detonation(enemy: CombatantState, enemy_index: int) -> void:
+	if not _has_status(enemy, "mind_detonation_primed"):
+		return
+	if not _current_round_player_breaches.get("stance", false):
+		return
+	await _detonate_mind_bomb(enemy, enemy_index)
+
+
+## Detonates a primed mind-bomb: builds explosion roll, routes through _resolve_attack vs Resolve.
+## Status removed BEFORE _resolve_attack — prevents re-trigger via on_breach (MD keys on Stance,
+## explosion breaches Resolve; different pools, so no re-trigger even without the guard).
+## No Fervor escalation: explosion is a delayed payoff, not a fresh cast.
+func _detonate_mind_bomb(enemy: CombatantState, enemy_index: int) -> void:
+	var status := _get_status(enemy, "mind_detonation_primed")
+	if status == null:
+		return
+	var frozen_fervor: int = status.stat_overrides.get("fervor_at_prime", 0) as int
+	_remove_status(enemy, "mind_detonation_primed")
+
+	var md_spell: SpellData = preload("res://resources/data/spells/mind_detonation.tres")
+	var bonuses := _collect_spell_bonuses(md_spell)
+	var pool: int = _effective_tier(_player, _get_action_modifier(_player, "strike")) + (bonuses["pool"] as int)
+	var keep: int = _training_keep_grade(_player) + (bonuses["keep"] as int)
+	var die: int  = _stat_size(_player, "ingenuity")
+	var flat: int = bonuses["flat"] as int
+
+	log_message.emit("[color=magenta][b]MIND DETONATION![/b] The charge erupts against %s's Resolve![/color]" % enemy.data.combatant_name)
+
+	var explosion_result := RollEngine.resolve(pool, die, keep, flat, 0, frozen_fervor)
+	log_message.emit(_fmt_spell_attack("[Mind Detonation]", explosion_result))
+
+	await _resolve_attack(true, enemy_index, explosion_result, "resolve")
+	# _resolve_attack handles guard roll, Massive logic, wound signals, and defeat detection.
+	# No _escalate_fervor call: explosion is not a cast.
+
+# --- End Mind Detonation helpers ---
+
 func _process_statuses_hook(
 		hook: String,
 		state: CombatantState,
@@ -1187,8 +1275,11 @@ func _process_statuses_hook(
 	## .duplicate() prevents mutation of the array if a future case adds/removes statuses mid-loop.
 	for status in state.active_statuses.duplicate():
 		match status.status_id:
+			"mind_detonation_primed":
+				pass  # Breach-driven via _check_mind_detonation at Phase 2.1 (post player-attack);
+				      # not hook-driven. The bomb does nothing on start_of_round / end_of_round hooks.
 			_:
-				pass  # No processing yet. Cases added in Groups B-D.
+				pass
 
 
 func _end_of_round() -> void:

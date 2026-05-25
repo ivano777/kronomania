@@ -156,8 +156,21 @@ that must be resolved first.
 Prerequisites: Group B complete.
 
 Four specialised disciplines using all Group A systems:
-- Mind Detonation (delayed effect via CombatStatus, explosion at
-  start_of_round)
+
+**Phase C1 ✓ — Mind Detonation**
+`ability_mind_detonation.tres` (max_levels=2). Placement scratch: pool=1,
+Ingenuity die, training keep, Fervor die included (no SpellBonusEffect bonuses).
+Applies `mind_detonation_primed` CombatStatus (duration=3) with frozen
+`fervor_at_prime` + `md_level` in `stat_overrides`. At Phase 2.1 (post
+player-attack) in all three round types: `_check_mind_detonation` fires
+`_detonate_mind_bomb` if Stance was breached and the status is active — routes
+through `_resolve_attack(true, …, "resolve")` using frozen Fervor + bonuses from
+`_collect_spell_bonuses`. No Fervor escalation from explosion. Status removed
+before `_resolve_attack` (anti-recursion guard). Fizzle message on expiry.
+L2 (tier≥3, prereq ing_core L3): +1 explosion keep.
+Known simplification: global `_current_round_player_breaches["stance"]` tracking —
+any Stance breach in the round triggers all primed bombs; per-enemy tracking deferred.
+
 - Chrono-Tinkering (skip next guard roll on a specific pool)
 - Echoing Mind (spells with tag "echo" hit again at end_of_round)
 - Hex Mastery (persistent CombatStatus: +1 wound on every player breach)
