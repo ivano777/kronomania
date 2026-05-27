@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="SpellData" format=3 uid="uid://mindrend01"]
+
+[ext_resource type="Script" path="res://resources/SpellData.gd" id="1_spscr"]
+
+[resource]
+script = ExtResource("1_spscr")
+spell_name = "Mind Rend"
+description = "Tear into an exposed mind. Break their Resolve to brand them with a curse — every wound you inflict then cuts deeper."
+aspect_stat = ""
+aspect_dice = 0
+target_pool = "resolve"
+flat_bonus = 0
+is_cantrip = false
+tags = PackedStringArray("arcane")

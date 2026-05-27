@@ -171,9 +171,18 @@ L2 (tier≥3, prereq ing_core L3): +1 explosion keep.
 Known simplification: global `_current_round_player_breaches["stance"]` tracking —
 any Stance breach in the round triggers all primed bombs; per-enemy tracking deferred.
 
+**Phase C2 ✓ — Hex Mastery**
+`ability_hex_mastery.tres` (max_levels=2). Injects Mind Rend (true spell, arcane tag,
+target_pool="resolve"). Dedicated `_cast_mind_rend` bypasses `_resolve_attack`: on a
+Resolve breach, suppresses the wound and applies `hex_marked` CombatStatus (L1:
+duration_rounds=3, "2 turns"; L2: duration_rounds=7, "4 turns"). On Resolve holds:
+nothing. While hex_marked is active, `_resolve_attack` applies `wounds_pending += 1`
+for every player breach on the hexed enemy (any pool); enemy-on-player breaches are
+never amplified. Intended combo: Hex + Mind Detonation — both the Stance breach AND
+the explosion breach are amplified by the same mark.
+
 - Chrono-Tinkering (skip next guard roll on a specific pool)
 - Echoing Mind (spells with tag "echo" hit again at end_of_round)
-- Hex Mastery (persistent CombatStatus: +1 wound on every player breach)
 
 ---
 

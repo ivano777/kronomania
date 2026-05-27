@@ -731,7 +731,10 @@ func _resolve_round_spell(spell: SpellData, target_index: int = 0) -> void:
 	# ── Phase 2: Player attacks chosen target ──────────────────────────────
 	var _pool_breached_before := _current_round_player_breaches.get(spell.target_pool, false) as bool
 	if not target.is_defeated:
-		await _resolve_attack(true, target_index, p_atk, spell.target_pool)
+		if spell.spell_name == "Mind Rend":
+			await _cast_mind_rend(target, target_index, p_atk)
+		else:
+			await _resolve_attack(true, target_index, p_atk, spell.target_pool)
 	# "breach" = this spell caused the round's FIRST breach on its target_pool.
 	# A spell that breaches an already-breached pool sets this to false.
 	# Group B mechanics that need pure per-spell breach detection should read
@@ -889,6 +892,10 @@ func _resolve_attack(attacker_is_player: bool, enemy_index: int, attack_result: 
 			attack_result.total as int, current_guard, defensive_size
 		)
 		var wounds_pending := 2 if massive else 1
+		# Hex Mastery: player breach on a hexed enemy deals +1 wound.
+		if attacker_is_player and not defender_is_player and _has_status(defender, "hex_marked"):
+			wounds_pending += 1
+			log_message.emit("  [color=purple]The hex flares — the wound cuts deeper (+1)![/color]")
 		if massive and not attacker_is_player and defender_is_player:
 			var interrupts := _find_interrupts(defender, "on_massive_wound")
 			for handler in interrupts:
@@ -1011,6 +1018,8 @@ func _tick_statuses(state: CombatantState) -> void:
 		state.active_statuses.erase(s)
 		if s.status_id == "mind_detonation_primed":
 			log_message.emit("[color=purple]The mind-bomb goes inert. Stance was never broken.[/color]")
+		elif s.status_id == "hex_marked":
+			log_message.emit("[color=purple]The hex fades from %s — the brand has run its course.[/color]" % state.data.combatant_name)
 
 # --- End status system helpers ---
 
@@ -1263,6 +1272,88 @@ func _detonate_mind_bomb(enemy: CombatantState, enemy_index: int) -> void:
 	# _resolve_attack handles guard roll, Massive logic, wound signals, and defeat detection.
 	# No _escalate_fervor call: explosion is not a cast.
 
+
+## Mind Rend: attacks enemy Resolve. On breach, suppresses the wound and applies hex_marked.
+## If Resolve holds, nothing happens (no mark, no wound).
+## Does NOT route through _resolve_attack — that path always deals the breach wound.
+## Mark applied AFTER on_breach hook so Mind Rend's own breach is never self-amplified
+## (wound is suppressed anyway, but ordering is kept correct for future consistency).
+func _cast_mind_rend(enemy: CombatantState, enemy_index: int, attack_result: Dictionary) -> void:
+	if enemy == null or enemy.is_defeated:
+		return
+	var attack_total: int = attack_result.total as int
+	var defensive_size: int = _get_pool_size(enemy, "resolve")
+
+	# Guard roll — mirrors _resolve_attack's enemy-defender subset for the "resolve" pool.
+	var _pool_fresh := not enemy.is_pool_rolled("resolve")
+	if _pool_fresh:
+		var defend_mod: ActionModifier = _get_action_modifier(enemy, "defend")
+		var _ew := enemy.weapon_override if enemy.weapon_override else enemy.data.equipped_weapon
+		var cap_str := "uncapped" if defend_mod.tier_cap == 0 else "cap %d" % defend_mod.tier_cap
+		log_message.emit("  %s defends with [i]%s[/i] (%s, Tier %d → %d dice)" % [
+			enemy.data.combatant_name,
+			_ew.item_name if _ew else "Bare Hands",
+			cap_str,
+			enemy.data.tier,
+			_effective_tier(enemy, defend_mod),
+		])
+		var flat_debuff: int = 0
+		var keep_debuff: int = 0
+		var _pending: Variant = enemy.pending_guard_debuffs.get("resolve", null)
+		if _pending != null:
+			flat_debuff = (_pending as Dictionary).get("flat", 0) as int
+			keep_debuff = (_pending as Dictionary).get("keep", 0) as int
+			enemy.pending_guard_debuffs.erase("resolve")
+			if flat_debuff != 0 or keep_debuff != 0:
+				log_message.emit("  [color=purple][Outcome debuff] flat %+d, keep grade %+d on %s Resolve guard.[/color]" % [
+					flat_debuff, keep_debuff, enemy.data.combatant_name
+				])
+		var def_result := RollEngine.resolve(
+			_effective_tier(enemy, defend_mod), defensive_size,
+			maxi(0, _training_keep_grade(enemy) + _defense_keep_grade(enemy, "resolve") + keep_debuff),
+			defend_mod.flat_bonus, 0
+		)
+		var guard_val: int = (def_result.total as int) + flat_debuff
+		enemy.set_guard_val("resolve", guard_val)
+		enemy.set_pool_rolled("resolve", true)
+		guard_changed.emit(false, enemy_index, "resolve", guard_val)
+		log_message.emit(_fmt_defense(enemy.data.combatant_name, def_result, "Resolve"))
+	else:
+		log_message.emit("  %s Resolve already active — Guard [b]%d[/b] absorbs pressure." % [
+			enemy.data.combatant_name, enemy.get_guard("resolve")
+		])
+
+	# Breach check: attack_total >= guard.
+	var current_guard: int = enemy.get_guard("resolve")
+	if attack_total >= current_guard:
+		# Fire on_breach hook BEFORE applying the mark. Intentional: mark not yet present,
+		# so Mind Rend's own breach cannot interact with its own hex. Wound is suppressed
+		# regardless — the mark is the payoff, not the breach.
+		_process_statuses_hook("on_breach", enemy, {"pool": "resolve", "attacker": _player})
+		_current_round_player_breaches["resolve"] = true
+		# Apply mark after the hook for ordering correctness.
+		var hex_level: int = PlayerProgression.get_node_level_by_id("hex_mastery")
+		var dur: int = 3 if hex_level < 2 else 7
+		var hex := CombatStatus.new()
+		hex.status_id = "hex_marked"
+		hex.duration_rounds = dur
+		hex.source_node_id = "hex_mastery"
+		_add_status(enemy, hex)
+		var perceived_turns: int = 2 if hex_level < 2 else 4
+		log_message.emit("[color=purple]Mind Rend tears through! %s's mind is BRANDED — no wound, but the hex takes hold (%d turns).[/color]" % [
+			enemy.data.combatant_name, perceived_turns
+		])
+	else:
+		# Resolve holds: no mark, no wound.
+		var remaining: int = current_guard - attack_total
+		enemy.set_guard_val("resolve", remaining)
+		log_message.emit("  %s's Resolve holds (%d remaining). No brand takes hold." % [
+			enemy.data.combatant_name, remaining
+		])
+
+	# Publish final guard value.
+	guard_changed.emit(false, enemy_index, "resolve", enemy.get_guard("resolve"))
+
 # --- End Mind Detonation helpers ---
 
 func _process_statuses_hook(
@@ -1278,6 +1369,8 @@ func _process_statuses_hook(
 			"mind_detonation_primed":
 				pass  # Breach-driven via _check_mind_detonation at Phase 2.1 (post player-attack);
 				      # not hook-driven. The bomb does nothing on start_of_round / end_of_round hooks.
+			"hex_marked":
+				pass  # Amplification is breach-driven via _resolve_attack; not hook-driven.
 			_:
 				pass
 

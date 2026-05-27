@@ -38,7 +38,15 @@ _Changelog: Mental Fortress node removed; anti-Burnout intent absorbed into Luci
   L2 (tier≥3, prereq ing_core L3): +1 explosion keep.
 - `chrono_tinkering` (L1): skip next guard roll on one pool
 - `echoing_mind` (L1): end_of_round echo for spells with tag "echo"
-- `hex_mastery` (L1): persistent CombatStatus, +1 wound on every breach
+- `hex_mastery` (L1-L2) ✓ — Phase C2. Injects Mind Rend (true spell, tags=["arcane"],
+  target_pool="resolve"). Mind Rend uses a dedicated helper `_cast_mind_rend` that
+  bypasses `_resolve_attack`: on a Resolve breach, suppresses the wound and applies
+  `hex_marked` CombatStatus (duration L1=3, L2=7; "2 turns"/"4 turns" perceived).
+  On Resolve holds: nothing. While `hex_marked` is active, every player breach on
+  that enemy (any pool) adds `wounds_pending += 1` in `_resolve_attack`. Enemy-on-player
+  breaches are never amplified. Mind Rend's own breach is not self-amplified (mark applied
+  after on_breach hook, wound suppressed). Known combo: Hex + Mind Detonation — both
+  the Stance breach and the explosion breach are amplified by the same mark.
 
 ### Tier 1 to Tier 3 — Cross-tier
 - `lucidity` (cross-tier, L1-L2): the caster's Fervor self-control node.
