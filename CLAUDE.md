@@ -131,15 +131,41 @@ docs/               # project-status.md (roadmap), project-index.md (generated c
 
 `CombatantData` is **immutable config** only. All runtime state lives inside `CombatManager.CombatantState`, an inner class instantiated per combat. Scene nodes hold no game state.
 
-`CombatantState` fields: `data` (CombatantData), `current_wounds`, `max_wounds`, `is_defeated`, `node_levels: Dictionary` (NodeData → int), `tier_override`, `weapon_override`, `off_hand_override` (EquipmentData), `space_domination_active: bool`, `item_action_charges: Dictionary` (action_key → remaining uses; initialized at `start_combat()` from `ActionModifier`s with `rest_type="combat"`), `active_statuses: Array[CombatStatus]` (temporary effects; always iterated as `.duplicate()`), `interrupt_handlers: Array[InterruptHandler]` (registered at `start_combat()` based on purchased nodes; combat-scoped, charges reset each combat), `pending_guard_debuffs: Dictionary` (`{ "<pool>": { "flat": int, "keep": int } }`; single-use debuffs queued by SpellOutcomeEffect, consumed on the next guard roll for that pool), plus per-pool guard state (`stance_guard`, `resolve_guard`, `stamina_guard`, and matching `_rolled` booleans), plus magic state (`fervor_size`, `is_burned_out`, `has_minor_studies`, `has_spellcasting`, `known_spells: Array`, `known_cantrips: Array`). Methods: `init()`, `reset_guard()`, `get_guard(pool)`, `set_guard_val(pool, value)`, `is_pool_rolled(pool)`, `set_pool_rolled(pool, value)`.
+`CombatantState` fields, grouped:
+- *Identity/HP:* `data` (CombatantData), `current_wounds`, `max_wounds`, `is_defeated`
+- *Progression:* `node_levels: Dictionary` (NodeData → int), `tier_override`, `weapon_override`, `off_hand_override` (EquipmentData)
+- *Per-combat charges:* `item_action_charges: Dictionary` (action_key → remaining uses; from `rest_type="combat"` ActionModifiers at `start_combat()`), `space_domination_active: bool`
+- *Effects:* `active_statuses: Array[CombatStatus]` (always iterated as `.duplicate()`), `interrupt_handlers: Array[InterruptHandler]` (combat-scoped, registered at `start_combat()`, charges reset each combat), `pending_guard_debuffs: Dictionary` (`{ "<pool>": { "flat", "keep" } }`; single-use, queued by SpellOutcomeEffect, consumed on next guard roll)
+- *Guard state:* `stance_guard`/`resolve_guard`/`stamina_guard` + matching `_rolled` booleans
+- *Magic:* `fervor_size`, `is_burned_out`, `has_minor_studies`, `has_spellcasting`, `known_spells`, `known_cantrips`
+- *Methods:* `init()`, `reset_guard()`, `get_guard(pool)`, `set_guard_val(pool, v)`, `is_pool_rolled(pool)`, `set_pool_rolled(pool, v)`
 
 ### Autoload singletons
 
 Signatures and signals are in `docs/project-index.md`. Architectural gotchas:
 - **`RollEngine`** — stateless. Returns `Dictionary`; always cast values with `as int` / `as Array` — the type inferencer cannot infer through `Dictionary`. `resolve()` accepts optional `fervor_size` (additive post-Keep Fervor die), `aspect_stat_size` and `aspect_count` (for mixed-pool spells), `post_keep_bonus_size` (additive post-Keep bonus die, e.g. Earthshatter). Returns `primary_dice_maxed_count` (Fervor escalation) and `post_keep_bonus_roll` (Earthshatter die result).
-- **`CombatManager`** — all output via signals; nothing returned. Disconnect all signals before `reload_current_scene()`. Signals: `player_intents_available(intents: Array[String])`, `fervor_changed(is_player, fervor_size, fervor_cap, is_burned_out)`, `player_magic_available(can_cantrip, can_cast_spell)`, `player_massive_incoming(charges_left)`, `player_burnout_imminent(charges_left)` (Lucidity L2: emitted when Burnout is about to be set, before `_burnout_decision_gate` is awaited), `player_defense_incoming(attacker_name, attack_total, target_pool)`, `player_defense_item_choice(options: Array)`. Internal gates (coroutine sync): `_massive_decision_gate(use_charge: bool)`, `_burnout_decision_gate(use_charge: bool)`. Public methods: `start_combat(player_data: CombatantData, enemies_data: Array)`, `player_chose_strike(net_advantage, target_pool, brutal_trade, target_index: int = 0, source_weapon: EquipmentData = null)`, `player_chose_cantrip(spell: SpellData, target_index: int = 0)`, `player_chose_spell(spell: SpellData, target_index: int = 0)`, `player_chose_degrade_wound(use_charge: bool)`, `player_chose_prevent_burnout(use_charge: bool)` (Lucidity L2: resolves the `_burnout_decision_gate`; emit true to avert Burnout, false to let it proceed), `player_acknowledged_defense()`, `player_chose_defense_item(mod: ActionModifier)`, `player_chose_lucidity()` (Lucidity L1: lower Fervor by 1 step, ends the round; no-op if `_can_use_lucidity()` returns false), `player_auto_execute_attack(target_index: int = 0, net_advantage: int = 0)`, `reset_item_charges(rest_type: String)` (called by DungeonManager on rest), `debug_set_fervor(size, burned_out)`, `debug_refill_hp()`, `debug_set_immortal(enabled: bool)`, `debug_set_lethal(enabled: bool)`, `debug_set_player_off_hand(weapon: EquipmentData)`, `get_player_bare_hands_modifier(action_key: String) → ActionModifier`, `get_player_attack_preview() → int`. Key helpers: `_get_action_modifier(state, action_key) → ActionModifier` (weapon → bare_hands → zero stub), `_effective_tier(state, mod: ActionModifier = null)` (mod.tier_cap=0 = uncapped), `_attack_flat(state)` / `_guard_flat(state)` / `_pool_bonus(state, action_key="strike")` all delegate to `_get_action_modifier`. Mind Detonation helpers: `_collect_spell_bonuses(spell: SpellData) → Dictionary` — sums `pool`/`keep`/`flat` bonuses across all purchased node levels for the given spell (matched by `spell_id` or tag); shared by `_resolve_round_spell` and `_detonate_mind_bomb`. `_check_mind_detonation(enemy, enemy_index)` — Phase 2.1 check: if enemy has `mind_detonation_primed` and `_current_round_player_breaches["stance"]` is true, calls `await _detonate_mind_bomb`. `_detonate_mind_bomb(enemy, enemy_index)` — removes the primed status (anti-recursion), builds explosion roll using frozen `fervor_at_prime` + bonuses from `_collect_spell_bonuses`, routes through `await _resolve_attack(true, enemy_index, …, "resolve")`; no Fervor escalation. Hex Mastery helpers: `_cast_mind_rend(enemy, enemy_index, attack_result)` — dedicated helper for Mind Rend; bypasses `_resolve_attack` to suppress the breach wound. On Resolve breach: fires on_breach hook, sets `_current_round_player_breaches["resolve"]=true`, applies `hex_marked` CombatStatus (duration L1=3, L2=7) AFTER the hook (mark not present during own breach). On Resolve holds: no mark, no wound. Hex amplification: `_resolve_attack` checks `if attacker_is_player and not defender_is_player and _has_status(defender, "hex_marked")` after `var wounds_pending := 2 if massive else 1` → `wounds_pending += 1`. Intended combo: Hex mark active + Mind Detonation explosion both get amplified by the same mark.
-- **`PlayerProgression`** — constellation state; read by `CombatManager` at `start_combat()`. `ALL_NODES` catalog (now includes 11 Dominion nodes; old core_dominion_1/2 replaced by dom_core). `get_known_spells()` and `get_known_cantrips()` iterate all purchased `node_levels`, collect from `levels_data[0..level-1].spells`. `get_node_level_by_id(id)` looks up a node by string ID and returns its current level (0 if absent). **Fervor persistence** (Group 5): `saved_fervor_size` / `saved_is_burned_out` / `saved_wounds` fields written by `CombatManager._end_combat()`, read by `start_combat()` (`saved_wounds` carries wounds between chained encounters). `combat_prefs: CombatPreferences` — persisted action defaults and mode flags; instantiated fresh in `reset()`, serialized/deserialized with save data. Methods: `reset()`, `apply_long_rest()` (reset fervor + clear burnout), `apply_short_rest()` (−1 wound, −1 fervor step, clear burnout), `apply_recovery()` (clear burnout only), `grant_points(n)`, `equip_main_hand(w)`, `equip_off_hand(w)`, `debug_set_points(n)`, `debug_set_tier(t)`.
-- **`DungeonManager`** — run state: `start_run()`, `current_enemies() → Array`, `on_victory()` (grants 1 point + advances index), `on_defeat()`, `has_next_enemy()`, `is_run_complete()`, `was_last_fight_chained()`, `enemies_cleared()`, `enemies_total()`. Hard-coded 8-encounter sequence: [1] Grunt, [2] Grunt→Grunt, [3] Grunt+Grunt, [4] Soldier, [5] Grunt→Grunt+Soldier, [6] Grunt+Grunt+Grunt, [7] Grunt+Soldier→Soldier+Soldier, [8] Knight (solo).
+
+**`CombatManager`** — all output via signals; nothing returned. Disconnect all signals before `reload_current_scene()`.
+
+*Signals:* `player_intents_available`, `fervor_changed`, `player_magic_available`, `player_massive_incoming`, `player_burnout_imminent` (Lucidity L2: emitted before `_burnout_decision_gate` is awaited), `player_defense_incoming`, `player_defense_item_choice`. Coroutine gates: `_massive_decision_gate(use_charge: bool)`, `_burnout_decision_gate(use_charge: bool)`.
+
+*Public methods:*
+- Combat lifecycle: `start_combat(player_data, enemies_data)`, `reset_item_charges(rest_type)`
+- Player actions: `player_chose_strike(net_advantage, target_pool, brutal_trade, target_index, source_weapon)`, `player_chose_cantrip(spell, target_index)`, `player_chose_spell(spell, target_index)`, `player_chose_lucidity()` (L1: lower Fervor by 1 step, ends round)
+- Interrupt responses: `player_chose_degrade_wound(use_charge)` (MftG), `player_chose_prevent_burnout(use_charge)` (L2: resolves `_burnout_decision_gate`; true = avert Burnout)
+- UI acknowledgments: `player_acknowledged_defense()`, `player_chose_defense_item(mod)`, `player_auto_execute_attack(target_index, net_advantage)`
+- Debug: `debug_set_fervor(size, burned_out)`, `debug_refill_hp()`, `debug_set_immortal(enabled)`, `debug_set_lethal(enabled)`, `debug_set_player_off_hand(weapon)`
+- Reads: `get_player_bare_hands_modifier(action_key) → ActionModifier`, `get_player_attack_preview() → int`
+
+*Key helpers:* `_get_action_modifier(state, key) → ActionModifier` (weapon → bare_hands → zero stub), `_effective_tier(state, mod)` (mod.tier_cap=0 = uncapped), `_attack_flat` / `_guard_flat` / `_pool_bonus` (all delegate to `_get_action_modifier`). `_collect_spell_bonuses(spell)` sums pool/keep/flat across purchased nodes for a spell (shared by `_resolve_round_spell` and `_detonate_mind_bomb`). Discipline entry points: `_check_mind_detonation`, `_detonate_mind_bomb`, `_cast_mind_rend` — see Game rules summary for behavior.
+
+**`PlayerProgression`** — constellation state; read by `CombatManager` at `start_combat()`.
+- `ALL_NODES` catalog: 11 Dominion + neg_core/ing_core L1-3 + ability nodes. `get_known_spells()` / `get_known_cantrips()` collect from `levels_data[0..level-1].spells`. `get_node_level_by_id(id)` returns current level (0 if absent).
+- **Fervor persistence:** `saved_fervor_size` / `saved_is_burned_out` / `saved_wounds` written by `CombatManager._end_combat()`, read at `start_combat()` (`saved_wounds` carries wounds across chained encounters).
+- `combat_prefs: CombatPreferences` — persisted action defaults and mode flags; fresh in `reset()`, serialized with save data.
+- Methods: `reset()`, `apply_long_rest()` (reset Fervor + clear Burnout), `apply_short_rest()` (−1 wound, −1 Fervor step, clear Burnout), `apply_recovery()` (clear Burnout only), `grant_points(n)`, `equip_main_hand(w)`, `equip_off_hand(w)`, `debug_set_points(n)`, `debug_set_tier(t)`.
+
+**`DungeonManager`** — run state: `start_run()`, `current_enemies() → Array`, `on_victory()` (grants 1 point + advances index), `on_defeat()`, `has_next_enemy()`, `is_run_complete()`, `was_last_fight_chained()`, `enemies_cleared()`, `enemies_total()`. Hard-coded 8-encounter sequence: [1] Grunt, [2] Grunt→Grunt, [3] Grunt+Grunt, [4] Soldier, [5] Grunt→Grunt+Soldier, [6] Grunt+Grunt+Grunt, [7] Grunt+Soldier→Soldier+Soldier, [8] Knight (solo).
 
 ### Round loop (CombatManager)
 
@@ -181,127 +207,58 @@ Helpers on `CombatManager`:
 - `_get_status(state, status_id) → CombatStatus`
 - `_tick_statuses(state)` — decrements `duration_rounds` for all non-permanent statuses and removes those that reach 0. Called once after `start_of_round` hooks in `_begin_round()` and once after `end_of_round` hooks in `_end_of_round()`.
 
-`_process_statuses_hook(hook, state, context)` dispatches on `status.status_id` via a `match` block. Always iterates `state.active_statuses.duplicate()` to prevent mutation during iteration. No match cases are active yet — Groups B–D will add them. Logic must never move into `CombatStatus` itself.
+`_process_statuses_hook(hook, state, context)` dispatches on `status.status_id` via a `match` block. Always iterates `state.active_statuses.duplicate()` to prevent mutation during iteration. Active cases: `mind_detonation_primed` (no-op — bomb is breach-driven, not hook-driven) and `hex_marked` (no-op — amplification is breach-driven). Logic must never move into `CombatStatus` itself.
 
 Stat overrides: `_stat_size(state, stat)` reads `status.stat_overrides[stat]` before falling through to node levels — status overrides always win over permanent progression. **Note:** `stat_overrides` is also used to carry non-stat payload in `mind_detonation_primed` (keys `fervor_at_prime`, `md_level`); these keys are never read by `_stat_size` and cause no side-effects.
 
 ### Interrupt system
 
-`InterruptHandler` is a reactive hook fired at specific points in the round loop. Handlers are
-registered per `CombatantState` at `start_combat()` based on purchased nodes. Each handler has
-a trigger, charges, and priority.
+`InterruptHandler` is a reactive hook registered per `CombatantState` at `start_combat()` from purchased nodes. Two fire points with **separate dispatch paths**:
 
-**Two fire points — two separate dispatch paths:**
+1. **`_resolve_attack()` path** — trigger `"on_massive_wound"`, wounds-shaped. Calls `_find_interrupts(state, trigger)` then `await _resolve_interrupt(handler, state, context)` for each (returns `{ "wounds_modified": int, "resolved": bool }`). Active handler: **Meat for the Grinder**. To add: new case in `_resolve_interrupt()` + `_resolve_<name>()` + register in `start_combat()` + update priority table.
+2. **`_escalate_fervor()` path** — trigger `"on_burnout"`, bool-shaped. Calls `await _try_prevent_burnout(state)` directly (emits `player_burnout_imminent`, awaits `_burnout_decision_gate`, returns `true` if prevented). Does NOT use `_resolve_interrupt`. Active handler: **Lucidity L2**.
 
-1. **`_resolve_attack()` path** (trigger `"on_massive_wound"`) — wounds-shaped dispatcher.
-   - Detects the triggerable event, calls `_find_interrupts(state, trigger)`, then for each
-     handler calls `await _resolve_interrupt(handler, state, context)`.
-   - `_resolve_interrupt` returns `{ "wounds_modified": int, "resolved": bool }`.
-   - `Meat for the Grinder` is the active handler on this path.
-   - Adding new attack-path handlers: add a case in `_resolve_interrupt()`, implement
-     `_resolve_<handler_name>()`, register in `start_combat()`, update priority table.
+Priority (lower first): Lucidity L2 (`on_burnout`) = 10, Meat for the Grinder (`on_massive_wound`) = 20. They never contend — different fire points.
 
-2. **`_escalate_fervor()` path** (trigger `"on_burnout"`) — bool-shaped dedicated resolver.
-   - When Burnout would be set, calls `await _try_prevent_burnout(state)` directly.
-   - `_try_prevent_burnout` emits `player_burnout_imminent`, awaits `_burnout_decision_gate`,
-     consumes the charge, and returns `true` if Burnout is prevented, `false` otherwise.
-   - Does NOT go through `_resolve_interrupt` — the return shape is a bool, not wounds.
-   - `Lucidity L2` is the active handler on this path.
+### Data-only resource fields
 
-Priority table (lower = processed first):
-- Lucidity L2 (anti-Burnout, trigger="on_burnout", fires in `_escalate_fervor`): 10
-- Meat for the Grinder (trigger="on_massive_wound", fires in `_resolve_attack`): 20
+Three data-only resources back the combat systems above (zero methods; all logic lives in `CombatManager`):
+- **CombatStatus** (`resources/CombatStatus.gd`): `status_id`, `duration_rounds` (-1 = permanent), `stat_overrides: Dictionary`, `escalation_threshold: int`, `source_node_id`. (Behaviour: see Status system above.)
+- **InterruptHandler** (`resources/InterruptHandler.gd`): `handler_id`, `trigger` ("on_massive_wound" | "on_burnout"), `target` ("self" | "enemy"), `charges`, `priority`. (Behaviour + dispatch paths: see Interrupt system above.)
+- **SpellOutcomeEffect** (`resources/SpellOutcomeEffect.gd`): `spell_id`, `trigger` ("on_hit" | "on_breach" | "on_cast" | "on_detonate"), `target`, `target_pool`, `effect_type` ("debuff_flat" | "debuff_keep" | "bonus_keep" | "bonus_flat" | "apply_status"), `value`, `condition`, `status_to_apply: CombatStatus`. (Behaviour: see Spell outcome effects below.)
 
-The two triggers never contend — they fire at different points in the round loop.
-
-### New architectural resources (Group A — fully implemented; unblocks Group B)
-
-**CombatStatus** — temporary state on a combatant. Hard rule: data only,
-zero functional methods. Fields: `status_id`, `duration_rounds`
-(-1 = permanent), `stat_overrides: Dictionary`, `escalation_threshold: int`,
-`source_node_id: String`.
-
-**InterruptHandler** — reactive interrupt at specific round-loop points. Fields:
-`handler_id`, `trigger` ("on_massive_wound" | "on_burnout"), `target` ("self" | "enemy"), `charges`, `priority`.
-Priority table: Lucidity L2 anti-Burnout = 10 (fires in `_escalate_fervor` via `_try_prevent_burnout`), Meat for the Grinder = 20 (fires in `_resolve_attack` via `_resolve_interrupt`).
-Two dispatch paths: `on_massive_wound` → wounds-shaped `_resolve_interrupt`; `on_burnout` → bool-shaped `_try_prevent_burnout`. Rule (attack path only): the second handler sees the outcome already modified by the first.
-
-**SpellOutcomeEffect** — post-resolution spell effect. Fields: `spell_id`,
-`trigger` ("on_hit" | "on_breach" | "on_cast" | "on_detonate"), `target`,
-`target_pool`, `effect_type`
-("debuff_flat" | "debuff_keep" | "bonus_keep" | "bonus_flat" | "apply_status"),
-`value`, `condition`, `status_to_apply: CombatStatus`.
-
-**Critical boundary — SpellOutcomeEffect vs CombatStatus:**
-- SpellOutcomeEffect = instantaneous effect resolved within the same spell
-  resolution
-- If the effect must persist across rounds, SpellOutcomeEffect with
-  effect_type="apply_status" applies a CombatStatus
-- NEVER add a duration field to SpellOutcomeEffect
+**Boundary — SpellOutcomeEffect vs CombatStatus:** SpellOutcomeEffect is instantaneous (resolved within the same spell resolution). For cross-round persistence use `effect_type="apply_status"` to apply a CombatStatus. NEVER add a duration field to SpellOutcomeEffect.
 
 ### Magic system
 
-Group 4 implements Fervor / Burnout / Cantrips / True Spells with per-spell `SpellData`:
-
 - **Fervor** — player-only runtime state on `CombatantState`. Track: d4 → d6 → d8 → d10 (`FERVOR_TRACK` const). Cap = `data.ingenuity_size`. Persists across combats via `PlayerProgression.saved_fervor_size`; Long Rest resets to d4, Recovery Scene only clears Burnout.
-- **Escalation** — after a true spell resolves, `await _escalate_fervor(_player, steps)` where `steps = primary_dice_maxed_count` (Ingenuity-tagged dice that rolled max, pre-Keep, including discarded) `+ (1 if fervor_maxed)`. Multiple steps possible in a single cast. `_escalate_fervor` is a coroutine: when a positive step would set `is_burned_out=true`, it awaits `_try_prevent_burnout` (Lucidity L2 interrupt path) before committing Burnout. Both call sites (`player_chose_lucidity` and `_resolve_round_spell`) use `await`. The cooling path (negative steps) never triggers the interrupt and returns immediately.
+- **Escalation** — after a true spell resolves, `await _escalate_fervor(_player, steps)` where `steps = primary_dice_maxed_count` (Ingenuity-tagged dice that rolled max, pre-Keep, including discarded) `+ (1 if fervor_maxed)`. `_escalate_fervor` is a coroutine: when a positive step would set `is_burned_out=true`, it awaits `_try_prevent_burnout` (Lucidity L2 interrupt path) before committing Burnout.
 - **Burnout** — blocks `player_chose_spell()`; cantrips remain available. Persists across combats; cleared by Long Rest or Recovery.
-- **Cantrip** — uses `SpellData` (is_cantrip=true). Ingenuity pool, no Fervor die, no escalation. Available during Burnout. Granted via `node.spells` (Minor Studies carries "Arcane Bolt" [`arcane_bolt.tres`] + "Arcane Touch" [`arcane_touch.tres`]).
-- **True spell** — uses `SpellData`. Ingenuity pool + optional aspect dice + real Fervor die. Granted by Spellcasting L1+ (Arcane Missile + Arcane Mark at L1).
+- **Cantrip** — `SpellData.is_cantrip=true`. Ingenuity pool, no Fervor die, no escalation. Available during Burnout. Granted via `node.spells` (Minor Studies: `arcane_bolt.tres`, `arcane_touch.tres`).
+- **True spell** — Ingenuity pool + optional aspect dice + real Fervor die. Granted by Spellcasting L1+ (Arcane Missile + Arcane Mark at L1).
 
-### SpellData (implemented)
+**SpellData** (`resources/SpellData.gd`): `spell_name`, `description`, `aspect_stat` (`"dominion"` | `"negation"` | `""` = pure Ingenuity), `aspect_dice` (non-Ingenuity pool dice; rest are Ingenuity-tagged and count toward escalation), `target_pool`, `flat_bonus`, `is_cantrip: bool`, `tags: PackedStringArray` (matched against `SpellBonusEffect.tag`).
 
-`resources/SpellData.gd` (`class_name SpellData`):
-- `spell_name: String`, `description: String`
-- `aspect_stat: String` (`"dominion"` | `"negation"` | `""`) — non-Ingenuity stat for anchor dice; `""` = pure Ingenuity.
-- `aspect_dice: int` — how many pool dice use `aspect_stat`; the rest are Ingenuity-tagged (count toward escalation even if discarded).
-- `target_pool: String` — defense pool the spell pressures.
-- `flat_bonus: int` — post-keep flat addition.
-- `is_cantrip: bool` — no Fervor die, available during Burnout.
-- `tags: PackedStringArray` — matched against `SpellBonusEffect.tag` at spell resolution.
+### Node-driven spell bonuses
 
-### Spell school system (implemented — Groups 4.5 A + B)
+**Core stat nodes:** `dom_core`/`neg_core`/`ing_core` L1–L3 grant stat size upgrades via `effect_type="stat_size_<stat>"` and `effect_value`. `CombatManager._stat_size(state, stat)` reads the base from `CombatantData` and returns the highest `effect_value` across all purchased `NodeLevelData` entries for that key.
 
-**Phase A — Core stat nodes (implemented):**
-- Core nodes (`dom_core` L1–L3, `neg_core` L1–L3, `ing_core` L1–L3) grant stat size upgrades via `effect_type="stat_size_<stat>"` and `effect_value`.
-- `CombatManager._stat_size(state, stat)` — reads base from `CombatantData`, returns highest `effect_value` across all purchased `NodeLevelData` entries for `"stat_size_<stat>"`.
+**SpellBonusEffect** (`resources/SpellBonusEffect.gd`): `tag: String`, `bonus_type: "pool"|"keep"|"flat"`, `value: int`, `stat: String`, `spell_id: String`. A bonus applies if `spell_id` matches the spell's name (non-empty), or `tag` matches one of the spell's tags (empty `spell_id`). `_resolve_round_spell()` sums matching entries into `spell_pool_bonus`, `spell_keep_bonus`, `spell_flat_bonus`. Example: Spellcasting L2 injects `tag="arcane", keep+1` + `spell_id="Arcane Missile", flat+1`; L3 adds another `keep+1` and `flat+1`.
 
-**Phase B — SpellBonusEffect pipeline (implemented):**
-- `SpellBonusEffect` resource (`resources/SpellBonusEffect.gd`): `tag: String`, `bonus_type: "pool"|"keep"|"flat"`, `value: int`, `stat: String`, `spell_id: String` (optional per-spell filter; empty = tag matching, non-empty = name match, overrides tag check).
-- `Spellcasting` L2/L3 inject bonus_effects: L2 adds `tag="arcane", keep+1` + `spell_id="Arcane Missile", flat+1`; L3 stacks another `keep+1` and `flat+1`. Keep bonuses are additive with L3 reaching grade 2 (keep 3 dice).
-- `CombatManager._resolve_round_spell()` sums matching `bonus_effects`: a bonus applies if `spell_id` matches the spell's name (non-empty), or `tag` matches one of the spell's tags (empty `spell_id`). Three summed locals: `spell_pool_bonus`, `spell_keep_bonus`, `spell_flat_bonus`.
+**Node schema:** `NodeData` fields: `node_id`, `display_name`, `category`, `base_description`, `icon`, `max_levels`, `levels_data: Array[NodeLevelData]`. `NodeLevelData` fields: `level_index`, `cost`, `required_tier`, `prerequisites: Array` (untyped `[{node_id, required_level}]`), `level_effect_description`, `effect_type`, `effect_value`, `stat`, `weapon_tags`, `uses_per_combat`, `spells: Array[SpellData]`, `bonus_effects: Array[SpellBonusEffect]`, `outcome_effects: Array[SpellOutcomeEffect]`. `PlayerProgression.node_levels: Dictionary` (NodeData → int). `CombatManager` helpers: `_node_effect_max`, `_node_effect_sum`, `_node_weapon_bonus_sum`, `_has_effect_type`, `_physical_keep_grade`, `_wounds_node_bonus`, `_meat_grinder_charges`.
 
-**Multi-level Node Schema (implemented — Group 4.8 Phase A):**
-- `NodeData` fields: `node_id: String`, `display_name: String`, `category: String`, `base_description: String`, `icon: Texture2D`, `max_levels: int`, `levels_data: Array[NodeLevelData]`.
-- `NodeLevelData` fields: `level_index`, `cost`, `required_tier`, `prerequisites: Array` (untyped, `[{node_id: String, required_level: int}]`), `level_effect_description`, `effect_type`, `effect_value`, `stat`, `weapon_tags: PackedStringArray`, `uses_per_combat`, `spells: Array[SpellData]`, `bonus_effects: Array[SpellBonusEffect]`, `outcome_effects: Array[SpellOutcomeEffect]`.
-- `PlayerProgression.node_levels: Dictionary` (NodeData → int); methods: `can_upgrade(node)`, `upgrade(node)`, `get_level(node)`, `get_node_level_by_id(id)`.
-- `CombatManager` helpers: `_node_effect_max(state, key)`, `_node_effect_sum(state, key)`, `_node_weapon_bonus_sum(state, key)`, `_has_effect_type(state, key)`, `_physical_keep_grade(state)`, `_wounds_node_bonus(state)`, `_meat_grinder_charges(state)`.
+### Spell outcome effects
 
-### Spell outcome effect system (Group A4)
+`SpellOutcomeEffect` is attached to `NodeLevelData` via `outcome_effects`. It describes effects applied AFTER spell resolution — contrast with `SpellBonusEffect` which modifies the roll itself.
 
-`SpellOutcomeEffect` is a data-only resource attached to `NodeLevelData` via `outcome_effects: Array[SpellOutcomeEffect]`. It describes effects applied AFTER spell resolution, in contrast to `SpellBonusEffect` which modifies the caster's roll itself.
+Resolution flow (`_resolve_round_spell` / `_resolve_round_cantrip`):
+1. Roll built with `SpellBonusEffect` applied (including `spell_id`-filtered bonuses)
+2. `_resolve_attack` runs, produces breach/hit outcome, updates `_current_round_player_breaches`
+3. `_apply_spell_outcome_effects` collects matching `SpellOutcomeEffect` entries from purchased nodes
+4. Each effect filtered by `trigger`, then `condition`, then dispatched
+5. Effects queue a single-use debuff in `pending_guard_debuffs` (consumed on next guard roll), apply a `CombatStatus`, or are no-ops with `push_warning`
 
-Flow at spell resolution (`_resolve_round_spell`, `_resolve_round_cantrip`):
-1. The attack roll is built (`SpellBonusEffect` applied here, including `spell_id`-filtered bonuses)
-2. `_resolve_attack` runs, producing breach/hit outcome; updates `_current_round_player_breaches`
-3. `_apply_spell_outcome_effects` collects all matching `SpellOutcomeEffect` entries from purchased nodes
-4. Each effect is filtered by `trigger`, then `condition`, then dispatched
-5. Effects either: queue a single-use debuff in `pending_guard_debuffs` (consumed on next defense on that pool), apply a `CombatStatus`, or are no-ops with `push_warning`
-
-**Boundary with `SpellBonusEffect`:**
-- `SpellBonusEffect` modifies the caster's roll → applied at roll construction time
-- `SpellOutcomeEffect` modifies post-resolution state → applied after the resolver returns
-- `SpellBonusEffect` now has optional `spell_id` for per-spell numerical upgrades (e.g. "Arcane Missile gets +1 flat from Spellcasting L2")
-
-**Boundary with `CombatStatus`:**
-- `SpellOutcomeEffect` is instantaneous — resolves in the same spell resolution that produced it
-- If persistence is needed, use `effect_type="apply_status"` to apply a `CombatStatus`
-- NEVER add a duration field to `SpellOutcomeEffect`
-
-**Round-scoped tracking:**
-- `_current_round_player_breaches: Dictionary` lives on `CombatManager` (not `CombatantState`) — it is round-scoped, reset every `_begin_round()`
-- Conditions like `"if_stance_breached_this_round"` read from this dict
-- `"hit"/"breach"` in the outcome dict means "this spell caused the round's FIRST breach on its target_pool". A spell that targets an already-breached pool will have `breach=false`. Pure per-spell breach detection is deferred to Group B.
+**Round-scoped tracking:** `_current_round_player_breaches: Dictionary` lives on `CombatManager` (not `CombatantState`) — round-scoped, reset every `_begin_round()`. Conditions like `"if_stance_breached_this_round"` read from this dict. `"hit"/"breach"` in the outcome dict means "this spell caused the round's FIRST breach on its target_pool" — a spell targeting an already-breached pool yields false.
 
 ### GDScript typing rules
 
@@ -331,40 +288,39 @@ Flow at spell resolution (`_resolve_round_spell`, `_resolve_round_cantrip`):
 | Area | What looks wrong | Why it's correct |
 |------|-----------------|-----------------|
 | `_resolve_round*` in CombatManager | Called without `await` from `player_chose_*` | Intentional coroutine pattern — runs cooperatively on main thread, yields at the timer |
+| `_end_of_round()` called without visible `await` | Looks like a blocking call | It is a coroutine, must be called with await — same rule as `_resolve_round*` |
+| Guard reset is in `_end_of_round()` not `_begin_round()` | Reset should happen at round start | Intentional — guards are 0 when `start_of_round` hooks fire, which is the correct state for status processing |
 | `global_script_class_cache.cfg` | May be stale after adding a new `class_name` | Must be updated manually when Godot editor hasn't been opened — headless runner uses the cached index |
 | `EquipmentData` flat fields (`potency`, `flat_attack_bonus`, etc.) | Still present on the resource | Deprecated shims — superseded by `action_modifiers`. Retained for backwards-compat with old `.tres` files; ignored at runtime when `action_modifiers` is non-empty |
 | Per-pool guard state in `CombatantState` | Three separate guard/rolled pairs | Intentional; cumulative Disadvantage on second+ pool pressure is deferred to a future group (see project-status.md Future section) |
 | `debug_set_player_weapon` on `CombatManager` | Public method with "debug" in name on a production autoload | Used by `DebugWeaponSelector`; safe because it's null-guarded at the call site |
-| `_process_statuses_hook` with potential `await` | Adds latency to the round loop | Required for future statuses that need player input |
 | `CombatStatus` with no methods | Nearly empty resource | Intentional — logic lives in the dispatcher, not in the data |
-| `_apply_wounds` bypassing interrupts in some contexts | Appears to ignore the interrupt system | Intentional for self-damage (blood_channeling) and hex damage — documented in code |
-| InterruptHandler priority 10/20 | Apparently arbitrary numbers | Lucidity L2 (10, reserved, fires in _escalate_fervor) before MftG (20) — deliberate design order, do not change |
-| `_end_of_round()` called without visible `await` | Looks like a blocking call | It is a coroutine, must be called with await — same rule as _resolve_round* |
+| `_process_statuses_hook` with potential `await` | Adds latency to the round loop | Required for future statuses that need player input |
+| `_process_statuses_hook` iterates `.duplicate()` of `active_statuses` | Unnecessary copy | Prevents array mutation during iteration if a future case adds/removes statuses mid-loop |
 | `_stat_size()` checks active_statuses before node_levels | Seems to give statuses higher priority than purchased nodes | Intentional — temporary overrides (e.g. Purple Hollow d12) must win over permanent progression |
 | `_add_status` silently replaces duplicates | Looks like a bug swallower | Intentional — applying the same status twice refreshes it, not stacks it |
-| `_process_statuses_hook` iterates `.duplicate()` of `active_statuses` | Unnecessary copy | Prevents array mutation during iteration if a future case adds/removes statuses mid-loop |
-| Guard reset is in `_end_of_round()` not `_begin_round()` | Reset should happen at round start | Intentional — guards are 0 when `start_of_round` hooks fire, which is the correct state for status processing |
-| `_resolve_interrupt` is awaited inside `_resolve_attack` | Adds an await point in the attack resolution | Intentional — interrupts may need player input; the await is the whole point |
-| InterruptHandler charges live on the handler instance, not on `CombatantState` | Charge counting feels scattered | Intentional — each handler manages its own resource; multiple handlers with the same trigger have independent charges |
-| Interrupt registration happens in `start_combat`, not on node purchase | Looks like late binding | Intentional — handlers are combat-scoped; charges reset every combat per design |
-| `wounds_pending` reassigned inside the interrupt loop before being assigned to `wounds` | Looks like a refactor smell | Intentional — the interrupt loop modifies wound count only on the player-defender/massive path; the final `var wounds := wounds_pending` is always the applied count |
 | `pending_guard_debuffs` is consumed and erased in `_resolve_attack` before the roll | Looks like state mutation during read | Intentional — debuffs are single-use; consuming before the roll guarantees they apply once and only once |
 | `_current_round_player_breaches` lives on `CombatManager`, not `CombatantState` | Looks like scope confusion | Intentional — it is round-scoped, not combatant-scoped; resets every `_begin_round()` |
 | `status_to_apply` is `.duplicate()`'d before adding in `_dispatch_spell_outcome_effect` | Looks like unnecessary copy | Intentional — each application must be independent; otherwise duration ticks would share state across enemies |
 | `bonus_keep`/`bonus_flat` in `SpellOutcomeEffect` produce a `push_warning` at dispatch | Looks like a stub | Intentional — reserved for outcome-driven bonuses (e.g. Mind Detonation L2); the warning prevents silent misuse before Group D authors them |
 | `SpellBonusEffect` with `spell_id` set matches OR-style with tag | Looks like permissive matching | Intentional — when `spell_id` is non-empty it is a name filter; when empty the existing tag-based matching applies; both being true simultaneously is harmless (summed once) |
-| `"hit"/"breach"` in spell outcome dict can be false even when attack_total >= guard | Looks like a bug | Intentional — they mean "this spell caused the round's FIRST breach on its target_pool"; a spell hitting an already-breached pool yields false. Pure per-spell breach detection is deferred to Group B. |
-| `_escalate_fervor` accepts negative steps | Looks like only-escalation code | Lucidity L1 lowers Fervor via negative steps; `clampi` floors at index 0; Burnout check and cap clamp are gated to `steps > 0` only. |
-| `_escalate_fervor` is a coroutine (contains `await`) | Looks like a sync helper | It awaits `_try_prevent_burnout` on the positive-step Burnout path (Lucidity L2 interrupt); both call sites (`player_chose_lucidity`, `_resolve_round_spell`) use `await`. The cooling path (steps=-1) never hits `await` in practice and returns immediately. |
-| `_try_prevent_burnout` is separate from `_resolve_interrupt` | Looks like duplicated interrupt logic | Intentional — `_resolve_interrupt` is wounds-shaped (`{ wounds_modified, resolved }`), used by the `_resolve_attack` path. `_try_prevent_burnout` is bool-shaped and fires inside `_escalate_fervor`, a different fire point. Forcing them through the same dispatcher would require changing the return contract. |
+| `"hit"/"breach"` in spell outcome dict can be false even when attack_total >= guard | Looks like a bug | Intentional — they mean "this spell caused the round's FIRST breach on its target_pool"; a spell hitting an already-breached pool yields false |
+| InterruptHandler priority 10/20 | Apparently arbitrary numbers | Lucidity L2 (10, reserved, fires in `_escalate_fervor`) before MftG (20) — deliberate design order, do not change |
+| `_resolve_interrupt` is awaited inside `_resolve_attack` | Adds an await point in the attack resolution | Intentional — interrupts may need player input; the await is the whole point |
+| InterruptHandler charges live on the handler instance, not on `CombatantState` | Charge counting feels scattered | Intentional — each handler manages its own resource; multiple handlers with the same trigger have independent charges |
+| Interrupt registration happens in `start_combat`, not on node purchase | Looks like late binding | Intentional — handlers are combat-scoped; charges reset every combat per design |
+| `wounds_pending` reassigned inside the interrupt loop before being assigned to `wounds` | Looks like a refactor smell | Intentional — the interrupt loop modifies wound count only on the player-defender/massive path; the final `var wounds := wounds_pending` is always the applied count |
+| `_escalate_fervor` accepts negative steps | Looks like only-escalation code | Lucidity L1 lowers Fervor via negative steps; `clampi` floors at index 0; Burnout check and cap clamp are gated to `steps > 0` only |
+| `_escalate_fervor` is a coroutine (contains `await`) | Looks like a sync helper | It awaits `_try_prevent_burnout` on the positive-step Burnout path; both call sites (`player_chose_lucidity`, `_resolve_round_spell`) use `await`. The cooling path (steps=-1) never hits `await` in practice |
+| `_try_prevent_burnout` is separate from `_resolve_interrupt` | Looks like duplicated interrupt logic | Intentional — `_resolve_interrupt` is wounds-shaped (`{ wounds_modified, resolved }`), used by `_resolve_attack`. `_try_prevent_burnout` is bool-shaped and fires inside `_escalate_fervor` — different fire point, different return contract |
+| `mind_detonation_primed` dispatcher case is a no-op | Looks unfinished | Intentional — the bomb is breach-driven via `_check_mind_detonation` at Phase 2.1 (post player-attack), not hook-driven; the `pass` prevents silent misrouting |
+| Mind Detonation placement roll uses pool=1, not tier | Looks like a bug | Intentional — placement is a deliberate weak scratch; the +1 pool from MD's `SpellBonusEffect` applies only to the explosion built in `_detonate_mind_bomb` |
 | Status removed BEFORE `_resolve_attack` in `_detonate_mind_bomb` | Looks like premature cleanup | Intentional — prevents re-trigger: MD fires on Stance breach; explosion hits Resolve; removing status first is the clean guarantee |
 | Mind Detonation explosion does not escalate Fervor | Looks inconsistent with spell casts | Intentional — explosion is a delayed payoff using frozen `fervor_at_prime`, not a fresh cast; `_escalate_fervor` is not called from `_detonate_mind_bomb` |
-| Mind Detonation placement roll uses pool=1, not tier | Looks like a bug | Intentional — placement is a deliberate weak scratch; the +1 pool from MD's `SpellBonusEffect` applies only to the explosion built in `_detonate_mind_bomb` |
-| `mind_detonation_primed` dispatcher case is a no-op | Looks unfinished | Intentional — the bomb is breach-driven via `_check_mind_detonation` at Phase 2.1 (post player-attack), not hook-driven; the `pass` prevents silent misrouting |
 | `_cast_mind_rend` bypasses `_resolve_attack` | Looks like it skips the pipeline | Intentional — Mind Rend suppresses the breach wound and applies a mark instead; the standard path always deals the wound |
 | hex amplification is `wounds_pending += 1` in `_resolve_attack` | Looks like a magic number | Intentional — Hex Mastery amplifies the player's breach wound on a hexed enemy; gated to `attacker_is_player and not defender_is_player and _has_status(defender, "hex_marked")` |
 | Mind Rend's own breach does not self-amplify | Looks like a missing case | Intentional — the mark is applied AFTER the on_breach hook fires, and Mind Rend suppresses its own wound anyway; the ordering prevents any future on_breach hook from seeing the mark mid-cast |
-| Hex + Mind Detonation: both Stance breach and explosion breach are amplified | Looks like double-counting | Intentional — both events route through `_resolve_attack(true, …)` with the same hex_marked on the enemy; each amplification is independent. This is the designed late-game combo. |
+| Hex + Mind Detonation: both Stance breach and explosion breach are amplified | Looks like double-counting | Intentional — both events route through `_resolve_attack(true, …)` with the same hex_marked on the enemy; each amplification is independent. This is the designed late-game combo |
 
 ## Game rules summary
 
@@ -385,7 +341,7 @@ The rules live in `docs/game-rules/`. The implementation must match them exactly
 | True spell | Ingenuity + optional aspect dice + real Fervor die; granted by Spellcasting L1+ (Arcane Missile vs Stance, Arcane Mark vs Resolve); escalation = `primary_dice_maxed_count` (Ingenuity-tagged dice maxed pre-Keep, including discarded) `+ (1 if fervor_maxed)` |
 | Fervor cap | = `ingenuity_size` die face; caster may act at cap; escalating **beyond** cap triggers Burnout |
 | Burnout | Blocks true spells; cantrips unaffected; persists across combats. Cleared by Long Rest (also resets Fervor) or Recovery Scene (Burnout only). |
-| Stat sizes | Base from `CombatantData`; upgraded by Core nodes (mechanic wired in Phase A of spell school feature) |
+| Stat sizes | Base from `CombatantData`; upgraded by Core nodes via `_stat_size()` |
 | Spellcasting L1-L3 | L1: grants Arcane Missile + Arcane Mark, unlocks Fervor. L2: all arcane Keep 2, Arcane Missile +1 flat, Arcane Mark breach → enemy Stance flat −2. L3: all arcane Keep 3, Arcane Missile +2 flat total, Arcane Mark breach also → enemy Stance keep −1 (Frattura Totale). |
 | Tier advancement | Slot-budget model: **5 combat slots + 2 Flavor slots** per tier; spending both advances the tier and resets counters. **Core nodes cost 2 combat slots** (Training / Ability cost 1; Flavor costs 1 from the Flavor budget). `PlayerProgression.tier_combat_spent` / `tier_flavor_spent` are public vars. |
 | Passive wounds | +1 Max Wounds at Tier 2, +1 at Tier 4 (cumulative +2). Applied at `start_combat()` via `_tier_wound_bonus(tier)`; base `.tres` files never mutated. |
@@ -398,6 +354,6 @@ The rules live in `docs/game-rules/`. The implementation must match them exactly
 | Lucidity L1 | Proactive action: lower Fervor by 1 step, costs the turn, unlimited uses. Hidden when Fervor is already at d4 (`_can_use_lucidity()` check). Calls `await _escalate_fervor(_player, -1)`; negative steps skip Burnout check and cap clamp. |
 | Lucidity L2 | Reactive interrupt: when a positive escalation step would cause Burnout, the player is prompted (`player_burnout_imminent`) to spend 1 charge per combat. If spent, Burnout is cancelled but **Fervor stays at the cap** (precarious-truce — next escalation will threaten Burnout again). Implemented as `InterruptHandler` (`handler_id="lucidity_prevent_burnout"`, `trigger="on_burnout"`, `priority=10`) registered at `start_combat()`; dispatched by `_try_prevent_burnout()` inside `_escalate_fervor()`, NOT through `_resolve_interrupt` (which is wounds-shaped). |
 | Mind Detonation | True spell (L1: tier≥2, prereq Spellcasting L1). Placement scratch: pool=1, Ingenuity die, training keep, Fervor die included, no SpellBonusEffect bonuses. Applies `mind_detonation_primed` CombatStatus (duration=3, freezes `fervor_at_prime` + `md_level` in `stat_overrides`). At Phase 2.1 (post player-attack) in all three round types: if enemy has `mind_detonation_primed` and `_current_round_player_breaches["stance"]` is true, `_detonate_mind_bomb` fires — removes status, builds explosion via `_collect_spell_bonuses`, calls `await _resolve_attack(true, …, "resolve")` using frozen Fervor; no Fervor escalation. Fizzle message logged on `_tick_statuses` expiry. L2 (tier≥3, prereq ing_core L3): +1 explosion keep. Known simplification: global Stance breach tracking — any breach in the round triggers all primed bombs. |
-| Hex Mastery / Mind Rend | True spell (L1: tier≥3, prereq Spellcasting L1). Mind Rend attacks enemy Resolve but uses `_cast_mind_rend` instead of `_resolve_attack` to suppress the breach wound. On breach: applies `hex_marked` CombatStatus (L1: duration_rounds=3/"2 turns", L2: duration_rounds=7/"4 turns") — no wound dealt. On Resolve holds: nothing. While `hex_marked` is active on an enemy, `_resolve_attack` adds `wounds_pending += 1` for every player breach on that enemy (any pool). Enemy-on-player breaches never amplified. Mind Rend's own breach is not self-amplified (mark applied after on_breach hook fires; wound suppressed regardless). Fervor escalates normally after Mind Rend (cast path in `_resolve_round_spell` unchanged). Intended combo with Mind Detonation: Hex + Stance breach amplified (+1), explosion breach also amplified (+1) by the same mark. |
+| Hex Mastery / Mind Rend | True spell (L1: tier≥3, prereq Spellcasting L1). Mind Rend attacks enemy Resolve but uses `_cast_mind_rend` instead of `_resolve_attack` to suppress the breach wound. On breach: applies `hex_marked` CombatStatus (L1: duration_rounds=3/"2 turns", L2: duration_rounds=7/"4 turns") — no wound dealt. On Resolve holds: nothing. While `hex_marked` is active on an enemy, `_resolve_attack` adds `wounds_pending += 1` for every player breach on that enemy (any pool). Enemy-on-player breaches never amplified. Mind Rend's own breach is not self-amplified (mark applied after on_breach hook fires; wound suppressed regardless). Fervor escalates normally after Mind Rend. Intended combo with Mind Detonation: Hex + Stance breach amplified (+1), explosion breach also amplified (+1) by the same mark. |
 
-Next unimplemented items: Group C remaining — Chrono-Tinkering, Echoing Mind (Phases C2 Hex Mastery, C1 Mind Detonation complete).
+Next unimplemented items: Group C remaining — Chrono-Tinkering, Echoing Mind.
