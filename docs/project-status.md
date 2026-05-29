@@ -181,8 +181,22 @@ for every player breach on the hexed enemy (any pool); enemy-on-player breaches 
 never amplified. Intended combo: Hex + Mind Detonation — both the Stance breach AND
 the explosion breach are amplified by the same mark.
 
+**Phase C3 ✓ — Echoing Mind**
+`ability_echoing_mind.tres` (max_levels=2). Injects Mind Lash (true spell, tags=["arcane","echo"],
+target_pool="stance"). After a true spell cast with the "echo" tag, applies `echoing_spell`
+CombatStatus on the PLAYER (the caster) with frozen `frozen_fervor`, `current_kept_dice` =
+cast_kept−1, and `em_level`. At each `end_of_round`, `_process_statuses_hook` (now a coroutine)
+awaits `_resolve_spell_echo` — routes through `_resolve_attack(true,…)` using frozen Fervor and
+decremented kept dice; no Fervor escalation. `current_kept_dice` decrements by 1 each round;
+status self-removes when next < 1. L2: each echo carries flat bonus = current_kept_dice for that
+echo. `duration_rounds=20` is a safety bound; real termination is via kept-dice decay.
+Known simplifications: one echo train at a time (new cast overwrites old);
+global Stance breach tracking for MD interactions (same as Mind Detonation).
+`_end_of_round` now `await`s hook calls and checks `_all_enemies_defeated()` mid-body
+(echo can kill the last enemy); all four `_end_of_round` call sites guard `_begin_round()`.
+New spell: `mind_lash.tres`. New node: `ability_echoing_mind.tres`.
+
 - Chrono-Tinkering (skip next guard roll on a specific pool)
-- Echoing Mind (spells with tag "echo" hit again at end_of_round)
 
 ---
 

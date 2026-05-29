@@ -334,6 +334,8 @@ func player_chose_lucidity() -> void:
 	log_message.emit("[color=cyan]Lucidity: you steady your mind and cool the Fervor.[/color]")
 	await _escalate_fervor(_player, -1)
 	await _end_of_round()
+	if _all_enemies_defeated():
+		return  # _end_combat already called inside _end_of_round (echo kill)
 	_begin_round()
 
 
@@ -564,6 +566,8 @@ func _resolve_round(net_advantage: int = 0, target_pool: String = "stance", brut
 
 	# ── Next round ─────────────────────────────────────────────────────────
 	await _end_of_round()
+	if _all_enemies_defeated():
+		return  # _end_combat already called inside _end_of_round (echo kill)
 	_begin_round()
 
 
@@ -646,6 +650,8 @@ func _resolve_round_cantrip(spell: SpellData, target_index: int = 0) -> void:
 				return
 
 	await _end_of_round()
+	if _all_enemies_defeated():
+		return  # _end_combat already called inside _end_of_round (echo kill)
 	_begin_round()
 
 
@@ -767,6 +773,31 @@ func _resolve_round_spell(spell: SpellData, target_index: int = 0) -> void:
 	if not target.is_defeated:
 		await _check_mind_detonation(target, target_index)
 
+	# Echoing Mind: arm echo if the spell has "echo" tag and target is still alive.
+	# "current_kept_dice" starts at (cast_kept − 1); if that is 0, no echo is created.
+	# New cast overwrites any existing echo train (latest cast wins — known simplification).
+	if "echo" in spell.tags and PlayerProgression.get_node_level_by_id("echoing_mind") > 0 and not target.is_defeated:
+		var _echo_bonuses := _collect_spell_bonuses(spell)
+		var _cast_kept_dice: int = _training_keep_grade(_player) + (_echo_bonuses["keep"] as int) + 1
+		var _initial_echo_kept: int = _cast_kept_dice - 1
+		if _initial_echo_kept >= 1:
+			if _has_status(_player, "echoing_spell"):
+				_remove_status(_player, "echoing_spell")
+				log_message.emit("[color=cyan]The previous echo is cut off as a new spell begins to resound.[/color]")
+			var echo_status := CombatStatus.new()
+			echo_status.status_id = "echoing_spell"
+			echo_status.duration_rounds = 20  # safety bound; real termination via current_kept_dice < 1
+			echo_status.source_node_id = "echoing_mind"
+			echo_status.stat_overrides = {
+				"spell_path": spell.resource_path,
+				"target_index": target_index,
+				"frozen_fervor": _player.fervor_size,
+				"current_kept_dice": _initial_echo_kept,
+				"em_level": PlayerProgression.get_node_level_by_id("echoing_mind"),
+			}
+			_add_status(_player, echo_status)
+			log_message.emit("[color=cyan]The spell begins to echo — it will resound for %d more turn(s).[/color]" % _initial_echo_kept)
+
 	if _all_enemies_defeated():
 		_end_combat()
 		return
@@ -795,6 +826,8 @@ func _resolve_round_spell(spell: SpellData, target_index: int = 0) -> void:
 		await _escalate_fervor(_player, escalation_steps)
 
 	await _end_of_round()
+	if _all_enemies_defeated():
+		return  # _end_combat already called inside _end_of_round (echo kill)
 	_begin_round()
 
 
@@ -1020,6 +1053,8 @@ func _tick_statuses(state: CombatantState) -> void:
 			log_message.emit("[color=purple]The mind-bomb goes inert. Stance was never broken.[/color]")
 		elif s.status_id == "hex_marked":
 			log_message.emit("[color=purple]The hex fades from %s — the brand has run its course.[/color]" % state.data.combatant_name)
+		elif s.status_id == "echoing_spell":
+			log_message.emit("[color=red][debug] echoing_spell expired via duration_rounds — should have self-terminated. Investigate.[/color]")
 
 # --- End status system helpers ---
 
@@ -1356,6 +1391,68 @@ func _cast_mind_rend(enemy: CombatantState, enemy_index: int, attack_result: Dic
 
 # --- End Mind Detonation helpers ---
 
+# --- Echoing Mind helpers (Group C3) ---
+
+## Resolves one end_of_round echo of an echoing spell. Called from the player's
+## end_of_round hook in _process_statuses_hook.
+## Decrements current_kept_dice for the next round; removes the status when no more echoes remain.
+## Uses frozen Fervor from the status payload — echo is a delayed payoff, not a fresh cast.
+## Does NOT call _escalate_fervor (intentional — frozen Fervor + no escalation is the design).
+## Pool tier uses _effective_tier with the strike mod, matching the original cast exactly.
+func _resolve_spell_echo(status: CombatStatus, state: CombatantState) -> void:
+	var spell_path: String = status.stat_overrides.get("spell_path", "") as String
+	var target_index: int  = status.stat_overrides.get("target_index", -1) as int
+	var frozen_fervor: int = status.stat_overrides.get("frozen_fervor", 0) as int
+	var current_kept: int  = status.stat_overrides.get("current_kept_dice", 0) as int
+	var em_level: int      = status.stat_overrides.get("em_level", 1) as int
+
+	if spell_path == "" or target_index < 0 or target_index >= _enemies.size():
+		_remove_status(state, "echoing_spell")
+		return
+	var spell: SpellData = load(spell_path) as SpellData
+	if spell == null:
+		_remove_status(state, "echoing_spell")
+		return
+	var target: CombatantState = _enemies[target_index]
+	if target == null or target.is_defeated:
+		log_message.emit("[color=cyan]The echo fades — no one left to hear it.[/color]")
+		_remove_status(state, "echoing_spell")
+		return
+
+	var bonuses := _collect_spell_bonuses(spell)
+	var pool: int      = _effective_tier(_player, _get_action_modifier(_player, "strike")) + (bonuses["pool"] as int)
+	var keep_grade: int = current_kept - 1  # kept_count back to keep_grade (engine keeps grade+1 dice)
+	var die: int       = _stat_size(_player, "ingenuity")
+	var base_flat: int = spell.flat_bonus + (bonuses["flat"] as int)
+	var echo_flat: int = current_kept if em_level >= 2 else 0  # L2: flat = kept dice for this echo
+	var total_flat: int = base_flat + echo_flat
+
+	var flat_note: String = (" (+%d flat from Echoing Mind L2)" % echo_flat) if em_level >= 2 else ""
+	log_message.emit("[color=cyan][b]ECHO![/b] %s resounds — keeping %d die(s)%s.[/color]" % [
+		spell.spell_name, current_kept, flat_note
+	])
+
+	var echo_result := RollEngine.resolve(pool, die, keep_grade, total_flat, 0, frozen_fervor)
+	log_message.emit(_fmt_spell_attack("[Echo: %s]" % spell.spell_name, echo_result))
+
+	# Route through _resolve_attack: Hex amplification and on_breach hooks fire normally.
+	# No _escalate_fervor: echo is not a cast; Fervor stays frozen.
+	await _resolve_attack(true, target_index, echo_result, spell.target_pool)
+
+	# Phase 2.1 equivalent: echo Stance breach can detonate primed mind-bombs.
+	if not target.is_defeated:
+		await _check_mind_detonation(target, target_index)
+
+	# Decrement kept dice; remove status when next echo would keep 0 dice.
+	var next_kept: int = current_kept - 1
+	if next_kept < 1:
+		_remove_status(state, "echoing_spell")
+		log_message.emit("[color=cyan]The echo dies away.[/color]")
+	else:
+		status.stat_overrides["current_kept_dice"] = next_kept
+
+# --- End Echoing Mind helpers ---
+
 func _process_statuses_hook(
 		hook: String,
 		state: CombatantState,
@@ -1371,14 +1468,22 @@ func _process_statuses_hook(
 				      # not hook-driven. The bomb does nothing on start_of_round / end_of_round hooks.
 			"hex_marked":
 				pass  # Amplification is breach-driven via _resolve_attack; not hook-driven.
+			"echoing_spell":
+				if hook == "end_of_round":
+					await _resolve_spell_echo(status, state)
 			_:
 				pass
 
 
 func _end_of_round() -> void:
-	_process_statuses_hook("end_of_round", _player)
+	await _process_statuses_hook("end_of_round", _player)
 	for enemy_state in _enemies:
-		_process_statuses_hook("end_of_round", enemy_state)
+		await _process_statuses_hook("end_of_round", enemy_state)
+
+	# An end_of_round echo may have killed enemies; end combat before continuing.
+	if _all_enemies_defeated():
+		_end_combat()
+		return
 
 	_tick_statuses(_player)
 	for enemy_state in _enemies:

@@ -157,7 +157,7 @@ Signatures and signals are in `docs/project-index.md`. Architectural gotchas:
 - Debug: `debug_set_fervor(size, burned_out)`, `debug_refill_hp()`, `debug_set_immortal(enabled)`, `debug_set_lethal(enabled)`, `debug_set_player_off_hand(weapon)`
 - Reads: `get_player_bare_hands_modifier(action_key) → ActionModifier`, `get_player_attack_preview() → int`
 
-*Key helpers:* `_get_action_modifier(state, key) → ActionModifier` (weapon → bare_hands → zero stub), `_effective_tier(state, mod)` (mod.tier_cap=0 = uncapped), `_attack_flat` / `_guard_flat` / `_pool_bonus` (all delegate to `_get_action_modifier`). `_collect_spell_bonuses(spell)` sums pool/keep/flat across purchased nodes for a spell (shared by `_resolve_round_spell` and `_detonate_mind_bomb`). Discipline entry points: `_check_mind_detonation`, `_detonate_mind_bomb`, `_cast_mind_rend` — see Game rules summary for behavior.
+*Key helpers:* `_get_action_modifier(state, key) → ActionModifier` (weapon → bare_hands → zero stub), `_effective_tier(state, mod)` (mod.tier_cap=0 = uncapped), `_attack_flat` / `_guard_flat` / `_pool_bonus` (all delegate to `_get_action_modifier`). `_collect_spell_bonuses(spell)` sums pool/keep/flat across purchased nodes for a spell (shared by `_resolve_round_spell`, `_detonate_mind_bomb`, and `_resolve_spell_echo`). Discipline entry points: `_check_mind_detonation`, `_detonate_mind_bomb`, `_cast_mind_rend`, `_resolve_spell_echo` — see Game rules summary for behavior.
 
 **`PlayerProgression`** — constellation state; read by `CombatManager` at `start_combat()`.
 - `ALL_NODES` catalog: 11 Dominion + neg_core/ing_core L1-3 + ability nodes. `get_known_spells()` / `get_known_cantrips()` collect from `levels_data[0..level-1].spells`. `get_node_level_by_id(id)` returns current level (0 if absent).
@@ -185,7 +185,12 @@ _begin_round()
   → [spell only] _escalate_fervor(steps) where steps = primary_dice_maxed_count (Ingenuity-tagged dice that rolled max, pre-Keep, including discarded) + (1 if fervor_maxed)
 
 await _end_of_round()
-  → _process_statuses_hook("end_of_round", _player / enemy × N)
+  → await _process_statuses_hook("end_of_round", _player / enemy × N)
+      → [Echoing Mind] "echoing_spell" case: await _resolve_spell_echo(status, state)
+          → await _resolve_attack(true, …) using frozen Fervor; no _escalate_fervor
+          → if not target.is_defeated: await _check_mind_detonation (echo can trigger MD)
+          → decrement current_kept_dice; remove status when next < 1
+  → if _all_enemies_defeated(): _end_combat(); return  ← echo may have killed last enemy
   → _tick_statuses(_player / enemy × N)           ← decrements/removes expired statuses
   → guard reset for all combatants (+ guard_changed signals)
   → await 0.8s timer
@@ -193,6 +198,8 @@ await _end_of_round()
 ```
 
 `_resolve_round*` are GDScript coroutines (use `await`). Calling them without `await` from the `player_chose_*` methods is intentional — they run cooperatively on the main thread, yielding at the timer. `_resolve_attack()` is also a coroutine (awaits inside the interrupt gate and inside `_defense_acknowledged`); all `_resolve_round*` calls to it use `await`. `_end_of_round()` is likewise a coroutine and must be called with `await`.
+
+`_process_statuses_hook` is now also a coroutine (has `await` for the `echoing_spell` end_of_round case). Calls in `_begin_round` and `_resolve_attack` are NOT awaited — they fire synchronously since no echo fires on `start_of_round` or `on_breach`. The `_end_of_round` calls ARE awaited.
 
 Guards are reset inside `_end_of_round()`, not `_begin_round()`. This ensures guards are already 0 when `start_of_round` hooks fire.
 
@@ -321,6 +328,12 @@ Resolution flow (`_resolve_round_spell` / `_resolve_round_cantrip`):
 | hex amplification is `wounds_pending += 1` in `_resolve_attack` | Looks like a magic number | Intentional — Hex Mastery amplifies the player's breach wound on a hexed enemy; gated to `attacker_is_player and not defender_is_player and _has_status(defender, "hex_marked")` |
 | Mind Rend's own breach does not self-amplify | Looks like a missing case | Intentional — the mark is applied AFTER the on_breach hook fires, and Mind Rend suppresses its own wound anyway; the ordering prevents any future on_breach hook from seeing the mark mid-cast |
 | Hex + Mind Detonation: both Stance breach and explosion breach are amplified | Looks like double-counting | Intentional — both events route through `_resolve_attack(true, …)` with the same hex_marked on the enemy; each amplification is independent. This is the designed late-game combo |
+| `echoing_spell` status lives on the PLAYER, not the target | Looks inconsistent with Mind Detonation / Hex which live on the target | Intentional — the caster is echoing; only one echoing_spell active at a time; new cast overwrites old; status moves cleanly with the caster regardless of which enemy is alive |
+| `current_kept_dice` self-terminates the echo, not `duration_rounds` | Looks like `duration_rounds` is the truth | Intentional — kept-dice decay is the design; `duration_rounds=20` is a safety bound that should NEVER trip; if it does, `_tick_statuses` logs a `[debug]` warning |
+| Echo routes through `_resolve_attack` but does NOT escalate Fervor | Looks inconsistent with normal spells | Intentional — `_escalate_fervor` is called in `_resolve_round_spell` after Phase 3, not in `_resolve_attack`. The echo bypasses the cast path so no escalation happens, which is the design (frozen Fervor + delayed payoff) |
+| New cast of an echoing spell overwrites the existing `echoing_spell` status | Looks like a bug — old echo is silently lost | Intentional — stacking multiple echo trains was rejected as too complex; the latest cast wins. Known simplification. |
+| `_process_statuses_hook` has `await` but NOT all call sites `await` it | Looks like missing await at `_begin_round` and `_resolve_attack` | Intentional — only the `end_of_round` hook fires real async logic (echo); `start_of_round` and `on_breach` paths never hit an await; fire-and-forget for those callers is safe and runs synchronously |
+| `_end_of_round` checks `_all_enemies_defeated()` mid-function and returns early | Looks like an abrupt exit skipping guard reset and timer | Intentional — an echo at end_of_round can kill the last enemy; `_end_combat()` is called before the timer; callers guard with `if _all_enemies_defeated(): return` before `_begin_round()` |
 
 ## Game rules summary
 
@@ -355,5 +368,6 @@ The rules live in `docs/game-rules/`. The implementation must match them exactly
 | Lucidity L2 | Reactive interrupt: when a positive escalation step would cause Burnout, the player is prompted (`player_burnout_imminent`) to spend 1 charge per combat. If spent, Burnout is cancelled but **Fervor stays at the cap** (precarious-truce — next escalation will threaten Burnout again). Implemented as `InterruptHandler` (`handler_id="lucidity_prevent_burnout"`, `trigger="on_burnout"`, `priority=10`) registered at `start_combat()`; dispatched by `_try_prevent_burnout()` inside `_escalate_fervor()`, NOT through `_resolve_interrupt` (which is wounds-shaped). |
 | Mind Detonation | True spell (L1: tier≥2, prereq Spellcasting L1). Placement scratch: pool=1, Ingenuity die, training keep, Fervor die included, no SpellBonusEffect bonuses. Applies `mind_detonation_primed` CombatStatus (duration=3, freezes `fervor_at_prime` + `md_level` in `stat_overrides`). At Phase 2.1 (post player-attack) in all three round types: if enemy has `mind_detonation_primed` and `_current_round_player_breaches["stance"]` is true, `_detonate_mind_bomb` fires — removes status, builds explosion via `_collect_spell_bonuses`, calls `await _resolve_attack(true, …, "resolve")` using frozen Fervor; no Fervor escalation. Fizzle message logged on `_tick_statuses` expiry. L2 (tier≥3, prereq ing_core L3): +1 explosion keep. Known simplification: global Stance breach tracking — any breach in the round triggers all primed bombs. |
 | Hex Mastery / Mind Rend | True spell (L1: tier≥3, prereq Spellcasting L1). Mind Rend attacks enemy Resolve but uses `_cast_mind_rend` instead of `_resolve_attack` to suppress the breach wound. On breach: applies `hex_marked` CombatStatus (L1: duration_rounds=3/"2 turns", L2: duration_rounds=7/"4 turns") — no wound dealt. On Resolve holds: nothing. While `hex_marked` is active on an enemy, `_resolve_attack` adds `wounds_pending += 1` for every player breach on that enemy (any pool). Enemy-on-player breaches never amplified. Mind Rend's own breach is not self-amplified (mark applied after on_breach hook fires; wound suppressed regardless). Fervor escalates normally after Mind Rend. Intended combo with Mind Detonation: Hex + Stance breach amplified (+1), explosion breach also amplified (+1) by the same mark. |
+| Echoing Mind / Mind Lash | True spell (L1: tier≥3, prereq Spellcasting L1). Mind Lash has `tags=["arcane","echo"]`. After cast, applies `echoing_spell` CombatStatus **on the player** (the caster). At each `end_of_round`, `_process_statuses_hook` awaits `_resolve_spell_echo(status, state)` — routes through `_resolve_attack(true,…)` using frozen `fervor_at_cast` and decremented `current_kept_dice` (starts at cast_kept−1; each echo decrements by 1; status removed when next < 1). No Fervor escalation from echoes. Echo fires with `current_kept_dice` dice kept; `echo_flat = current_kept` when L2, 0 at L1. New cast overwrites existing echo (latest wins — known simplification). Echo routes through `_resolve_attack` fully: Hex amplification and Mind Detonation interactions are live on each echo. Cast with `cast_kept=1` (keep_grade=0) → initial_echo=0 → no status applied. |
 
-Next unimplemented items: Group C remaining — Chrono-Tinkering, Echoing Mind.
+Next unimplemented items: Group C remaining — Chrono-Tinkering.

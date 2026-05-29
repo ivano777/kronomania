@@ -37,7 +37,14 @@ _Changelog: Mental Fortress node removed; anti-Burnout intent absorbed into Luci
   Fervor + explosion bonuses from `_collect_spell_bonuses`. No Fervor escalation.
   L2 (tier≥3, prereq ing_core L3): +1 explosion keep.
 - `chrono_tinkering` (L1): skip next guard roll on one pool
-- `echoing_mind` (L1): end_of_round echo for spells with tag "echo"
+- `echoing_mind` (L1-L2) ✓ — Phase C3. Injects Mind Lash (true spell, tags=["arcane","echo"],
+  target_pool="stance"). After cast, applies `echoing_spell` CombatStatus on the PLAYER with
+  frozen `frozen_fervor`, `current_kept_dice` = cast_kept−1, `em_level`. At each `end_of_round`,
+  `_process_statuses_hook` awaits `_resolve_spell_echo`: routes through `_resolve_attack(true,…)`
+  using frozen Fervor and decremented kept dice; no Fervor escalation; Hex amplification and Mind
+  Detonation interactions fire normally. Status self-removes when `next_kept < 1`. L2: echo flat
+  bonus = current_kept_dice for that echo. Known simplification: one echo train at a time (new
+  cast overwrites). `cast_kept=1` → initial_echo=0 → no status applied.
 - `hex_mastery` (L1-L2) ✓ — Phase C2. Injects Mind Rend (true spell, tags=["arcane"],
   target_pool="resolve"). Mind Rend uses a dedicated helper `_cast_mind_rend` that
   bypasses `_resolve_attack`: on a Resolve breach, suppresses the wound and applies
