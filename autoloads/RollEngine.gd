@@ -34,7 +34,7 @@ func keep_worst(dice: Array[int], keep_count: int) -> Array[int]:
 # Full resolution: Build Pool → Roll → Keep → Flat → total.
 # tier             : int — base pool size (1 die per Tier)
 # die_size         : int — face value of the Ingenuity/primary stat die (4, 6, 8, or 10)
-# keep_grade       : int — training grade: 0 → keep 1, 1 → keep 2, 2 → keep 3
+# keep_grade       : int — kept-dice count: N = keep N dice (1 = 1 die, 2 = 2 dice, 3 = 3 dice)
 # flat             : int — additive bonus applied after Keep (0 if unused)
 # net_advantage    : int — positive = extra dice, negative = fewer dice;
 #                          pool ≤ 0 triggers Desperation (roll 2, keep worst)
@@ -76,11 +76,11 @@ func resolve(tier: int, die_size: int, keep_grade: int, flat: int = 0, net_advan
 		combined.append_array(aspect_dice_arr)
 		combined.append_array(ing_dice_arr)
 		dice = combined
-		var keep_count: int = mini(keep_grade + 1, pool_size)
+		var keep_count: int = mini(keep_grade, pool_size)
 		kept = keep_best(dice, keep_count)
 	else:
 		# Pure pool: all dice are primary-tagged.
-		var keep_count: int = mini(keep_grade + 1, pool_size)
+		var keep_count: int = mini(keep_grade, pool_size)
 		dice = roll_dice(pool_size, die_size)
 		kept = keep_best(dice, keep_count)
 		for d in dice:

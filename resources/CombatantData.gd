@@ -19,8 +19,8 @@ extends Resource
 ## Ingenuity die face used for Resolve defense rolls.
 @export_enum("4", "6", "8", "10") var ingenuity_size: int = 4
 
-## Training grade for Keep: 0 → keep 1, 1 → keep 2, 2 → keep 3.
-@export_range(0, 2) var keep_grade: int = 0
+## Training grade for Keep: N = keep N dice (1 = keep 1, 2 = keep 2, 3 = keep 3).
+@export_range(1, 3) var keep_grade: int = 1
 
 ## Velocity Threshold: static timing threshold authored on the ENEMY only.
 ## Only the player's action roll is compared to the enemy's VT.

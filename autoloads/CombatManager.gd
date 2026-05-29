@@ -778,7 +778,7 @@ func _resolve_round_spell(spell: SpellData, target_index: int = 0) -> void:
 	# New cast overwrites any existing echo train (latest cast wins — known simplification).
 	if "echo" in spell.tags and PlayerProgression.get_node_level_by_id("echoing_mind") > 0 and not target.is_defeated:
 		var _echo_bonuses := _collect_spell_bonuses(spell)
-		var _cast_kept_dice: int = _training_keep_grade(_player) + (_echo_bonuses["keep"] as int) + 1
+		var _cast_kept_dice: int = _training_keep_grade(_player) + (_echo_bonuses["keep"] as int)
 		var _initial_echo_kept: int = _cast_kept_dice - 1
 		if _initial_echo_kept >= 1:
 			if _has_status(_player, "echoing_spell"):
@@ -895,7 +895,7 @@ func _resolve_attack(attacker_is_player: bool, enemy_index: int, attack_result: 
 				])
 		var def_result := RollEngine.resolve(
 				_effective_tier(defender, defend_mod), defensive_size,
-				maxi(0, _training_keep_grade(defender) + _defense_keep_grade(defender, target_pool) + keep_debuff), defend_mod.flat_bonus,
+				maxi(1, _training_keep_grade(defender) + _defense_keep_grade(defender, target_pool) + keep_debuff), defend_mod.flat_bonus,
 				sd_adv
 			)
 		var guard_val: int = (def_result.total as int) + flat_debuff
@@ -1345,7 +1345,7 @@ func _cast_mind_rend(enemy: CombatantState, enemy_index: int, attack_result: Dic
 				])
 		var def_result := RollEngine.resolve(
 			_effective_tier(enemy, defend_mod), defensive_size,
-			maxi(0, _training_keep_grade(enemy) + _defense_keep_grade(enemy, "resolve") + keep_debuff),
+			maxi(1, _training_keep_grade(enemy) + _defense_keep_grade(enemy, "resolve") + keep_debuff),
 			defend_mod.flat_bonus, 0
 		)
 		var guard_val: int = (def_result.total as int) + flat_debuff
@@ -1421,7 +1421,7 @@ func _resolve_spell_echo(status: CombatStatus, state: CombatantState) -> void:
 
 	var bonuses := _collect_spell_bonuses(spell)
 	var pool: int      = _effective_tier(_player, _get_action_modifier(_player, "strike")) + (bonuses["pool"] as int)
-	var keep_grade: int = current_kept - 1  # kept_count back to keep_grade (engine keeps grade+1 dice)
+	var keep_grade: int = current_kept  # keep_grade IS the kept-dice count (post-refactor naming)
 	var die: int       = _stat_size(_player, "ingenuity")
 	var base_flat: int = spell.flat_bonus + (bonuses["flat"] as int)
 	var echo_flat: int = current_kept if em_level >= 2 else 0  # L2: flat = kept dice for this echo
