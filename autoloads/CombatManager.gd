@@ -895,7 +895,7 @@ func _resolve_attack(attacker_is_player: bool, enemy_index: int, attack_result: 
 				])
 		var def_result := RollEngine.resolve(
 				_effective_tier(defender, defend_mod), defensive_size,
-				maxi(1, _training_keep_grade(defender) + _defense_keep_grade(defender, target_pool) + keep_debuff), defend_mod.flat_bonus,
+				maxi(1, _defense_keep_grade(defender, target_pool) + keep_debuff), defend_mod.flat_bonus,
 				sd_adv
 			)
 		var guard_val: int = (def_result.total as int) + flat_debuff
@@ -1345,7 +1345,7 @@ func _cast_mind_rend(enemy: CombatantState, enemy_index: int, attack_result: Dic
 				])
 		var def_result := RollEngine.resolve(
 			_effective_tier(enemy, defend_mod), defensive_size,
-			maxi(1, _training_keep_grade(enemy) + _defense_keep_grade(enemy, "resolve") + keep_debuff),
+			maxi(1, _defense_keep_grade(enemy, "resolve") + keep_debuff),
 			defend_mod.flat_bonus, 0
 		)
 		var guard_val: int = (def_result.total as int) + flat_debuff
@@ -1735,9 +1735,10 @@ func _training_keep_grade(state: CombatantState) -> int:
 	return maxi(state.data.keep_grade, _node_effect_max(state, "training_keep"))
 
 
-## Returns the pool-specific defensive keep grade from stance_keep / resolve_keep / stamina_keep nodes.
+## Returns the effective defensive keep grade for the given pool: max of
+## _training_keep_grade and pool-specific *_keep nodes (mirrors _physical_keep_grade architecture).
 func _defense_keep_grade(state: CombatantState, pool: String) -> int:
-	return _node_effect_max(state, pool + "_keep")
+	return maxi(_training_keep_grade(state), _node_effect_max(state, pool + "_keep"))
 
 
 ## Steps Fervor by `steps` track positions (positive = escalate, negative = cool).

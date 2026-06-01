@@ -11,7 +11,7 @@ required_tier = 1
 prerequisites = []
 level_effect_description = "Natural endurance. Keep 1 die when rolling Stamina guard."
 effect_type = "stamina_keep"
-effect_value = 0
+effect_value = 1
 
 [sub_resource type="Resource" id="Level_1"]
 script = ExtResource("2_ldscr")
@@ -21,7 +21,7 @@ required_tier = 1
 prerequisites = [{"node_id": "dom_core", "required_level": 1}]
 level_effect_description = "Trained endurance. Keep 2 dice when rolling Stamina guard."
 effect_type = "stamina_keep"
-effect_value = 1
+effect_value = 2
 
 [sub_resource type="Resource" id="Level_2"]
 script = ExtResource("2_ldscr")
@@ -31,7 +31,7 @@ required_tier = 2
 prerequisites = [{"node_id": "dom_stamina", "required_level": 2}, {"node_id": "dom_core", "required_level": 2}]
 level_effect_description = "Hardened body. Keep 3 dice when rolling Stamina guard."
 effect_type = "stamina_keep"
-effect_value = 2
+effect_value = 3
 
 [resource]
 script = ExtResource("1_ndscr")

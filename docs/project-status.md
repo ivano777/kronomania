@@ -196,6 +196,12 @@ global Stance breach tracking for MD interactions (same as Mind Detonation).
 (echo can kill the last enemy); all four `_end_of_round` call sites guard `_begin_round()`.
 New spell: `mind_lash.tres`. New node: `ability_echoing_mind.tres`.
 
+**Phase C2.6 ✓ — Defensive keep grade unification**
+`_defense_keep_grade` now uses `maxi(_training_keep_grade, _node_effect_max)` mirroring `_physical_keep_grade`.
+Call sites in `_resolve_attack` and `_cast_mind_rend` simplified (redundant `_training_keep_grade` sum removed).
+Defensive node effect_values shifted 0/1/2 → 1/2/3 to match their "Keep 1/2/3 dice" descriptions.
+Behavior-identical (mathematical equivalence proven and probe-tested).
+
 - Chrono-Tinkering (skip next guard roll on a specific pool)
 
 ---
