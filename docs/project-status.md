@@ -152,7 +152,7 @@ that must be resolved first.
 
 ---
 
-### ⏳ Group C — Ingenuity Branch: Disciplines
+### ✓ Group C — Ingenuity Branch: Disciplines — COMPLETE
 Prerequisites: Group B complete.
 
 Four specialised disciplines using all Group A systems:
@@ -198,11 +198,28 @@ New spell: `mind_lash.tres`. New node: `ability_echoing_mind.tres`.
 
 **Phase C2.6 ✓ — Defensive keep grade unification**
 `_defense_keep_grade` now uses `maxi(_training_keep_grade, _node_effect_max)` mirroring `_physical_keep_grade`.
-Call sites in `_resolve_attack` and `_cast_mind_rend` simplified (redundant `_training_keep_grade` sum removed).
+Call sites in `_resolve_attack` and `_cast_mind_rend` simplified (redundant `_training_keep_guard` sum removed).
 Defensive node effect_values shifted 0/1/2 → 1/2/3 to match their "Keep 1/2/3 dice" descriptions.
 Behavior-identical (mathematical equivalence proven and probe-tested).
 
-- Chrono-Tinkering (skip next guard roll on a specific pool)
+**Phase C4 ✓ — Chrono-Tinkering**
+`ability_chrono_tinkering.tres` (max_levels=2). Injects Time Lock (true spell, arcane tag,
+target_pool="resolve"). Dedicated `_cast_time_lock` bypasses `_resolve_attack`: on a Resolve
+breach, suppresses the wound and applies `time_locked` CombatStatus on the enemy in ARMED
+phase (`stat_overrides`: `phase`, `locked_pool`, `skip_resets`, `frozen_value`). On hold: nothing.
+The ARMED status waits for the next player attack routed through `_resolve_attack` (any pool,
+including echoes and MD explosions). At that attack's end, a new inline block (after the final
+`guard_changed.emit`) transitions the status to FROZEN: records `locked_pool`, sets `skip_resets`
+to the chrono node level (1 for L1, 2 for L2), and stores `frozen_value` = post-attack guard
+(0 on breach via `did_breach` flag, remaining on hold). While FROZEN, `_end_of_round` reads
+`frozen_value` from `stat_overrides`, resets all guards, then restores the frozen pool and
+marks it rolled — preventing re-roll next round. Decrements `skip_resets` each round; removes
+the status at 0. The frozen value tracks player progress (updated each time the player attacks
+the frozen pool while FROZEN). Fizzle log in `_tick_statuses` for ARMED expiry via duration.
+New spell: `time_lock.tres`. New node: `ability_chrono_tinkering.tres`.
+Key architectural note: `frozen_value` in `stat_overrides` is the source of truth (not `get_guard`)
+because `_resolve_attack`'s breach path does not clear the stored guard to 0 (intentional for
+multi-enemy scenarios); breach-awareness is provided by the local `did_breach` flag.
 
 ---
 

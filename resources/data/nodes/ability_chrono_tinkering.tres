@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="NodeData" format=3 uid="uid://chronotinknode1"]
+
+[ext_resource type="Script" path="res://resources/NodeData.gd" id="1_ndscr"]
+[ext_resource type="Script" path="res://resources/NodeLevelData.gd" id="2_ldscr"]
+[ext_resource type="Resource" uid="uid://timelocksp1" path="res://resources/data/spells/time_lock.tres" id="3_tlspell"]
+
+[sub_resource type="Resource" id="Level_1"]
+script = ExtResource("2_ldscr")
+level_index = 1
+cost = 1
+required_tier = 3
+prerequisites = [{"node_id": "spellcasting", "required_level": 1}]
+level_effect_description = "Inject Time Lock: an attack vs Resolve that, on a breach, freezes the next guard you strike — it will not reset or re-roll for 1 round, letting you press the same guard again."
+effect_type = "chrono_tinkering"
+spells = [ExtResource("3_tlspell")]
+
+[sub_resource type="Resource" id="Level_2"]
+script = ExtResource("2_ldscr")
+level_index = 2
+cost = 1
+required_tier = 3
+prerequisites = [{"node_id": "chrono_tinkering", "required_level": 1}]
+level_effect_description = "The freeze deepens — the guard stays locked for 2 rounds."
+effect_type = "chrono_tinkering"
+
+[resource]
+script = ExtResource("1_ndscr")
+node_id = "chrono_tinkering"
+display_name = "Chrono-Tinkering"
+category = "ingenuity"
+base_description = "Master the thread of time itself. Break an enemy's Resolve and the next guard you strike will be frozen — it will not renew, letting you press the same value again and again."
+max_levels = 2
+levels_data = [SubResource("Level_1"), SubResource("Level_2")]

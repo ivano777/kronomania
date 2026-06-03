@@ -739,6 +739,8 @@ func _resolve_round_spell(spell: SpellData, target_index: int = 0) -> void:
 	if not target.is_defeated:
 		if spell.spell_name == "Mind Rend":
 			await _cast_mind_rend(target, target_index, p_atk)
+		elif spell.spell_name == "Time Lock":
+			await _cast_time_lock(target, target_index, p_atk)
 		else:
 			await _resolve_attack(true, target_index, p_atk, spell.target_pool)
 	# "breach" = this spell caused the round's FIRST breach on its target_pool.
@@ -914,7 +916,9 @@ func _resolve_attack(attacker_is_player: bool, enemy_index: int, attack_result: 
 	# Breach check: attack_total >= guard (guard reaches 0 or below).
 	var current_guard: int = defender.get_guard(target_pool)
 	var force_breach := _debug_lethal and attacker_is_player and not defender_is_player
+	var did_breach := false
 	if (attack_result.total as int) >= current_guard or force_breach:
+		did_breach = true
 		_process_statuses_hook("on_breach", defender, {
 			"pool": target_pool,
 			"attacker": attacker
@@ -981,6 +985,27 @@ func _resolve_attack(attacker_is_player: bool, enemy_index: int, attack_result: 
 
 	# Publish final guard value after consumption.
 	guard_changed.emit(defender_is_player, defender_ei, target_pool, defender.get_guard(target_pool))
+
+	# Chrono-Tinkering: armed→frozen transition fires after ANY player attack on this enemy.
+	# Echoes and explosions also route through _resolve_attack with attacker_is_player=true — intended.
+	# Time Lock's own Resolve attack uses _cast_time_lock (bypasses this path); status is armed
+	# after that function returns, so the transition cannot self-trigger from the casting attack.
+	if attacker_is_player and not defender_is_player and _has_status(defender, "time_locked"):
+		var tl := _get_status(defender, "time_locked")
+		if tl != null:
+			var phase := tl.stat_overrides.get("phase", "") as String
+			var post_val: int = 0 if did_breach else defender.get_guard(target_pool)
+			if phase == "armed":
+				var chrono_level: int = PlayerProgression.get_node_level_by_id("chrono_tinkering")
+				tl.stat_overrides["phase"] = "frozen"
+				tl.stat_overrides["locked_pool"] = target_pool
+				tl.stat_overrides["skip_resets"] = chrono_level
+				tl.stat_overrides["frozen_value"] = post_val
+				log_message.emit("[color=cyan]Time frozen! %s's %s guard is locked at %d — it will not renew for %d round(s).[/color]" % [
+					defender.data.combatant_name, target_pool, post_val, chrono_level
+				])
+			elif phase == "frozen" and (tl.stat_overrides.get("locked_pool", "") as String) == target_pool:
+				tl.stat_overrides["frozen_value"] = post_val
 
 
 func _end_combat() -> void:
@@ -1055,6 +1080,11 @@ func _tick_statuses(state: CombatantState) -> void:
 			log_message.emit("[color=purple]The hex fades from %s — the brand has run its course.[/color]" % state.data.combatant_name)
 		elif s.status_id == "echoing_spell":
 			log_message.emit("[color=red][debug] echoing_spell expired via duration_rounds — should have self-terminated. Investigate.[/color]")
+		elif s.status_id == "time_locked":
+			var ph := s.stat_overrides.get("phase", "") as String
+			if ph == "armed":
+				log_message.emit("[color=cyan]The armed Time Lock dissipates — the moment slips away, unfrozen.[/color]")
+			# frozen expiry via duration_rounds is a safety net; real removal is in _end_of_round
 
 # --- End status system helpers ---
 
@@ -1389,7 +1419,86 @@ func _cast_mind_rend(enemy: CombatantState, enemy_index: int, attack_result: Dic
 	# Publish final guard value.
 	guard_changed.emit(false, enemy_index, "resolve", enemy.get_guard("resolve"))
 
-# --- End Mind Detonation helpers ---
+# --- End Hex Mastery helpers ---
+
+# --- Chrono-Tinkering helpers (Group C4) ---
+
+## Time Lock: attacks enemy Resolve. On breach, suppresses the wound and applies
+## the "time_locked" status (armed phase). On hold, nothing happens.
+## Mirrors _cast_mind_rend's structure — dedicated helper to suppress the breach wound.
+func _cast_time_lock(enemy: CombatantState, enemy_index: int, attack_result: Dictionary) -> void:
+	if enemy == null or enemy.is_defeated:
+		return
+	var attack_total: int = attack_result.total as int
+	var defensive_size: int = _get_pool_size(enemy, "resolve")
+
+	# Guard roll — mirrors _cast_mind_rend's enemy-defender subset for the "resolve" pool.
+	var _pool_fresh := not enemy.is_pool_rolled("resolve")
+	if _pool_fresh:
+		var defend_mod: ActionModifier = _get_action_modifier(enemy, "defend")
+		var _ew := enemy.weapon_override if enemy.weapon_override else enemy.data.equipped_weapon
+		var cap_str := "uncapped" if defend_mod.tier_cap == 0 else "cap %d" % defend_mod.tier_cap
+		log_message.emit("  %s defends with [i]%s[/i] (%s, Tier %d → %d dice)" % [
+			enemy.data.combatant_name,
+			_ew.item_name if _ew else "Bare Hands",
+			cap_str,
+			enemy.data.tier,
+			_effective_tier(enemy, defend_mod),
+		])
+		var flat_debuff: int = 0
+		var keep_debuff: int = 0
+		var _pending: Variant = enemy.pending_guard_debuffs.get("resolve", null)
+		if _pending != null:
+			flat_debuff = (_pending as Dictionary).get("flat", 0) as int
+			keep_debuff = (_pending as Dictionary).get("keep", 0) as int
+			enemy.pending_guard_debuffs.erase("resolve")
+			if flat_debuff != 0 or keep_debuff != 0:
+				log_message.emit("  [color=purple][Outcome debuff] flat %+d, keep grade %+d on %s Resolve guard.[/color]" % [
+					flat_debuff, keep_debuff, enemy.data.combatant_name
+				])
+		var def_result := RollEngine.resolve(
+			_effective_tier(enemy, defend_mod), defensive_size,
+			maxi(1, _defense_keep_grade(enemy, "resolve") + keep_debuff),
+			defend_mod.flat_bonus, 0
+		)
+		var guard_val: int = (def_result.total as int) + flat_debuff
+		enemy.set_guard_val("resolve", guard_val)
+		enemy.set_pool_rolled("resolve", true)
+		guard_changed.emit(false, enemy_index, "resolve", guard_val)
+		log_message.emit(_fmt_defense(enemy.data.combatant_name, def_result, "Resolve"))
+	else:
+		log_message.emit("  %s Resolve already active — Guard [b]%d[/b] absorbs pressure." % [
+			enemy.data.combatant_name, enemy.get_guard("resolve")
+		])
+
+	# Breach check: attack_total >= guard.
+	var current_guard: int = enemy.get_guard("resolve")
+	if attack_total >= current_guard:
+		# Fire on_breach hook BEFORE applying the status. Intentional: same ordering as
+		# _cast_mind_rend. Time Lock's own breach cannot trigger the armed→frozen transition
+		# because the status is applied AFTER this hook, and the transition fires in _resolve_attack
+		# (which this function bypasses). Wound is suppressed — the freeze is the payoff.
+		_process_statuses_hook("on_breach", enemy, {"pool": "resolve", "attacker": _player})
+		_current_round_player_breaches["resolve"] = true
+		var tl := CombatStatus.new()
+		tl.status_id = "time_locked"
+		tl.duration_rounds = 20  # safety bound; real lifecycle driven by phase + skip_resets
+		tl.source_node_id = "chrono_tinkering"
+		tl.stat_overrides = {"phase": "armed", "locked_pool": "", "skip_resets": 0, "frozen_value": 0}
+		_add_status(enemy, tl)
+		log_message.emit("[color=cyan]Time Lock takes hold — the next guard you strike will be frozen.[/color]")
+	else:
+		# Resolve holds: no status, no wound.
+		var remaining: int = current_guard - attack_total
+		enemy.set_guard_val("resolve", remaining)
+		log_message.emit("  %s's Resolve holds (%d remaining). The time-snare fails to catch." % [
+			enemy.data.combatant_name, remaining
+		])
+
+	# Publish final guard value.
+	guard_changed.emit(false, enemy_index, "resolve", enemy.get_guard("resolve"))
+
+# --- End Chrono-Tinkering helpers ---
 
 # --- Echoing Mind helpers (Group C3) ---
 
@@ -1468,6 +1577,9 @@ func _process_statuses_hook(
 				      # not hook-driven. The bomb does nothing on start_of_round / end_of_round hooks.
 			"hex_marked":
 				pass  # Amplification is breach-driven via _resolve_attack; not hook-driven.
+			"time_locked":
+				pass  # Two-phase mechanic (armed→frozen). Transition fires in _resolve_attack;
+				      # freeze preservation fires in _end_of_round. No hook-driven work.
 			"echoing_spell":
 				if hook == "end_of_round":
 					await _resolve_spell_echo(status, state)
@@ -1494,9 +1606,36 @@ func _end_of_round() -> void:
 	for pool in POOL_NAMES:
 		guard_changed.emit(true, -1, pool, 0)
 	for i in _enemies.size():
-		_enemies[i].reset_guard()
+		var e: CombatantState = _enemies[i]
+		# Chrono-Tinkering: read frozen_value stored at transition time (breach-aware).
+		# Capture BEFORE reset so it survives reset_guard(). Echoes may have updated
+		# frozen_value via _resolve_attack in the end_of_round hooks above — correct.
+		var frozen_pool := ""
+		var frozen_val := 0
+		var ct_status := _get_status(e, "time_locked")
+		if ct_status != null \
+				and (ct_status.stat_overrides.get("phase", "") as String) == "frozen" \
+				and (ct_status.stat_overrides.get("skip_resets", 0) as int) > 0:
+			frozen_pool = ct_status.stat_overrides.get("locked_pool", "") as String
+			frozen_val = ct_status.stat_overrides.get("frozen_value", 0) as int
+		e.reset_guard()
 		for pool in POOL_NAMES:
 			guard_changed.emit(false, i, pool, 0)
+		# Restore frozen pool after reset; mark it rolled so it won't re-roll next round.
+		if frozen_pool != "":
+			e.set_guard_val(frozen_pool, frozen_val)
+			e.set_pool_rolled(frozen_pool, true)
+			guard_changed.emit(false, i, frozen_pool, frozen_val)
+			ct_status.stat_overrides["skip_resets"] = (ct_status.stat_overrides["skip_resets"] as int) - 1
+			log_message.emit("[color=cyan]%s's %s remains frozen at %d (%d round(s) left).[/color]" % [
+				e.data.combatant_name, frozen_pool, frozen_val,
+				ct_status.stat_overrides["skip_resets"] as int
+			])
+			if (ct_status.stat_overrides["skip_resets"] as int) <= 0:
+				_remove_status(e, "time_locked")
+				log_message.emit("[color=cyan]The time-freeze on %s's %s expires.[/color]" % [
+					e.data.combatant_name, frozen_pool
+				])
 
 	await get_tree().create_timer(0.8).timeout
 

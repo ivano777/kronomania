@@ -26,6 +26,7 @@ const ALL_NODES: Array = [
 	preload("res://resources/data/nodes/ability_mind_detonation.tres"),
 	preload("res://resources/data/nodes/ability_hex_mastery.tres"),
 	preload("res://resources/data/nodes/ability_echoing_mind.tres"),
+	preload("res://resources/data/nodes/ability_chrono_tinkering.tres"),
 	preload("res://resources/data/nodes/flavor_warrior_oath.tres"),
 	preload("res://resources/data/nodes/flavors/flavor_exile_brand.tres"),
 	preload("res://resources/data/nodes/flavors/flavor_blood_debt.tres"),

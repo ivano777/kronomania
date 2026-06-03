@@ -36,7 +36,16 @@ _Changelog: Mental Fortress node removed; anti-Burnout intent absorbed into Luci
   `_resolve_attack(true, …, "resolve")` if Stance was breached; uses frozen
   Fervor + explosion bonuses from `_collect_spell_bonuses`. No Fervor escalation.
   L2 (tier≥3, prereq ing_core L3): +1 explosion keep.
-- `chrono_tinkering` (L1): skip next guard roll on one pool
+- `chrono_tinkering` (L1-L2) ✓ — Phase C4. Injects Time Lock (true spell, arcane tag,
+  target_pool="resolve"). Dedicated `_cast_time_lock` bypasses `_resolve_attack`: on a
+  Resolve breach, suppresses the wound and applies `time_locked` CombatStatus on the enemy
+  in ARMED phase. The next player attack routed through `_resolve_attack` (any pool, incl.
+  echoes and explosions) transitions the status to FROZEN: records which pool was attacked,
+  sets `skip_resets` = node level, stores `frozen_value` = post-attack guard (0 on breach,
+  remaining on hold). `_end_of_round` reads `frozen_value` and restores the frozen pool
+  after reset, preventing it from re-rolling. Each round decrements `skip_resets`; status
+  removed when 0. L1: freeze lasts 1 round. L2 (tier≥3, prereq chrono_tinkering L1):
+  freeze lasts 2 rounds. Frozen value tracks player progress across rounds.
 - `echoing_mind` (L1-L2) ✓ — Phase C3. Injects Mind Lash (true spell, tags=["arcane","echo"],
   target_pool="stance"). After cast, applies `echoing_spell` CombatStatus on the PLAYER with
   frozen `frozen_fervor`, `current_kept_dice` = cast_kept−1, `em_level`. At each `end_of_round`,
