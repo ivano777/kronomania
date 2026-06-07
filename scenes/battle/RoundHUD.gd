@@ -4,8 +4,8 @@ class_name RoundHUD
 extends VBoxContainer
 
 signal strike_confirmed(pool: String, brutal_trade: bool, source_weapon: EquipmentData)
-signal cantrip_selected(spell: SpellData)
-signal spell_selected(spell: SpellData)
+signal cantrip_selected(spell: SpellData, source_weapon: EquipmentData)
+signal spell_selected(spell: SpellData, source_weapon: EquipmentData)
 signal wound_degrade_chosen(use_charge: bool)
 signal burnout_prevent_chosen(use_charge: bool)
 signal auto_attack_requested()
@@ -284,15 +284,17 @@ func _show_tool_panel(intent: String) -> void:
 			var sum_lbl := Label.new()
 			sum_lbl.text = summary
 			row.add_child(sum_lbl)
-		# Pin button — attack tools only; saves default weapon for Group 7.6 Auto Mode.
-		if intent == "attack" and entry.has("weapon_key"):
-			var saved_wk: String = PlayerProgression.combat_prefs.defaults.get("attack_weapon", "")
+		# Pin button — attack and magic tools; saves default weapon for Auto Mode.
+		if entry.has("weapon_key") and (intent == "attack" or intent == "magic"):
+			var pref_key := "attack_weapon" if intent == "attack" else "cast_weapon"
+			var saved_wk: String = PlayerProgression.combat_prefs.defaults.get(pref_key, "")
 			var _wk: String = entry["weapon_key"] as String
+			var _intent_copy := intent
 			var pin_btn := Button.new()
 			pin_btn.text = "✓" if _wk == saved_wk else "★"
 			pin_btn.pressed.connect(func() -> void:
-				PlayerProgression.combat_prefs.defaults["attack_weapon"] = _wk
-				_show_tool_panel("attack")
+				PlayerProgression.combat_prefs.defaults[pref_key] = _wk
+				_show_tool_panel(_intent_copy)
 			)
 			row.add_child(pin_btn)
 		var sel_btn := Button.new()
@@ -320,8 +322,31 @@ func _build_tool_entries(intent: String) -> Array:
 			if not added_any:
 				entries.append({"name": "Bare Hands", "summary": "", "weapon_key": "bare_hands", "item": null})
 		"magic":
-			entries.append({"name": "[Arcane Arts]", "summary": "Stat: Ingenuity", "item": null})
+			var added_any := false
+			for slot_w: EquipmentData in [PlayerProgression.main_hand, PlayerProgression.off_hand]:
+				if slot_w == null:
+					continue
+				for mod: ActionModifier in slot_w.action_modifiers:
+					if mod.action_key == "cast":
+						entries.append({"name": slot_w.item_name, "summary": _format_cast_summary(mod), "weapon_key": slot_w.item_name, "item": slot_w})
+						added_any = true
+						break
+			if not added_any:
+				entries.append({"name": "Bare Hands", "summary": "Full Tier", "weapon_key": "bare_hands", "item": null})
 	return entries
+
+
+func _format_cast_summary(mod: ActionModifier) -> String:
+	var parts: Array[String] = []
+	if mod.tier_cap > 0:
+		parts.append("Tier ≤ %d" % mod.tier_cap)
+	if mod.pool_bonus != 0:
+		parts.append("Pool %+d" % mod.pool_bonus)
+	if mod.keep_bonus != 0:
+		parts.append("Keep %+d" % mod.keep_bonus)
+	if mod.flat_bonus != 0:
+		parts.append("Flat %+d" % mod.flat_bonus)
+	return "  ".join(parts)
 
 
 func _format_modifier_summary(mod: ActionModifier) -> String:
@@ -344,7 +369,7 @@ func _format_action_summary(mod: ActionModifier) -> String:
 func _on_tool_selected(intent: String, data) -> void:
 	match intent:
 		"attack": _show_action_panel(data)
-		"magic":  _show_execution_magic()
+		"magic":  _show_execution_magic(data as EquipmentData)
 
 
 # ── Action layer ──────────────────────────────────────────────────────────────
@@ -399,17 +424,17 @@ func _show_action_panel(weapon_item) -> void:
 		_action_panel.add_child(_brutal_toggle)
 
 
-func _show_execution_magic() -> void:
+func _show_execution_magic(cast_tool: EquipmentData = null) -> void:
 	var cantrips: Array = PlayerProgression.get_known_cantrips()
 	var spells: Array   = PlayerProgression.get_known_spells()
 	# Auto-fire: only one option total — skip panel entirely.
 	if _can_cantrip and not _can_cast_spell and cantrips.size() == 1:
 		disable_actions()
-		cantrip_selected.emit(cantrips[0] as SpellData)
+		cantrip_selected.emit(cantrips[0] as SpellData, cast_tool)
 		return
 	if _can_cast_spell and not _can_cantrip and spells.size() == 1:
 		disable_actions()
-		spell_selected.emit(spells[0] as SpellData)
+		spell_selected.emit(spells[0] as SpellData, cast_tool)
 		return
 	_clear_action_panel()
 	if _tool_was_collapsed:
@@ -430,7 +455,7 @@ func _show_execution_magic() -> void:
 			cast_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			cast_btn.pressed.connect(func() -> void:
 				disable_actions()
-				cantrip_selected.emit(sp)
+				cantrip_selected.emit(sp, cast_tool)
 			)
 			row.add_child(cast_btn)
 			var pin_btn := Button.new()
@@ -438,7 +463,7 @@ func _show_execution_magic() -> void:
 			var _sn := sp.spell_name
 			pin_btn.pressed.connect(func() -> void:
 				PlayerProgression.combat_prefs.defaults["magic"] = _sn
-				_show_execution_magic()
+				_show_execution_magic(cast_tool)
 			)
 			row.add_child(pin_btn)
 			_action_panel.add_child(row)
@@ -456,7 +481,7 @@ func _show_execution_magic() -> void:
 			cast_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			cast_btn.pressed.connect(func() -> void:
 				disable_actions()
-				spell_selected.emit(sp)
+				spell_selected.emit(sp, cast_tool)
 			)
 			row.add_child(cast_btn)
 			var pin_btn := Button.new()
@@ -464,7 +489,7 @@ func _show_execution_magic() -> void:
 			var _sn := sp.spell_name
 			pin_btn.pressed.connect(func() -> void:
 				PlayerProgression.combat_prefs.defaults["magic"] = _sn
-				_show_execution_magic()
+				_show_execution_magic(cast_tool)
 			)
 			row.add_child(pin_btn)
 			_action_panel.add_child(row)

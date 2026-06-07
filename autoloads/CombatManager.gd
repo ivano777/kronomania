@@ -173,6 +173,8 @@ var _debug_lethal: bool = false
 var _waiting_for_player: bool = false
 ## Weapon the player explicitly chose this round; null = use default main-hand resolution.
 var _player_strike_weapon: EquipmentData = null
+## Casting tool the player chose this round; null = Bare Hands (uncapped, full Tier).
+var _player_cast_weapon: EquipmentData = null
 ## Round-scoped: which defense pools the player has breached this round (any attack/spell).
 ## Reset each _begin_round(). Used by SpellOutcomeEffect conditions.
 var _current_round_player_breaches: Dictionary = {
@@ -281,16 +283,17 @@ func player_chose_strike(net_advantage: int = 0, target_pool: String = "stance",
 
 ## Called by BattleScene when the player selects a cantrip spell.
 ## Ingenuity-based attack; no Fervor cost; available during Burnout.
-func player_chose_cantrip(spell: SpellData, target_index: int = 0) -> void:
+func player_chose_cantrip(spell: SpellData, target_index: int = 0, source_weapon: EquipmentData = null) -> void:
 	if not _waiting_for_player:
 		return
 	_waiting_for_player = false
+	_player_cast_weapon = source_weapon
 	_resolve_round_cantrip(spell, target_index)
 
 
 ## Called by BattleScene when the player selects a true spell.
 ## Ingenuity-based attack with a real Fervor die; blocked during Burnout.
-func player_chose_spell(spell: SpellData, target_index: int = 0) -> void:
+func player_chose_spell(spell: SpellData, target_index: int = 0, source_weapon: EquipmentData = null) -> void:
 	if not _waiting_for_player:
 		return
 	if _player.is_burned_out:
@@ -300,6 +303,7 @@ func player_chose_spell(spell: SpellData, target_index: int = 0) -> void:
 		player_action_required.emit()
 		return
 	_waiting_for_player = false
+	_player_cast_weapon = source_weapon
 	_resolve_round_spell(spell, target_index)
 
 
@@ -580,9 +584,13 @@ func _resolve_round_cantrip(spell: SpellData, target_index: int = 0) -> void:
 		target.data.combatant_name
 	])
 
+	var cast_mod := _get_cast_modifier(_player)
+	_player_cast_weapon = null
 	var p_atk := RollEngine.resolve(
-		_effective_tier(_player, _get_action_modifier(_player, "strike")), _stat_size(_player, "ingenuity"), _training_keep_grade(_player),
-		spell.flat_bonus, _pool_bonus(_player)
+		_effective_tier(_player, cast_mod) + cast_mod.pool_bonus,
+		_stat_size(_player, "ingenuity"),
+		_training_keep_grade(_player) + cast_mod.keep_bonus,
+		spell.flat_bonus + cast_mod.flat_bonus, 0
 	)
 	log_message.emit(_fmt_attack(_player.data.combatant_name, p_atk) + " [cantrip]")
 
@@ -680,6 +688,10 @@ func _resolve_round_spell(spell: SpellData, target_index: int = 0) -> void:
 		target.data.combatant_name
 	])
 
+	var cast_mod := _get_cast_modifier(_player)
+	_player_cast_weapon = null
+	# PHASE 2: freeze cast_mod into mind_detonation_primed / echoing_spell so delayed payoffs reflect the tool.
+
 	# Mind Detonation placement scratch: 1 Ingenuity die, no SpellBonusEffect bonuses.
 	# Bonuses (+pool, +keep) are reserved for the explosion built in _detonate_mind_bomb.
 	# All other spells: collect school bonuses via _collect_spell_bonuses and apply to roll.
@@ -689,7 +701,7 @@ func _resolve_round_spell(spell: SpellData, target_index: int = 0) -> void:
 			1,
 			_stat_size(_player, "ingenuity"),
 			_training_keep_grade(_player),
-			0, _pool_bonus(_player), _player.fervor_size, 0, 0
+			0, 0, _player.fervor_size, 0, 0
 		)
 	else:
 		var bonuses := _collect_spell_bonuses(spell)
@@ -706,10 +718,10 @@ func _resolve_round_spell(spell: SpellData, target_index: int = 0) -> void:
 				parts.append("+%d flat" % spell_flat_bonus)
 			log_message.emit("  [color=yellow]School bonus: %s[/color]" % ", ".join(parts))
 		p_atk = RollEngine.resolve(
-			_effective_tier(_player, _get_action_modifier(_player, "strike")) + spell_pool_bonus,
+			_effective_tier(_player, cast_mod) + spell_pool_bonus + cast_mod.pool_bonus,
 			_stat_size(_player, "ingenuity"),
-			_training_keep_grade(_player) + spell_keep_bonus,
-			spell.flat_bonus + spell_flat_bonus, _pool_bonus(_player), _player.fervor_size,
+			_training_keep_grade(_player) + spell_keep_bonus + cast_mod.keep_bonus,
+			spell.flat_bonus + spell_flat_bonus + cast_mod.flat_bonus, 0, _player.fervor_size,
 			aspect_stat_size, spell.aspect_dice
 		)
 	log_message.emit(_fmt_spell_attack(_player.data.combatant_name, p_atk))
@@ -1323,7 +1335,8 @@ func _detonate_mind_bomb(enemy: CombatantState, enemy_index: int) -> void:
 
 	var md_spell: SpellData = preload("res://resources/data/spells/mind_detonation.tres")
 	var bonuses := _collect_spell_bonuses(md_spell)
-	var pool: int = _effective_tier(_player, _get_action_modifier(_player, "strike")) + (bonuses["pool"] as int)
+	# PHASE 2: replace _effective_tier(_player, null) with the cast tier frozen in mind_detonation_primed.
+	var pool: int = _effective_tier(_player, null) + (bonuses["pool"] as int)
 	var keep: int = _training_keep_grade(_player) + (bonuses["keep"] as int)
 	var die: int  = _stat_size(_player, "ingenuity")
 	var flat: int = bonuses["flat"] as int
@@ -1507,7 +1520,7 @@ func _cast_time_lock(enemy: CombatantState, enemy_index: int, attack_result: Dic
 ## Decrements current_kept_dice for the next round; removes the status when no more echoes remain.
 ## Uses frozen Fervor from the status payload — echo is a delayed payoff, not a fresh cast.
 ## Does NOT call _escalate_fervor (intentional — frozen Fervor + no escalation is the design).
-## Pool tier uses _effective_tier with the strike mod, matching the original cast exactly.
+## Pool tier: Phase 1 interim — full Tier (uncapped). Phase 2 will freeze the chosen cast tool.
 func _resolve_spell_echo(status: CombatStatus, state: CombatantState) -> void:
 	var spell_path: String = status.stat_overrides.get("spell_path", "") as String
 	var target_index: int  = status.stat_overrides.get("target_index", -1) as int
@@ -1529,7 +1542,8 @@ func _resolve_spell_echo(status: CombatStatus, state: CombatantState) -> void:
 		return
 
 	var bonuses := _collect_spell_bonuses(spell)
-	var pool: int      = _effective_tier(_player, _get_action_modifier(_player, "strike")) + (bonuses["pool"] as int)
+	# PHASE 2: replace _effective_tier(_player, null) with the cast tier frozen in echoing_spell.
+	var pool: int      = _effective_tier(_player, null) + (bonuses["pool"] as int)
 	var keep_grade: int = current_kept  # keep_grade IS the kept-dice count (post-refactor naming)
 	var die: int       = _stat_size(_player, "ingenuity")
 	var base_flat: int = spell.flat_bonus + (bonuses["flat"] as int)
@@ -1756,6 +1770,17 @@ func _get_action_modifier(state: CombatantState, action_key: String) -> ActionMo
 			if mod.action_key == action_key:
 				return mod
 	return state.data.get_bare_hands_modifier(action_key)
+
+
+## Resolves the "cast" ActionModifier from the player's chosen casting tool (_player_cast_weapon).
+## Null tool or no "cast" key → uncapped bare-hands stub (tier_cap=0, all bonuses zero = full Tier).
+func _get_cast_modifier(state: CombatantState) -> ActionModifier:
+	var tool: EquipmentData = _player_cast_weapon
+	if tool:
+		for mod in tool.action_modifiers:
+			if mod.action_key == "cast":
+				return mod
+	return state.data.get_bare_hands_modifier("cast")
 
 
 ## Architecture stub: applies derivation_ratio to parent's bonuses (floor). No derived actions yet.

@@ -1,13 +1,13 @@
-[gd_resource type="Resource" script_class="NodeData" format=3 uid="uid://flv_pilgrim12"]
+[gd_resource type="Resource" script_class="NodeData" format=3 uid="uid://c5058b0wdh6wn"]
 
-[ext_resource type="Script" path="res://resources/NodeData.gd" id="1_ndscr"]
-[ext_resource type="Script" path="res://resources/NodeLevelData.gd" id="2_ldscr"]
+[ext_resource type="Script" uid="uid://bmnx7e2qr4xap" path="res://resources/NodeData.gd" id="1_ndscr"]
+[ext_resource type="Script" uid="uid://b5jmcbfapk1vw" path="res://resources/NodeLevelData.gd" id="2_ldscr"]
+[ext_resource type="Script" uid="uid://bti1350te7qt4" path="res://resources/SpellBonusEffect.gd" id="2_qq5dy"]
+[ext_resource type="Script" uid="uid://c4xm7w538586w" path="res://resources/SpellOutcomeEffect.gd" id="3_fqokf"]
+[ext_resource type="Script" uid="uid://bi5ystpmshc26" path="res://resources/SpellData.gd" id="4_yx67g"]
 
 [sub_resource type="Resource" id="Level_1"]
 script = ExtResource("2_ldscr")
-level_index = 1
-cost = 1
-required_tier = 1
 level_effect_description = "You are seeking something no map can show and no victory confirms."
 
 [resource]
@@ -16,5 +16,4 @@ node_id = "pilgrim"
 display_name = "Pilgrim"
 category = "Flavor"
 base_description = "You are seeking something no map can show and no victory confirms."
-max_levels = 1
-levels_data = [SubResource("Level_1")]
+levels_data = Array[ExtResource("2_ldscr")]([SubResource("Level_1")])

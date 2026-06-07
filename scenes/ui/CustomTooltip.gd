@@ -149,6 +149,15 @@ func _populate_equipment(eq: EquipmentData) -> void:
 			"defend":
 				if mod.flat_bonus != 0:
 					_add_row("Defend  Flat", "%+d" % mod.flat_bonus)
+			"cast":
+				if mod.tier_cap > 0:
+					_add_row("Cast  Tier cap", str(mod.tier_cap))
+				if mod.pool_bonus != 0:
+					_add_row("Cast  Pool", "%+d" % mod.pool_bonus)
+				if mod.keep_bonus != 0:
+					_add_row("Cast  Keep", "%+d" % mod.keep_bonus)
+				if mod.flat_bonus != 0:
+					_add_row("Cast  Flat", "%+d" % mod.flat_bonus)
 
 	_desc.text = ""
 	_desc_sep.hide()

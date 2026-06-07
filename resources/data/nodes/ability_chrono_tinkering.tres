@@ -1,25 +1,31 @@
-[gd_resource type="Resource" script_class="NodeData" format=3 uid="uid://chronotinknode1"]
+[gd_resource type="Resource" script_class="NodeData" format=3 uid="uid://bdrs41cbne68a"]
 
-[ext_resource type="Script" path="res://resources/NodeData.gd" id="1_ndscr"]
-[ext_resource type="Script" path="res://resources/NodeLevelData.gd" id="2_ldscr"]
+[ext_resource type="Script" uid="uid://bmnx7e2qr4xap" path="res://resources/NodeData.gd" id="1_ndscr"]
+[ext_resource type="Script" uid="uid://bti1350te7qt4" path="res://resources/SpellBonusEffect.gd" id="2_ivxtl"]
+[ext_resource type="Script" uid="uid://b5jmcbfapk1vw" path="res://resources/NodeLevelData.gd" id="2_ldscr"]
+[ext_resource type="Script" uid="uid://c4xm7w538586w" path="res://resources/SpellOutcomeEffect.gd" id="3_1m3t8"]
 [ext_resource type="Resource" uid="uid://timelocksp1" path="res://resources/data/spells/time_lock.tres" id="3_tlspell"]
+[ext_resource type="Script" uid="uid://bi5ystpmshc26" path="res://resources/SpellData.gd" id="4_r6l52"]
 
 [sub_resource type="Resource" id="Level_1"]
 script = ExtResource("2_ldscr")
-level_index = 1
-cost = 1
 required_tier = 3
-prerequisites = [{"node_id": "spellcasting", "required_level": 1}]
+prerequisites = [{
+"node_id": "spellcasting",
+"required_level": 1
+}]
 level_effect_description = "Inject Time Lock: an attack vs Resolve that, on a breach, freezes the next guard you strike — it will not reset or re-roll for 1 round, letting you press the same guard again."
 effect_type = "chrono_tinkering"
-spells = [ExtResource("3_tlspell")]
+spells = Array[ExtResource("4_r6l52")]([ExtResource("3_tlspell")])
 
 [sub_resource type="Resource" id="Level_2"]
 script = ExtResource("2_ldscr")
 level_index = 2
-cost = 1
 required_tier = 3
-prerequisites = [{"node_id": "chrono_tinkering", "required_level": 1}]
+prerequisites = [{
+"node_id": "chrono_tinkering",
+"required_level": 1
+}]
 level_effect_description = "The freeze deepens — the guard stays locked for 2 rounds."
 effect_type = "chrono_tinkering"
 
@@ -30,4 +36,4 @@ display_name = "Chrono-Tinkering"
 category = "ingenuity"
 base_description = "Master the thread of time itself. Break an enemy's Resolve and the next guard you strike will be frozen — it will not renew, letting you press the same value again and again."
 max_levels = 2
-levels_data = [SubResource("Level_1"), SubResource("Level_2")]
+levels_data = Array[ExtResource("2_ldscr")]([SubResource("Level_1"), SubResource("Level_2")])

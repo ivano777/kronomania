@@ -221,10 +221,23 @@ Key architectural note: `frozen_value` in `stat_overrides` is the source of trut
 because `_resolve_attack`'s breach path does not clear the stored guard to 0 (intentional for
 multi-enemy scenarios); breach-awareness is provided by the local `did_breach` flag.
 
+**Phase D-pre ✓ — Cast Tool Selection (Phase 1)**
+Explicit casting-tool layer mirrors the strike weapon-selection flow. Player picks a casting tool
+(list + pin/star default) before the spell list; chosen tool's `"cast"` ActionModifier governs the
+cast pool. Mundane weapons get `tier_cap=1` (caps pool to 1 die); Bare Hands (or no `"cast"` key)
+falls back to the uncapped bare-hands stub (full Tier). `_get_cast_modifier(state)` in
+CombatManager resolves the chosen `_player_cast_weapon`. All four mundane weapon .tres files carry
+the new `"cast"` sub-resource. Cantrip + true-spell paths now use the cast tool; Mind Detonation
+placement is gear-independent (pool=1); explosion + echo are interim full Tier (`_effective_tier(null)`).
+Tooltip renders `"Cast  Tier cap"` and bonus rows. `RoundHUD` cast tool panel + pin button mirrors
+attack behavior; signals `cantrip_selected`/`spell_selected` carry `source_weapon`.
+**Phase 2 pending:** freeze the chosen cast tool into `mind_detonation_primed` / `echoing_spell`
+so delayed payoffs (explosion and echo) reflect the tool chosen at cast time.
+
 ---
 
 ### ⏳ Group D — Ingenuity Branch: Late Game and Hybrids
-Prerequisites: Group C complete.
+Prerequisites: Group C + Phase D-pre Phase 2 complete.
 
 - Purple Hollow (L1): suicide trance, CombatStatus with stat_override
   ingenuity_size=12 and escalation_threshold=10, consequences on expiry

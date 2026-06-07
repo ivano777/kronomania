@@ -81,6 +81,23 @@ _Changelog: Mental Fortress node removed; anti-Burnout intent absorbed into Luci
 - `blood_channeling` (Dom+Ing hybrid): cast during Burnout with self-damage
 - `cataclysmic_arts` (hybrid): Meteor Shower with aspect_stat="dominion"
 
+## Casting implement system (Phase D-pre)
+
+Spells and cantrips use an explicit **casting tool** selected by the player each round — structurally identical to the strike weapon-selection flow.
+
+**Pool formula:** `pool = effective_tier(cast_mod) + cast_mod.pool_bonus + school_pool_bonus`
+- `cast_mod` = the chosen tool's `"cast"` ActionModifier (or bare-hands stub if none)
+- `_effective_tier(player, cast_mod)` = `mini(tier, cast_mod.tier_cap)` if tier_cap > 0, else full Tier
+- Mundane weapons: `tier_cap = 1` — casting while holding steel caps the pool to 1 die
+- Bare Hands (or no item with `"cast"` key): `tier_cap = 0` → full Tier, all bonuses zero
+- Magic foci (future content): any `tier_cap`/`pool_bonus`/`keep_bonus`/`flat_bonus` combination
+
+**Mind Detonation placement** is gear-independent: pool=1 always.
+
+**Phase 1 (implemented):** direct casts (cantrip + true spell) use the chosen cast tool. Explosion (`_detonate_mind_bomb`) and echo (`_resolve_spell_echo`) use interim full Tier (`_effective_tier(null)`).
+
+**Phase 2 (pending):** freeze the chosen `cast_mod` into `mind_detonation_primed.stat_overrides` and `echoing_spell.stat_overrides` at prime/cast time so the delayed payoffs reflect the cast tool.
+
 ## Design not yet completed
 
 - aether_barrier: defensive mechanic undefined

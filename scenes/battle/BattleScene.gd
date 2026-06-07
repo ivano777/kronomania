@@ -264,14 +264,14 @@ func _on_strike_confirmed(pool: String, brutal_trade: bool, source_weapon: Equip
 	)
 
 
-func _on_cantrip_selected(spell: SpellData) -> void:
+func _on_cantrip_selected(spell: SpellData, source_weapon: EquipmentData) -> void:
 	_player_visual.play_cast_spell()
-	CombatManager.player_chose_cantrip(spell, _target_index)
+	CombatManager.player_chose_cantrip(spell, _target_index, source_weapon)
 
 
-func _on_spell_selected(spell: SpellData) -> void:
+func _on_spell_selected(spell: SpellData, source_weapon: EquipmentData) -> void:
 	_player_visual.play_cast_spell()
-	CombatManager.player_chose_spell(spell, _target_index)
+	CombatManager.player_chose_spell(spell, _target_index, source_weapon)
 
 
 func _teardown_signals() -> void:

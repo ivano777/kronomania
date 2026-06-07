@@ -1,23 +1,28 @@
-[gd_resource type="Resource" script_class="NodeData" format=3 uid="uid://abilucidity01"]
+[gd_resource type="Resource" script_class="NodeData" format=3 uid="uid://bilucidity01"]
 
-[ext_resource type="Script" path="res://resources/NodeData.gd" id="1_ndscr"]
-[ext_resource type="Script" path="res://resources/NodeLevelData.gd" id="2_ldscr"]
+[ext_resource type="Script" uid="uid://bmnx7e2qr4xap" path="res://resources/NodeData.gd" id="1_ndscr"]
+[ext_resource type="Script" uid="uid://bti1350te7qt4" path="res://resources/SpellBonusEffect.gd" id="2_gaxpv"]
+[ext_resource type="Script" uid="uid://b5jmcbfapk1vw" path="res://resources/NodeLevelData.gd" id="2_ldscr"]
+[ext_resource type="Script" uid="uid://c4xm7w538586w" path="res://resources/SpellOutcomeEffect.gd" id="3_sgxui"]
+[ext_resource type="Script" uid="uid://bi5ystpmshc26" path="res://resources/SpellData.gd" id="4_vir1x"]
 
 [sub_resource type="Resource" id="Level_1"]
 script = ExtResource("2_ldscr")
-level_index = 1
-cost = 1
-required_tier = 1
-prerequisites = [{"node_id": "minor_studies", "required_level": 1}]
+prerequisites = [{
+"node_id": "minor_studies",
+"required_level": 1
+}]
 level_effect_description = "Action: lower your Fervor by 1 step. Costs your turn. Unlimited uses. Unavailable when Fervor is already minimal (d4)."
 effect_type = "lucidity_lower_fervor"
 
 [sub_resource type="Resource" id="Level_2"]
 script = ExtResource("2_ldscr")
 level_index = 2
-cost = 1
 required_tier = 3
-prerequisites = [{"node_id": "lucidity", "required_level": 1}]
+prerequisites = [{
+"node_id": "lucidity",
+"required_level": 1
+}]
 level_effect_description = "Reactive: once per combat, when Fervor would cause Burnout, you may spend a charge to avert it. Fervor stays at the edge — this buys a reprieve, not relief."
 effect_type = "lucidity_prevent_burnout"
 
@@ -28,4 +33,4 @@ display_name = "Lucidity"
 category = "Ability"
 base_description = "Master your own Fervor. Cool the burn before it consumes you."
 max_levels = 2
-levels_data = [SubResource("Level_1"), SubResource("Level_2")]
+levels_data = Array[ExtResource("2_ldscr")]([SubResource("Level_1"), SubResource("Level_2")])

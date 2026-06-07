@@ -1,95 +1,84 @@
 [gd_resource type="Resource" script_class="NodeData" format=3 uid="uid://bspellcast001"]
 
-[ext_resource type="Script" path="res://resources/NodeData.gd" id="1_ndscr"]
-[ext_resource type="Script" path="res://resources/NodeLevelData.gd" id="2_ldscr"]
-[ext_resource type="Script" path="res://resources/SpellBonusEffect.gd" id="3_bescr"]
-[ext_resource type="Script" path="res://resources/SpellOutcomeEffect.gd" id="4_oescr"]
+[ext_resource type="Script" uid="uid://bmnx7e2qr4xap" path="res://resources/NodeData.gd" id="1_ndscr"]
+[ext_resource type="Script" uid="uid://b5jmcbfapk1vw" path="res://resources/NodeLevelData.gd" id="2_ldscr"]
+[ext_resource type="Script" uid="uid://bti1350te7qt4" path="res://resources/SpellBonusEffect.gd" id="3_bescr"]
+[ext_resource type="Script" uid="uid://c4xm7w538586w" path="res://resources/SpellOutcomeEffect.gd" id="4_oescr"]
+[ext_resource type="Script" uid="uid://bi5ystpmshc26" path="res://resources/SpellData.gd" id="4_wcqf8"]
 [ext_resource type="Resource" uid="uid://rcmissile01" path="res://resources/data/spells/arcane_missile.tres" id="5_missile"]
-[ext_resource type="Resource" uid="uid://arcane_mark01" path="res://resources/data/spells/arcane_mark.tres" id="6_mark"]
+[ext_resource type="Resource" path="res://resources/data/spells/arcane_mark.tres" id="6_mark"]
 
 [sub_resource type="Resource" id="Level_1"]
 script = ExtResource("2_ldscr")
-level_index = 1
-cost = 1
-required_tier = 1
-prerequisites = [{"node_id": "minor_studies", "required_level": 1}]
+prerequisites = [{
+"node_id": "minor_studies",
+"required_level": 1
+}]
 level_effect_description = "Master Fervor channeling. Cast true spells with Ingenuity + Fervor die. Unlocks Arcane Missile (vs Stance) and Arcane Mark (vs Resolve)."
 effect_type = "spellcasting"
-spells = [ExtResource("5_missile"), ExtResource("6_mark")]
+spells = Array[ExtResource("4_wcqf8")]([ExtResource("5_missile"), ExtResource("6_mark")])
 
 [sub_resource type="Resource" id="BonusKeep_2"]
 script = ExtResource("3_bescr")
 tag = "arcane"
 bonus_type = "keep"
-value = 1
-stat = ""
-spell_id = ""
 
 [sub_resource type="Resource" id="BonusFlatAM_2"]
 script = ExtResource("3_bescr")
-tag = ""
 bonus_type = "flat"
-value = 1
-stat = ""
 spell_id = "Arcane Missile"
 
 [sub_resource type="Resource" id="OutcomeFlat_2"]
 script = ExtResource("4_oescr")
 spell_id = "Arcane Mark"
 trigger = "on_breach"
-target = "enemy"
 target_pool = "stance"
 effect_type = "debuff_flat"
 value = -2
-condition = ""
 source_node_id = "spellcasting"
 
 [sub_resource type="Resource" id="Level_2"]
 script = ExtResource("2_ldscr")
 level_index = 2
-cost = 1
 required_tier = 2
-prerequisites = [{"node_id": "spellcasting", "required_level": 1}]
+prerequisites = [{
+"node_id": "spellcasting",
+"required_level": 1
+}]
 level_effect_description = "Magical mastery deepens. All arcane casts gain Keep 2. Arcane Missile strikes harder (+1). When Arcane Mark breaks the mind, the enemy's Stance falters (-2)."
-bonus_effects = [SubResource("BonusKeep_2"), SubResource("BonusFlatAM_2")]
-outcome_effects = [SubResource("OutcomeFlat_2")]
+bonus_effects = Array[ExtResource("3_bescr")]([SubResource("BonusKeep_2"), SubResource("BonusFlatAM_2")])
+outcome_effects = Array[ExtResource("4_oescr")]([SubResource("OutcomeFlat_2")])
 
 [sub_resource type="Resource" id="BonusKeep_3"]
 script = ExtResource("3_bescr")
 tag = "arcane"
 bonus_type = "keep"
-value = 1
-stat = ""
-spell_id = ""
 
 [sub_resource type="Resource" id="BonusFlatAM_3"]
 script = ExtResource("3_bescr")
-tag = ""
 bonus_type = "flat"
-value = 1
-stat = ""
 spell_id = "Arcane Missile"
 
 [sub_resource type="Resource" id="OutcomeKeep_3"]
 script = ExtResource("4_oescr")
 spell_id = "Arcane Mark"
 trigger = "on_breach"
-target = "enemy"
 target_pool = "stance"
 effect_type = "debuff_keep"
 value = -1
-condition = ""
 source_node_id = "spellcasting"
 
 [sub_resource type="Resource" id="Level_3"]
 script = ExtResource("2_ldscr")
 level_index = 3
-cost = 1
 required_tier = 3
-prerequisites = [{"node_id": "spellcasting", "required_level": 2}]
+prerequisites = [{
+"node_id": "spellcasting",
+"required_level": 2
+}]
 level_effect_description = "Peak channeling. All arcane casts gain Keep 3. Arcane Missile reaches full power. Arcane Mark's brand fractures the enemy's Stance entirely (-1 keep die in addition to the -2 flat)."
-bonus_effects = [SubResource("BonusKeep_3"), SubResource("BonusFlatAM_3")]
-outcome_effects = [SubResource("OutcomeKeep_3")]
+bonus_effects = Array[ExtResource("3_bescr")]([SubResource("BonusKeep_3"), SubResource("BonusFlatAM_3")])
+outcome_effects = Array[ExtResource("4_oescr")]([SubResource("OutcomeKeep_3")])
 
 [resource]
 script = ExtResource("1_ndscr")
@@ -98,4 +87,4 @@ display_name = "Spellcasting"
 category = "Ability"
 base_description = "You have mastered Fervor channeling. Cast true spells using Ingenuity + a real Fervor die. Each max-roll escalates Fervor instability."
 max_levels = 3
-levels_data = [SubResource("Level_1"), SubResource("Level_2"), SubResource("Level_3")]
+levels_data = Array[ExtResource("2_ldscr")]([SubResource("Level_1"), SubResource("Level_2"), SubResource("Level_3")])

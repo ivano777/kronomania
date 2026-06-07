@@ -1,25 +1,31 @@
 [gd_resource type="Resource" script_class="NodeData" format=3 uid="uid://hexmastnode1"]
 
-[ext_resource type="Script" path="res://resources/NodeData.gd" id="1_ndscr"]
-[ext_resource type="Script" path="res://resources/NodeLevelData.gd" id="2_ldscr"]
+[ext_resource type="Script" uid="uid://bmnx7e2qr4xap" path="res://resources/NodeData.gd" id="1_ndscr"]
+[ext_resource type="Script" uid="uid://b5jmcbfapk1vw" path="res://resources/NodeLevelData.gd" id="2_ldscr"]
+[ext_resource type="Script" uid="uid://bti1350te7qt4" path="res://resources/SpellBonusEffect.gd" id="2_s5bj8"]
+[ext_resource type="Script" uid="uid://c4xm7w538586w" path="res://resources/SpellOutcomeEffect.gd" id="3_5o1kc"]
 [ext_resource type="Resource" uid="uid://mindrend01" path="res://resources/data/spells/mind_rend.tres" id="3_mrspell"]
+[ext_resource type="Script" uid="uid://bi5ystpmshc26" path="res://resources/SpellData.gd" id="4_bk2j5"]
 
 [sub_resource type="Resource" id="Level_1"]
 script = ExtResource("2_ldscr")
-level_index = 1
-cost = 1
 required_tier = 3
-prerequisites = [{"node_id": "spellcasting", "required_level": 1}]
+prerequisites = [{
+"node_id": "spellcasting",
+"required_level": 1
+}]
 level_effect_description = "Inject Mind Rend: an attack vs Resolve that, on a breach, deals no wound but brands the target with a hex for 2 turns. While hexed, every guard you break on that enemy deals +1 wound."
 effect_type = "hex_mastery"
-spells = [ExtResource("3_mrspell")]
+spells = Array[ExtResource("4_bk2j5")]([ExtResource("3_mrspell")])
 
 [sub_resource type="Resource" id="Level_2"]
 script = ExtResource("2_ldscr")
 level_index = 2
-cost = 1
 required_tier = 3
-prerequisites = [{"node_id": "hex_mastery", "required_level": 1}]
+prerequisites = [{
+"node_id": "hex_mastery",
+"required_level": 1
+}]
 level_effect_description = "The brand lingers. Hex duration extended to 4 turns."
 
 [resource]
@@ -29,4 +35,4 @@ display_name = "Hex Mastery"
 category = "ingenuity"
 base_description = "Brand the enemy's mind. Break their Resolve to curse them — then every wound you deal cuts deeper."
 max_levels = 2
-levels_data = [SubResource("Level_1"), SubResource("Level_2")]
+levels_data = Array[ExtResource("2_ldscr")]([SubResource("Level_1"), SubResource("Level_2")])
