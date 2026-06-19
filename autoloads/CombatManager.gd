@@ -498,7 +498,7 @@ func _resolve_round(net_advantage: int = 0, target_pool: String = "stance", brut
 			_strike_mod = _player.data.get_bare_hands_modifier("strike")
 	else:
 		_strike_mod = _get_action_modifier(_player, "strike")
-	var keep_grade := _physical_keep_grade(_player) + _node_weapon_bonus_sum(_player, "weapon_keep") + _strike_mod.keep_bonus
+	var keep_grade := _physical_keep_grade(_player) + _node_weapon_bonus_sum(_player, "weapon_keep", chosen_weapon) + _strike_mod.keep_bonus
 	var brutal_flat := 5 if brutal_trade else 0
 
 	var earthshatter_size := 0
@@ -508,8 +508,8 @@ func _resolve_round(net_advantage: int = 0, target_pool: String = "stance", brut
 
 	var p_atk := RollEngine.resolve(
 		_effective_tier(_player, _strike_mod), _stat_size(_player, "dominion"), keep_grade,
-		_attack_flat(_player) + brutal_flat,
-		net_advantage + _pool_bonus(_player),
+		_attack_flat(_player, _strike_mod, chosen_weapon) + brutal_flat,
+		net_advantage + _pool_bonus(_player, "strike", _strike_mod),
 		0, 0, 0, earthshatter_size
 	)
 	var _atk_weapon_name := chosen_weapon.item_name if chosen_weapon else _attacker_weapon_name(_player)
@@ -690,7 +690,6 @@ func _resolve_round_spell(spell: SpellData, target_index: int = 0) -> void:
 
 	var cast_mod := _get_cast_modifier(_player)
 	_player_cast_weapon = null
-	# PHASE 2: freeze cast_mod into mind_detonation_primed / echoing_spell so delayed payoffs reflect the tool.
 
 	# Mind Detonation placement scratch: 1 Ingenuity die, no SpellBonusEffect bonuses.
 	# Bonuses (+pool, +keep) are reserved for the explosion built in _detonate_mind_bomb.
@@ -779,6 +778,10 @@ func _resolve_round_spell(spell: SpellData, target_index: int = 0) -> void:
 		bomb.stat_overrides = {
 			"fervor_at_prime": _player.fervor_size,
 			"md_level": PlayerProgression.get_node_level_by_id("mind_detonation"),
+			"cast_tier": _effective_tier(_player, cast_mod),
+			"cast_pool_bonus": cast_mod.pool_bonus,
+			"cast_keep_bonus": cast_mod.keep_bonus,
+			"cast_flat_bonus": cast_mod.flat_bonus,
 		}
 		_add_status(target, bomb)
 		log_message.emit("[color=purple]A psychic charge is set in %s's mind...[/color]" % target.data.combatant_name)
@@ -792,7 +795,8 @@ func _resolve_round_spell(spell: SpellData, target_index: int = 0) -> void:
 	# New cast overwrites any existing echo train (latest cast wins — known simplification).
 	if "echo" in spell.tags and PlayerProgression.get_node_level_by_id("echoing_mind") > 0 and not target.is_defeated:
 		var _echo_bonuses := _collect_spell_bonuses(spell)
-		var _cast_kept_dice: int = _training_keep_grade(_player) + (_echo_bonuses["keep"] as int)
+		# cast_mod.keep_bonus baked in here so the focus keep decays with the echo train.
+		var _cast_kept_dice: int = _training_keep_grade(_player) + (_echo_bonuses["keep"] as int) + cast_mod.keep_bonus
 		var _initial_echo_kept: int = _cast_kept_dice - 1
 		if _initial_echo_kept >= 1:
 			if _has_status(_player, "echoing_spell"):
@@ -808,6 +812,9 @@ func _resolve_round_spell(spell: SpellData, target_index: int = 0) -> void:
 				"frozen_fervor": _player.fervor_size,
 				"current_kept_dice": _initial_echo_kept,
 				"em_level": PlayerProgression.get_node_level_by_id("echoing_mind"),
+				"cast_tier": _effective_tier(_player, cast_mod),
+				"cast_pool_bonus": cast_mod.pool_bonus,
+				"cast_flat_bonus": cast_mod.flat_bonus,
 			}
 			_add_status(_player, echo_status)
 			log_message.emit("[color=cyan]The spell begins to echo — it will resound for %d more turn(s).[/color]" % _initial_echo_kept)
@@ -1330,16 +1337,20 @@ func _detonate_mind_bomb(enemy: CombatantState, enemy_index: int) -> void:
 	var status := _get_status(enemy, "mind_detonation_primed")
 	if status == null:
 		return
-	var frozen_fervor: int = status.stat_overrides.get("fervor_at_prime", 0) as int
+	var frozen_fervor: int   = status.stat_overrides.get("fervor_at_prime", 0) as int
+	var cast_tier: int       = status.stat_overrides.get("cast_tier", _effective_tier(_player, null)) as int
+	var cast_pool_bonus: int = status.stat_overrides.get("cast_pool_bonus", 0) as int
+	var cast_keep_bonus: int = status.stat_overrides.get("cast_keep_bonus", 0) as int
+	var cast_flat_bonus: int = status.stat_overrides.get("cast_flat_bonus", 0) as int
 	_remove_status(enemy, "mind_detonation_primed")
 
 	var md_spell: SpellData = preload("res://resources/data/spells/mind_detonation.tres")
 	var bonuses := _collect_spell_bonuses(md_spell)
-	# PHASE 2: replace _effective_tier(_player, null) with the cast tier frozen in mind_detonation_primed.
-	var pool: int = _effective_tier(_player, null) + (bonuses["pool"] as int)
-	var keep: int = _training_keep_grade(_player) + (bonuses["keep"] as int)
+	# Cast tool frozen at prime time governs the explosion (cap + pool/keep/flat); see Phase 2.
+	var pool: int = cast_tier + cast_pool_bonus + (bonuses["pool"] as int)
+	var keep: int = _training_keep_grade(_player) + cast_keep_bonus + (bonuses["keep"] as int)
 	var die: int  = _stat_size(_player, "ingenuity")
-	var flat: int = bonuses["flat"] as int
+	var flat: int = (bonuses["flat"] as int) + cast_flat_bonus
 
 	log_message.emit("[color=magenta][b]MIND DETONATION![/b] The charge erupts against %s's Resolve![/color]" % enemy.data.combatant_name)
 
@@ -1520,13 +1531,16 @@ func _cast_time_lock(enemy: CombatantState, enemy_index: int, attack_result: Dic
 ## Decrements current_kept_dice for the next round; removes the status when no more echoes remain.
 ## Uses frozen Fervor from the status payload — echo is a delayed payoff, not a fresh cast.
 ## Does NOT call _escalate_fervor (intentional — frozen Fervor + no escalation is the design).
-## Pool tier: Phase 1 interim — full Tier (uncapped). Phase 2 will freeze the chosen cast tool.
+## Pool uses the cast tier frozen in echoing_spell at cast time; full-Tier fallback for legacy statuses.
 func _resolve_spell_echo(status: CombatStatus, state: CombatantState) -> void:
-	var spell_path: String = status.stat_overrides.get("spell_path", "") as String
-	var target_index: int  = status.stat_overrides.get("target_index", -1) as int
-	var frozen_fervor: int = status.stat_overrides.get("frozen_fervor", 0) as int
-	var current_kept: int  = status.stat_overrides.get("current_kept_dice", 0) as int
-	var em_level: int      = status.stat_overrides.get("em_level", 1) as int
+	var spell_path: String   = status.stat_overrides.get("spell_path", "") as String
+	var target_index: int    = status.stat_overrides.get("target_index", -1) as int
+	var frozen_fervor: int   = status.stat_overrides.get("frozen_fervor", 0) as int
+	var current_kept: int    = status.stat_overrides.get("current_kept_dice", 0) as int
+	var em_level: int        = status.stat_overrides.get("em_level", 1) as int
+	var cast_tier: int       = status.stat_overrides.get("cast_tier", _effective_tier(_player, null)) as int
+	var cast_pool_bonus: int = status.stat_overrides.get("cast_pool_bonus", 0) as int
+	var cast_flat_bonus: int = status.stat_overrides.get("cast_flat_bonus", 0) as int
 
 	if spell_path == "" or target_index < 0 or target_index >= _enemies.size():
 		_remove_status(state, "echoing_spell")
@@ -1542,12 +1556,13 @@ func _resolve_spell_echo(status: CombatStatus, state: CombatantState) -> void:
 		return
 
 	var bonuses := _collect_spell_bonuses(spell)
-	# PHASE 2: replace _effective_tier(_player, null) with the cast tier frozen in echoing_spell.
-	var pool: int      = _effective_tier(_player, null) + (bonuses["pool"] as int)
-	var keep_grade: int = current_kept  # keep_grade IS the kept-dice count (post-refactor naming)
-	var die: int       = _stat_size(_player, "ingenuity")
-	var base_flat: int = spell.flat_bonus + (bonuses["flat"] as int)
-	var echo_flat: int = current_kept if em_level >= 2 else 0  # L2: flat = kept dice for this echo
+	# Cast tool frozen at cast time governs the echo pool + flat; keep_grade carries the
+	# decaying kept-dice count (focus keep was baked into it at arming). See Phase 2.
+	var pool: int       = cast_tier + cast_pool_bonus + (bonuses["pool"] as int)
+	var keep_grade: int = current_kept  # decaying kept-dice count; focus keep already in it
+	var die: int        = _stat_size(_player, "ingenuity")
+	var base_flat: int  = spell.flat_bonus + (bonuses["flat"] as int) + cast_flat_bonus
+	var echo_flat: int  = current_kept if em_level >= 2 else 0  # L2: flat = kept dice for this echo
 	var total_flat: int = base_flat + echo_flat
 
 	var flat_note: String = (" (+%d flat from Echoing Mind L2)" % echo_flat) if em_level >= 2 else ""
@@ -1704,8 +1719,9 @@ func _effective_tier(state: CombatantState, mod: ActionModifier = null) -> int:
 
 
 ## Flat bonus applied to attack rolls: strike ActionModifier flat + weapon_flat node bonuses.
-func _attack_flat(state: CombatantState) -> int:
-	return _get_action_modifier(state, "strike").flat_bonus + _node_weapon_bonus_sum(state, "weapon_flat")
+func _attack_flat(state: CombatantState, strike_mod: ActionModifier = null, weapon: EquipmentData = null) -> int:
+	var m := strike_mod if strike_mod != null else _get_action_modifier(state, "strike")
+	return m.flat_bonus + _node_weapon_bonus_sum(state, "weapon_flat", weapon)
 
 
 ## Returns {item_name, mod} for the player's defense roll.
@@ -1752,8 +1768,9 @@ func _guard_flat(state: CombatantState) -> int:
 
 
 ## Pool size modifier from the ActionModifier for the given action key.
-func _pool_bonus(state: CombatantState, action_key: String = "strike") -> int:
-	return _get_action_modifier(state, action_key).pool_bonus
+func _pool_bonus(state: CombatantState, action_key: String = "strike", strike_mod: ActionModifier = null) -> int:
+	var m := strike_mod if strike_mod != null else _get_action_modifier(state, action_key)
+	return m.pool_bonus
 
 
 ## Looks up the ActionModifier for action_key: weapon first, then bare_hands (always present).
@@ -1840,9 +1857,9 @@ func _node_effect_sum(state: CombatantState, key: String) -> int:
 
 
 ## Returns the sum of effect_value for entries matching key where all weapon_tags match the equipped weapon.
-func _node_weapon_bonus_sum(state: CombatantState, key: String) -> int:
+func _node_weapon_bonus_sum(state: CombatantState, key: String, weapon_override: EquipmentData = null) -> int:
 	var total := 0
-	var weapon: EquipmentData = state.weapon_override if state.weapon_override else state.data.equipped_weapon
+	var weapon: EquipmentData = weapon_override if weapon_override != null else (state.weapon_override if state.weapon_override else state.data.equipped_weapon)
 	for node in state.node_levels.keys():
 		var nd: NodeData = node as NodeData
 		if nd == null:

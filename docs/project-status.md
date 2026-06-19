@@ -6,6 +6,9 @@ Tracks what is implemented and what remains. Updated after each feature ships.
 
 ## Implemented
 
+### Bug fixes
+- **Bug 2 — Off-hand strike bonuses** — `_resolve_round` player strike now sources flat bonus, pool bonus, and weapon-tag node bonuses (`weapon_flat`, `weapon_keep`) from the chosen weapon (`_strike_mod` + `chosen_weapon`) instead of the main-hand. Helpers `_attack_flat`, `_pool_bonus`, `_node_weapon_bonus_sum` gained optional params defaulting to the old behavior; enemy/auto/preview call sites are unchanged.
+
 ### Core systems
 - **RollEngine** — stateless dice resolver: Pool → Roll → Keep → Flat. Optional `fervor_size`, `aspect_stat_size`/`aspect_count`, `post_keep_bonus_size`. Returns `primary_dice_maxed_count`, `post_keep_bonus_roll`. Helpers: `is_fast()`, `is_massive()`.
 - **CombatManager** — 1v1 state machine. `CombatantState` tracks wounds, per-pool guard, magic state, item charges. Round loop: `_begin_round → player_chose_* → _resolve_round_* → _resolve_attack × 2 → loop`. Node-level helpers for stat sizes, keep grades, flat bonuses.
@@ -221,23 +224,26 @@ Key architectural note: `frozen_value` in `stat_overrides` is the source of trut
 because `_resolve_attack`'s breach path does not clear the stored guard to 0 (intentional for
 multi-enemy scenarios); breach-awareness is provided by the local `did_breach` flag.
 
-**Phase D-pre ✓ — Cast Tool Selection (Phase 1)**
+**Phase D-pre ✓ — Cast Tool Selection (Phases 1 + 2) — COMPLETE**
 Explicit casting-tool layer mirrors the strike weapon-selection flow. Player picks a casting tool
 (list + pin/star default) before the spell list; chosen tool's `"cast"` ActionModifier governs the
 cast pool. Mundane weapons get `tier_cap=1` (caps pool to 1 die); Bare Hands (or no `"cast"` key)
 falls back to the uncapped bare-hands stub (full Tier). `_get_cast_modifier(state)` in
 CombatManager resolves the chosen `_player_cast_weapon`. All four mundane weapon .tres files carry
-the new `"cast"` sub-resource. Cantrip + true-spell paths now use the cast tool; Mind Detonation
-placement is gear-independent (pool=1); explosion + echo are interim full Tier (`_effective_tier(null)`).
+the new `"cast"` sub-resource. Cantrip + true-spell paths use the cast tool; Mind Detonation
+placement is gear-independent (pool=1).
 Tooltip renders `"Cast  Tier cap"` and bonus rows. `RoundHUD` cast tool panel + pin button mirrors
 attack behavior; signals `cantrip_selected`/`spell_selected` carry `source_weapon`.
-**Phase 2 pending:** freeze the chosen cast tool into `mind_detonation_primed` / `echoing_spell`
-so delayed payoffs (explosion and echo) reflect the tool chosen at cast time.
+Phase 2: chosen `cast_mod` frozen into `mind_detonation_primed.stat_overrides` (`cast_tier`,
+`cast_pool_bonus`, `cast_keep_bonus`, `cast_flat_bonus`) and `echoing_spell.stat_overrides`
+(`cast_tier`, `cast_pool_bonus`, `cast_flat_bonus`; focus keep baked into `current_kept_dice`).
+Delayed payoffs (explosion + echo) read frozen values; legacy statuses without keys fall back to
+full Tier (`_effective_tier(_player, null)`). `_player_cast_weapon` cleared after freeze, before Phase 2.1.
 
 ---
 
 ### ⏳ Group D — Ingenuity Branch: Late Game and Hybrids
-Prerequisites: Group C + Phase D-pre Phase 2 complete.
+Prerequisites: Group C + Phase D-pre complete. ✓ All prerequisites met.
 
 - Purple Hollow (L1): suicide trance, CombatStatus with stat_override
   ingenuity_size=12 and escalation_threshold=10, consequences on expiry

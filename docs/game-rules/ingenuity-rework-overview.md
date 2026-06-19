@@ -94,9 +94,9 @@ Spells and cantrips use an explicit **casting tool** selected by the player each
 
 **Mind Detonation placement** is gear-independent: pool=1 always.
 
-**Phase 1 (implemented):** direct casts (cantrip + true spell) use the chosen cast tool. Explosion (`_detonate_mind_bomb`) and echo (`_resolve_spell_echo`) use interim full Tier (`_effective_tier(null)`).
+**Phase 1 (implemented):** direct casts (cantrip + true spell) use the chosen cast tool.
 
-**Phase 2 (pending):** freeze the chosen `cast_mod` into `mind_detonation_primed.stat_overrides` and `echoing_spell.stat_overrides` at prime/cast time so the delayed payoffs reflect the cast tool.
+**Phase 2 (implemented):** the chosen `cast_mod` is frozen into `mind_detonation_primed.stat_overrides` and `echoing_spell.stat_overrides` at prime/cast time. Keys frozen: `cast_tier`, `cast_pool_bonus`, `cast_flat_bonus` (both); `cast_keep_bonus` in bomb only (echo bakes keep into `current_kept_dice` at arming). Delayed payoffs read these keys; legacy statuses without them fall back to full Tier. `_player_cast_weapon` cleared after freeze, before Phase 2.1.
 
 ## Design not yet completed
 
