@@ -77,6 +77,7 @@ Godot binary resolved from (in order): 1) `GODOT` env var; 2) `.env.local` in pr
 
 ```
 autoloads/          # RollEngine (dice), CombatManager (combat SM), PlayerProgression (constellation), DungeonManager (run state), SaveManager, DebugManager, SpriteRegistry, TooltipManager
+combat/             # CombatManager refactor layers: CombatantState.gd (per-combat state), CombatMath.gd (pure static math), StatusOps.gd + InterruptOps.gd (status/interrupt bookkeeping), Disciplines.gd (magic disciplines)
 resources/          # Resource class defs (.gd) + data/ (.tres) — see project-index.md
 scenes/main_menu/   # MainMenuScene (title, New Game, 3-slot save/load, Quit)
 scenes/battle/      # BattleScene (1v1), CombatantHUD, RoundHUD, Combatant
@@ -96,7 +97,9 @@ docs/               # project-status.md (roadmap), project-index.md (generated m
 
 `CombatantData` (`.tres`) → `CombatManager` → signals → `BattleScene` → HUD nodes.
 
-`CombatantData` is **immutable config** only. All runtime state lives in `CombatManager.CombatantState` (inner class, instantiated per combat). Scene nodes hold no game state.
+`CombatantData` is **immutable config** only. All runtime state lives in `CombatantState` (`combat/CombatantState.gd`, global `class_name`, instantiated per combat). Scene nodes hold no game state.
+
+**CombatManager refactor (in progress — incremental strangler):** pure combat math (stat/tier/keep/modifier/format helpers) lives in `combat/CombatMath.gd` as stateless `static` funcs. CombatManager keeps same-signature private wrappers (`_stat_size`, `_effective_tier`, `_get_action_modifier`, `_add_status`, `_find_interrupts`, …) that delegate to `CombatMath.*` / `StatusOps.*` / `InterruptOps.*`. Do NOT re-inline the logic into CombatManager. `StatusOps.tick()` RETURNS log lines (the `_tick_statuses` wrapper emits them). Orchestrators that read `PlayerProgression`/round-scoped state stay in CombatManager: `_apply_spell_outcome_effects` (delegates per-effect predicates + dispatch to `StatusOps`), `_process_statuses_hook` (awaits the echo). Awaited interrupt resolvers (`_resolve_interrupt`, `_resolve_meat_for_the_grinder`, `_try_prevent_burnout`) stay in CombatManager. Magic-discipline logic (Mind Detonation, Mind Rend, Time Lock cast, echo resolution + the shared `roll_enemy_guard` dedup) lives in `combat/Disciplines.gd` as statics over the `CombatManager` autoload global; CM keeps `_check_mind_detonation`/`_cast_mind_rend`/`_cast_time_lock`/`_resolve_spell_echo` wrappers. The async spine (`_resolve_attack`, `_resolve_round*`, `_end_of_round`) plus two chrono snippets embedded in it (armed→frozen in `_resolve_attack`, frozen restore in `_end_of_round`) stay in CombatManager. **Refactor COMPLETE — all 5 phases done** (0 characterization tests, 1 CombatState, 2 CombatMath, 3 StatusOps+InterruptOps, 4 Disciplines). CombatManager 2052 → 1466 lines.
 
 `CombatantState` fields, grouped:
 - *Identity/HP:* `data`, `current_wounds`, `max_wounds`, `is_defeated`

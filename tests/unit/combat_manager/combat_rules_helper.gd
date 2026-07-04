@@ -13,10 +13,9 @@ func effective_tier(base_tier: int, tier_override: int, tier_cap: int) -> int:
 	return mini(base, tier_cap)
 
 
-## Mirrors CombatManager._tier_wound_bonus().
-## +1 at Tier 2, +1 again at Tier 4 (cumulative +2 maximum).
+## Delegates to the real CombatMath.tier_wound_bonus (single source of truth after Phase 2).
 func tier_wound_bonus(tier: int) -> int:
-	return (1 if tier >= 2 else 0) + (1 if tier >= 4 else 0)
+	return CombatMath.tier_wound_bonus(tier)
 
 
 ## Mirrors the Massive Wound condition used in CombatManager._resolve_attack().

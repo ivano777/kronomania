@@ -82,85 +82,9 @@ signal _burnout_decision_gate(use_charge: bool)
 
 # ── Runtime state ─────────────────────────────────────────────────────────────
 
-class CombatantState:
-	var data: CombatantData
-	var current_wounds: int = 0
-	var max_wounds: int     = 3
-	var is_defeated: bool   = false
-	var weapon_override: EquipmentData = null      # main-hand override; null = use data.equipped_weapon
-	var off_hand_override: EquipmentData = null    # off-hand override; null = no off-hand equipped
-	var node_levels: Dictionary = {}           # NodeData → int; runtime copy from PlayerProgression for player
-	var tier_override: int = 0                 # when > 0, overrides data.tier (used for player Tier from Constellation)
-	# Per-pool guard state (Stance / Resolve / Stamina).
-	var stance_guard: int   = 0
-	var resolve_guard: int  = 0
-	var stamina_guard: int  = 0
-	var stance_rolled: bool  = false
-	var resolve_rolled: bool = false
-	var stamina_rolled: bool = false
-	# Magic state — player only; resets to base each combat.
-	var fervor_size: int    = 4     # current Fervor die face (4/6/8/10); starts at d4
-	var is_burned_out: bool = false # blocks true spells when true
-	var has_minor_studies: bool = false  # derived from unlocked_nodes in start_combat()
-	var has_spellcasting: bool  = false  # derived from unlocked_nodes in start_combat()
-	var known_spells: Array   = []  # Array[SpellData] — non-cantrip spells, player only
-	var known_cantrips: Array = []  # Array[SpellData] — cantrip spells, player only
-	var space_domination_active: bool = false  # Melee L2: Advantage on first Stamina guard roll each combat
-	var item_action_charges: Dictionary = {}   # action_key → remaining uses (from ActionModifier.uses_per_rest)
-	var active_statuses: Array[CombatStatus] = []
-	var interrupt_handlers: Array[InterruptHandler] = []
-	## Single-use debuffs queued by SpellOutcomeEffect; consumed on the next guard roll
-	## for the matching pool. { "<pool>": { "flat": int, "keep": int } }
-	var pending_guard_debuffs: Dictionary = {}
-
-	func init(d: CombatantData) -> void:
-		data = d
-		current_wounds = 0
-		max_wounds = d.max_wounds + (d.equipped_weapon.max_wounds_bonus if d.equipped_weapon else 0)
-		is_defeated = false
-		node_levels.clear()
-		for n in d.starting_nodes:
-			if n is NodeData:
-				node_levels[n as NodeData] = 1
-		fervor_size = 4
-		is_burned_out = false
-		has_minor_studies = false
-		has_spellcasting = false
-		space_domination_active = false
-		active_statuses = []
-		interrupt_handlers = []
-		pending_guard_debuffs = {}
-		reset_guard()
-
-	func reset_guard() -> void:
-		stance_guard = 0;  resolve_guard = 0;  stamina_guard = 0
-		stance_rolled = false; resolve_rolled = false; stamina_rolled = false
-
-	func get_guard(pool: String) -> int:
-		match pool:
-			"stance":  return stance_guard
-			"resolve": return resolve_guard
-			"stamina": return stamina_guard
-		return 0
-
-	func set_guard_val(pool: String, value: int) -> void:
-		match pool:
-			"stance":  stance_guard  = value
-			"resolve": resolve_guard = value
-			"stamina": stamina_guard = value
-
-	func is_pool_rolled(pool: String) -> bool:
-		match pool:
-			"stance":  return stance_rolled
-			"resolve": return resolve_rolled
-			"stamina": return stamina_rolled
-		return false
-
-	func set_pool_rolled(pool: String, value: bool) -> void:
-		match pool:
-			"stance":  stance_rolled  = value
-			"resolve": resolve_rolled = value
-			"stamina": stamina_rolled = value
+# CombatantState (per-combat mutable state) lives in combat/CombatantState.gd as a global
+# class_name (extracted in Phase 1 of the CombatManager refactor). All references below
+# resolve to that class.
 
 
 var _player: CombatantState
@@ -692,7 +616,7 @@ func _resolve_round_spell(spell: SpellData, target_index: int = 0) -> void:
 	_player_cast_weapon = null
 
 	# Mind Detonation placement scratch: 1 Ingenuity die, no SpellBonusEffect bonuses.
-	# Bonuses (+pool, +keep) are reserved for the explosion built in _detonate_mind_bomb.
+	# Bonuses (+pool, +keep) are reserved for the explosion built in Disciplines.detonate_mind_bomb.
 	# All other spells: collect school bonuses via _collect_spell_bonuses and apply to roll.
 	var p_atk: Dictionary
 	if spell.spell_name == "Mind Detonation":
@@ -1061,72 +985,42 @@ func _all_enemies_defeated() -> bool:
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-# --- Status system helpers (Group A) ---
+# --- Status system helpers (Group A) — logic in combat/StatusOps.gd ---
+# Thin wrappers preserve signatures + the contract-test surface. _tick_statuses emits the
+# log lines StatusOps.tick returns. _process_statuses_hook (awaits the echo) stays below.
 
 func _add_status(state: CombatantState, status: CombatStatus) -> void:
-	_remove_status(state, status.status_id)
-	state.active_statuses.append(status)
+	StatusOps.add(state, status)
 
 func _remove_status(state: CombatantState, status_id: String) -> void:
-	state.active_statuses = state.active_statuses.filter(
-		func(s): return s.status_id != status_id
-	)
+	StatusOps.remove(state, status_id)
 
 func _has_status(state: CombatantState, status_id: String) -> bool:
-	return state.active_statuses.any(
-		func(s): return s.status_id == status_id
-	)
+	return StatusOps.has(state, status_id)
 
 func _get_status(state: CombatantState, status_id: String) -> CombatStatus:
-	for s in state.active_statuses:
-		if s.status_id == status_id:
-			return s
-	return null
+	return StatusOps.get_status(state, status_id)
 
 func _tick_statuses(state: CombatantState) -> void:
-	var expired: Array[CombatStatus] = []
-	for s in state.active_statuses:
-		if s.duration_rounds == -1:
-			continue
-		s.duration_rounds -= 1
-		if s.duration_rounds <= 0:
-			expired.append(s)
-	for s in expired:
-		state.active_statuses.erase(s)
-		if s.status_id == "mind_detonation_primed":
-			log_message.emit("[color=purple]The mind-bomb goes inert. Stance was never broken.[/color]")
-		elif s.status_id == "hex_marked":
-			log_message.emit("[color=purple]The hex fades from %s — the brand has run its course.[/color]" % state.data.combatant_name)
-		elif s.status_id == "echoing_spell":
-			log_message.emit("[color=red][debug] echoing_spell expired via duration_rounds — should have self-terminated. Investigate.[/color]")
-		elif s.status_id == "time_locked":
-			var ph := s.stat_overrides.get("phase", "") as String
-			if ph == "armed":
-				log_message.emit("[color=cyan]The armed Time Lock dissipates — the moment slips away, unfrozen.[/color]")
-			# frozen expiry via duration_rounds is a safety net; real removal is in _end_of_round
+	for msg in StatusOps.tick(state):
+		log_message.emit(msg)
 
 # --- End status system helpers ---
 
-# --- Interrupt system helpers (Group A3) ---
+# --- Interrupt system helpers (Group A3) — logic in combat/InterruptOps.gd ---
+# Awaited resolvers (_resolve_interrupt, _resolve_meat_for_the_grinder, _try_prevent_burnout)
+# stay in CombatManager; only the pure bookkeeping is delegated.
 
 func _register_interrupt(state: CombatantState, handler: InterruptHandler) -> void:
-	# No deduplication — two distinct handlers with the same trigger may coexist.
-	state.interrupt_handlers.append(handler)
+	InterruptOps.register(state, handler)
 
 
 func _find_interrupts(state: CombatantState, trigger: String) -> Array[InterruptHandler]:
-	# Returns all matching handlers that still have charges, sorted by priority ascending.
-	var matches: Array[InterruptHandler] = []
-	for h in state.interrupt_handlers:
-		if h.trigger == trigger and (h.charges > 0 or h.charges == -1):
-			matches.append(h)
-	matches.sort_custom(func(a, b): return a.priority < b.priority)
-	return matches
+	return InterruptOps.find(state, trigger)
 
 
 func _consume_interrupt_charge(handler: InterruptHandler) -> void:
-	if handler.charges > 0:
-		handler.charges -= 1
+	InterruptOps.consume_charge(handler)
 
 
 func _resolve_interrupt(
@@ -1196,6 +1090,9 @@ func _apply_spell_outcome_effects(
 	##     "target_pool": String, "round_breaches": Dictionary }
 	## round_breaches tracks which pools the player has breached this round across
 	## all attacks (not just this spell).
+	# Collection + filtering orchestration stays here (reads PlayerProgression.node_levels +
+	# round-scoped breach state via `outcome`); the per-effect predicates and dispatch live in
+	# combat/StatusOps.gd.
 	var effects: Array[SpellOutcomeEffect] = []
 	for node in PlayerProgression.node_levels:
 		var nd: NodeData = node as NodeData
@@ -1204,95 +1101,22 @@ func _apply_spell_outcome_effects(
 		var level := PlayerProgression.node_levels[node] as int
 		for i in range(mini(level, nd.levels_data.size())):
 			for effect in nd.levels_data[i].outcome_effects:
-				if _spell_outcome_matches(effect, spell):
+				if StatusOps.outcome_matches(effect, spell):
 					effects.append(effect)
 
 	for effect in effects:
-		if not _spell_outcome_trigger_fires(effect, outcome):
+		if not StatusOps.outcome_trigger_fires(effect, outcome):
 			continue
-		if not _spell_outcome_condition_holds(effect, caster_state, target_state, outcome):
+		if not StatusOps.outcome_condition_holds(effect, caster_state, target_state, outcome):
 			continue
-		_dispatch_spell_outcome_effect(effect, caster_state, target_state, outcome)
-
-
-func _spell_outcome_matches(effect: SpellOutcomeEffect, spell: SpellData) -> bool:
-	if effect.spell_id == "":
-		return true
-	return effect.spell_id == spell.spell_name
-
-
-func _spell_outcome_trigger_fires(effect: SpellOutcomeEffect, outcome: Dictionary) -> bool:
-	match effect.trigger:
-		"on_cast":
-			return true
-		"on_hit", "on_breach":
-			return outcome.get("breach", false) as bool
-		_:
-			push_warning("Unknown SpellOutcomeEffect.trigger: " + effect.trigger)
-			return false
-
-
-func _spell_outcome_condition_holds(
-		effect: SpellOutcomeEffect,
-		caster_state: CombatantState,
-		_target_state: CombatantState,
-		outcome: Dictionary
-) -> bool:
-	if effect.condition == "":
-		return true
-	var round_breaches: Dictionary = outcome.get("round_breaches", {})
-	match effect.condition:
-		"if_stance_breached_this_round":
-			return round_breaches.get("stance", false) as bool
-		"if_resolve_breached_this_round":
-			return round_breaches.get("resolve", false) as bool
-		"if_stamina_breached_this_round":
-			return round_breaches.get("stamina", false) as bool
-		"if_fervor_at_cap":
-			return caster_state.fervor_size >= _stat_size(caster_state, "ingenuity_size")
-		_:
-			push_warning("Unknown SpellOutcomeEffect.condition: " + effect.condition)
-			return false
-
-
-func _dispatch_spell_outcome_effect(
-		effect: SpellOutcomeEffect,
-		caster_state: CombatantState,
-		target_state: CombatantState,
-		_outcome: Dictionary
-) -> void:
-	var receiver: CombatantState = caster_state if effect.target == "self" else target_state
-	match effect.effect_type:
-		"debuff_flat":
-			_add_pending_guard_debuff(receiver, effect.target_pool, "flat", effect.value)
-		"debuff_keep":
-			_add_pending_guard_debuff(receiver, effect.target_pool, "keep", effect.value)
-		"apply_status":
-			if effect.status_to_apply != null:
-				# Duplicate so each application is an independent instance.
-				var st: CombatStatus = effect.status_to_apply.duplicate()
-				_add_status(receiver, st)
-		"bonus_keep", "bonus_flat":
-			# Reserved for outcome-conditional bonuses (e.g. Group D Mind Detonation).
-			# These effect_types are NOT for flat roll upgrades — use SpellBonusEffect instead.
-			push_warning("bonus_keep/bonus_flat in outcome_effects not dispatched at A4; use SpellBonusEffect instead")
-		_:
-			push_warning("Unknown SpellOutcomeEffect.effect_type: " + effect.effect_type)
-
-
-func _add_pending_guard_debuff(state: CombatantState, pool: String, kind: String, value: int) -> void:
-	if not state.pending_guard_debuffs.has(pool):
-		state.pending_guard_debuffs[pool] = {"flat": 0, "keep": 0}
-	var entry := state.pending_guard_debuffs[pool] as Dictionary
-	entry[kind] = (entry.get(kind, 0) as int) + value
-	state.pending_guard_debuffs[pool] = entry
+		StatusOps.dispatch_outcome_effect(effect, caster_state, target_state, outcome)
 
 # --- End spell outcome effect helpers ---
 
 # --- Mind Detonation helpers (Group C1) ---
 
 ## Collects pool/keep/flat SpellBonusEffect bonuses for a spell across all purchased nodes.
-## Shared by _resolve_round_spell (cast path) and _detonate_mind_bomb (explosion path).
+## Shared by _resolve_round_spell (cast path) and Disciplines.detonate_mind_bomb (explosion path).
 func _collect_spell_bonuses(spell: SpellData) -> Dictionary:
 	var pool_bonus := 0
 	var keep_bonus := 0
@@ -1317,279 +1141,25 @@ func _collect_spell_bonuses(spell: SpellData) -> Dictionary:
 	return {"pool": pool_bonus, "keep": keep_bonus, "flat": flat_bonus}
 
 
-## Phase 2.1 check: fires if the enemy carries mind_detonation_primed and their Stance
-## was breached this round. Called after the player's Phase 2 attack in all round types.
-## KNOWN SIMPLIFICATION: uses global _current_round_player_breaches["stance"], not per-enemy.
-## If multiple enemies are primed, any Stance breach in the round triggers all primed bombs.
+# --- Discipline helpers — logic in combat/Disciplines.gd (Phase 4) ---
+# Thin wrappers over the Disciplines module; round-loop call sites + contract tests unchanged.
+# The armed→frozen transition (in _resolve_attack) and frozen-guard restore (in _end_of_round)
+# stay inline in the spine — see the fragile-areas notes there.
+
 func _check_mind_detonation(enemy: CombatantState, enemy_index: int) -> void:
-	if not _has_status(enemy, "mind_detonation_primed"):
-		return
-	if not _current_round_player_breaches.get("stance", false):
-		return
-	await _detonate_mind_bomb(enemy, enemy_index)
+	await Disciplines.check_mind_detonation(enemy, enemy_index)
 
 
-## Detonates a primed mind-bomb: builds explosion roll, routes through _resolve_attack vs Resolve.
-## Status removed BEFORE _resolve_attack — prevents re-trigger via on_breach (MD keys on Stance,
-## explosion breaches Resolve; different pools, so no re-trigger even without the guard).
-## No Fervor escalation: explosion is a delayed payoff, not a fresh cast.
-func _detonate_mind_bomb(enemy: CombatantState, enemy_index: int) -> void:
-	var status := _get_status(enemy, "mind_detonation_primed")
-	if status == null:
-		return
-	var frozen_fervor: int   = status.stat_overrides.get("fervor_at_prime", 0) as int
-	var cast_tier: int       = status.stat_overrides.get("cast_tier", _effective_tier(_player, null)) as int
-	var cast_pool_bonus: int = status.stat_overrides.get("cast_pool_bonus", 0) as int
-	var cast_keep_bonus: int = status.stat_overrides.get("cast_keep_bonus", 0) as int
-	var cast_flat_bonus: int = status.stat_overrides.get("cast_flat_bonus", 0) as int
-	_remove_status(enemy, "mind_detonation_primed")
-
-	var md_spell: SpellData = preload("res://resources/data/spells/mind_detonation.tres")
-	var bonuses := _collect_spell_bonuses(md_spell)
-	# Cast tool frozen at prime time governs the explosion (cap + pool/keep/flat); see Phase 2.
-	var pool: int = cast_tier + cast_pool_bonus + (bonuses["pool"] as int)
-	var keep: int = _training_keep_grade(_player) + cast_keep_bonus + (bonuses["keep"] as int)
-	var die: int  = _stat_size(_player, "ingenuity")
-	var flat: int = (bonuses["flat"] as int) + cast_flat_bonus
-
-	log_message.emit("[color=magenta][b]MIND DETONATION![/b] The charge erupts against %s's Resolve![/color]" % enemy.data.combatant_name)
-
-	var explosion_result := RollEngine.resolve(pool, die, keep, flat, 0, frozen_fervor)
-	log_message.emit(_fmt_spell_attack("[Mind Detonation]", explosion_result))
-
-	await _resolve_attack(true, enemy_index, explosion_result, "resolve")
-	# _resolve_attack handles guard roll, Massive logic, wound signals, and defeat detection.
-	# No _escalate_fervor call: explosion is not a cast.
-
-
-## Mind Rend: attacks enemy Resolve. On breach, suppresses the wound and applies hex_marked.
-## If Resolve holds, nothing happens (no mark, no wound).
-## Does NOT route through _resolve_attack — that path always deals the breach wound.
-## Mark applied AFTER on_breach hook so Mind Rend's own breach is never self-amplified
-## (wound is suppressed anyway, but ordering is kept correct for future consistency).
 func _cast_mind_rend(enemy: CombatantState, enemy_index: int, attack_result: Dictionary) -> void:
-	if enemy == null or enemy.is_defeated:
-		return
-	var attack_total: int = attack_result.total as int
-	var defensive_size: int = _get_pool_size(enemy, "resolve")
+	Disciplines.cast_mind_rend(enemy, enemy_index, attack_result)
 
-	# Guard roll — mirrors _resolve_attack's enemy-defender subset for the "resolve" pool.
-	var _pool_fresh := not enemy.is_pool_rolled("resolve")
-	if _pool_fresh:
-		var defend_mod: ActionModifier = _get_action_modifier(enemy, "defend")
-		var _ew := enemy.weapon_override if enemy.weapon_override else enemy.data.equipped_weapon
-		var cap_str := "uncapped" if defend_mod.tier_cap == 0 else "cap %d" % defend_mod.tier_cap
-		log_message.emit("  %s defends with [i]%s[/i] (%s, Tier %d → %d dice)" % [
-			enemy.data.combatant_name,
-			_ew.item_name if _ew else "Bare Hands",
-			cap_str,
-			enemy.data.tier,
-			_effective_tier(enemy, defend_mod),
-		])
-		var flat_debuff: int = 0
-		var keep_debuff: int = 0
-		var _pending: Variant = enemy.pending_guard_debuffs.get("resolve", null)
-		if _pending != null:
-			flat_debuff = (_pending as Dictionary).get("flat", 0) as int
-			keep_debuff = (_pending as Dictionary).get("keep", 0) as int
-			enemy.pending_guard_debuffs.erase("resolve")
-			if flat_debuff != 0 or keep_debuff != 0:
-				log_message.emit("  [color=purple][Outcome debuff] flat %+d, keep grade %+d on %s Resolve guard.[/color]" % [
-					flat_debuff, keep_debuff, enemy.data.combatant_name
-				])
-		var def_result := RollEngine.resolve(
-			_effective_tier(enemy, defend_mod), defensive_size,
-			maxi(1, _defense_keep_grade(enemy, "resolve") + keep_debuff),
-			defend_mod.flat_bonus, 0
-		)
-		var guard_val: int = (def_result.total as int) + flat_debuff
-		enemy.set_guard_val("resolve", guard_val)
-		enemy.set_pool_rolled("resolve", true)
-		guard_changed.emit(false, enemy_index, "resolve", guard_val)
-		log_message.emit(_fmt_defense(enemy.data.combatant_name, def_result, "Resolve"))
-	else:
-		log_message.emit("  %s Resolve already active — Guard [b]%d[/b] absorbs pressure." % [
-			enemy.data.combatant_name, enemy.get_guard("resolve")
-		])
 
-	# Breach check: attack_total >= guard.
-	var current_guard: int = enemy.get_guard("resolve")
-	if attack_total >= current_guard:
-		# Fire on_breach hook BEFORE applying the mark. Intentional: mark not yet present,
-		# so Mind Rend's own breach cannot interact with its own hex. Wound is suppressed
-		# regardless — the mark is the payoff, not the breach.
-		_process_statuses_hook("on_breach", enemy, {"pool": "resolve", "attacker": _player})
-		_current_round_player_breaches["resolve"] = true
-		# Apply mark after the hook for ordering correctness.
-		var hex_level: int = PlayerProgression.get_node_level_by_id("hex_mastery")
-		var dur: int = 3 if hex_level < 2 else 7
-		var hex := CombatStatus.new()
-		hex.status_id = "hex_marked"
-		hex.duration_rounds = dur
-		hex.source_node_id = "hex_mastery"
-		_add_status(enemy, hex)
-		var perceived_turns: int = 2 if hex_level < 2 else 4
-		log_message.emit("[color=purple]Mind Rend tears through! %s's mind is BRANDED — no wound, but the hex takes hold (%d turns).[/color]" % [
-			enemy.data.combatant_name, perceived_turns
-		])
-	else:
-		# Resolve holds: no mark, no wound.
-		var remaining: int = current_guard - attack_total
-		enemy.set_guard_val("resolve", remaining)
-		log_message.emit("  %s's Resolve holds (%d remaining). No brand takes hold." % [
-			enemy.data.combatant_name, remaining
-		])
-
-	# Publish final guard value.
-	guard_changed.emit(false, enemy_index, "resolve", enemy.get_guard("resolve"))
-
-# --- End Hex Mastery helpers ---
-
-# --- Chrono-Tinkering helpers (Group C4) ---
-
-## Time Lock: attacks enemy Resolve. On breach, suppresses the wound and applies
-## the "time_locked" status (armed phase). On hold, nothing happens.
-## Mirrors _cast_mind_rend's structure — dedicated helper to suppress the breach wound.
 func _cast_time_lock(enemy: CombatantState, enemy_index: int, attack_result: Dictionary) -> void:
-	if enemy == null or enemy.is_defeated:
-		return
-	var attack_total: int = attack_result.total as int
-	var defensive_size: int = _get_pool_size(enemy, "resolve")
+	Disciplines.cast_time_lock(enemy, enemy_index, attack_result)
 
-	# Guard roll — mirrors _cast_mind_rend's enemy-defender subset for the "resolve" pool.
-	var _pool_fresh := not enemy.is_pool_rolled("resolve")
-	if _pool_fresh:
-		var defend_mod: ActionModifier = _get_action_modifier(enemy, "defend")
-		var _ew := enemy.weapon_override if enemy.weapon_override else enemy.data.equipped_weapon
-		var cap_str := "uncapped" if defend_mod.tier_cap == 0 else "cap %d" % defend_mod.tier_cap
-		log_message.emit("  %s defends with [i]%s[/i] (%s, Tier %d → %d dice)" % [
-			enemy.data.combatant_name,
-			_ew.item_name if _ew else "Bare Hands",
-			cap_str,
-			enemy.data.tier,
-			_effective_tier(enemy, defend_mod),
-		])
-		var flat_debuff: int = 0
-		var keep_debuff: int = 0
-		var _pending: Variant = enemy.pending_guard_debuffs.get("resolve", null)
-		if _pending != null:
-			flat_debuff = (_pending as Dictionary).get("flat", 0) as int
-			keep_debuff = (_pending as Dictionary).get("keep", 0) as int
-			enemy.pending_guard_debuffs.erase("resolve")
-			if flat_debuff != 0 or keep_debuff != 0:
-				log_message.emit("  [color=purple][Outcome debuff] flat %+d, keep grade %+d on %s Resolve guard.[/color]" % [
-					flat_debuff, keep_debuff, enemy.data.combatant_name
-				])
-		var def_result := RollEngine.resolve(
-			_effective_tier(enemy, defend_mod), defensive_size,
-			maxi(1, _defense_keep_grade(enemy, "resolve") + keep_debuff),
-			defend_mod.flat_bonus, 0
-		)
-		var guard_val: int = (def_result.total as int) + flat_debuff
-		enemy.set_guard_val("resolve", guard_val)
-		enemy.set_pool_rolled("resolve", true)
-		guard_changed.emit(false, enemy_index, "resolve", guard_val)
-		log_message.emit(_fmt_defense(enemy.data.combatant_name, def_result, "Resolve"))
-	else:
-		log_message.emit("  %s Resolve already active — Guard [b]%d[/b] absorbs pressure." % [
-			enemy.data.combatant_name, enemy.get_guard("resolve")
-		])
 
-	# Breach check: attack_total >= guard.
-	var current_guard: int = enemy.get_guard("resolve")
-	if attack_total >= current_guard:
-		# Fire on_breach hook BEFORE applying the status. Intentional: same ordering as
-		# _cast_mind_rend. Time Lock's own breach cannot trigger the armed→frozen transition
-		# because the status is applied AFTER this hook, and the transition fires in _resolve_attack
-		# (which this function bypasses). Wound is suppressed — the freeze is the payoff.
-		_process_statuses_hook("on_breach", enemy, {"pool": "resolve", "attacker": _player})
-		_current_round_player_breaches["resolve"] = true
-		var tl := CombatStatus.new()
-		tl.status_id = "time_locked"
-		tl.duration_rounds = 20  # safety bound; real lifecycle driven by phase + skip_resets
-		tl.source_node_id = "chrono_tinkering"
-		tl.stat_overrides = {"phase": "armed", "locked_pool": "", "skip_resets": 0, "frozen_value": 0}
-		_add_status(enemy, tl)
-		log_message.emit("[color=cyan]Time Lock takes hold — the next guard you strike will be frozen.[/color]")
-	else:
-		# Resolve holds: no status, no wound.
-		var remaining: int = current_guard - attack_total
-		enemy.set_guard_val("resolve", remaining)
-		log_message.emit("  %s's Resolve holds (%d remaining). The time-snare fails to catch." % [
-			enemy.data.combatant_name, remaining
-		])
-
-	# Publish final guard value.
-	guard_changed.emit(false, enemy_index, "resolve", enemy.get_guard("resolve"))
-
-# --- End Chrono-Tinkering helpers ---
-
-# --- Echoing Mind helpers (Group C3) ---
-
-## Resolves one end_of_round echo of an echoing spell. Called from the player's
-## end_of_round hook in _process_statuses_hook.
-## Decrements current_kept_dice for the next round; removes the status when no more echoes remain.
-## Uses frozen Fervor from the status payload — echo is a delayed payoff, not a fresh cast.
-## Does NOT call _escalate_fervor (intentional — frozen Fervor + no escalation is the design).
-## Pool uses the cast tier frozen in echoing_spell at cast time; full-Tier fallback for legacy statuses.
 func _resolve_spell_echo(status: CombatStatus, state: CombatantState) -> void:
-	var spell_path: String   = status.stat_overrides.get("spell_path", "") as String
-	var target_index: int    = status.stat_overrides.get("target_index", -1) as int
-	var frozen_fervor: int   = status.stat_overrides.get("frozen_fervor", 0) as int
-	var current_kept: int    = status.stat_overrides.get("current_kept_dice", 0) as int
-	var em_level: int        = status.stat_overrides.get("em_level", 1) as int
-	var cast_tier: int       = status.stat_overrides.get("cast_tier", _effective_tier(_player, null)) as int
-	var cast_pool_bonus: int = status.stat_overrides.get("cast_pool_bonus", 0) as int
-	var cast_flat_bonus: int = status.stat_overrides.get("cast_flat_bonus", 0) as int
-
-	if spell_path == "" or target_index < 0 or target_index >= _enemies.size():
-		_remove_status(state, "echoing_spell")
-		return
-	var spell: SpellData = load(spell_path) as SpellData
-	if spell == null:
-		_remove_status(state, "echoing_spell")
-		return
-	var target: CombatantState = _enemies[target_index]
-	if target == null or target.is_defeated:
-		log_message.emit("[color=cyan]The echo fades — no one left to hear it.[/color]")
-		_remove_status(state, "echoing_spell")
-		return
-
-	var bonuses := _collect_spell_bonuses(spell)
-	# Cast tool frozen at cast time governs the echo pool + flat; keep_grade carries the
-	# decaying kept-dice count (focus keep was baked into it at arming). See Phase 2.
-	var pool: int       = cast_tier + cast_pool_bonus + (bonuses["pool"] as int)
-	var keep_grade: int = current_kept  # decaying kept-dice count; focus keep already in it
-	var die: int        = _stat_size(_player, "ingenuity")
-	var base_flat: int  = spell.flat_bonus + (bonuses["flat"] as int) + cast_flat_bonus
-	var echo_flat: int  = current_kept if em_level >= 2 else 0  # L2: flat = kept dice for this echo
-	var total_flat: int = base_flat + echo_flat
-
-	var flat_note: String = (" (+%d flat from Echoing Mind L2)" % echo_flat) if em_level >= 2 else ""
-	log_message.emit("[color=cyan][b]ECHO![/b] %s resounds — keeping %d die(s)%s.[/color]" % [
-		spell.spell_name, current_kept, flat_note
-	])
-
-	var echo_result := RollEngine.resolve(pool, die, keep_grade, total_flat, 0, frozen_fervor)
-	log_message.emit(_fmt_spell_attack("[Echo: %s]" % spell.spell_name, echo_result))
-
-	# Route through _resolve_attack: Hex amplification and on_breach hooks fire normally.
-	# No _escalate_fervor: echo is not a cast; Fervor stays frozen.
-	await _resolve_attack(true, target_index, echo_result, spell.target_pool)
-
-	# Phase 2.1 equivalent: echo Stance breach can detonate primed mind-bombs.
-	if not target.is_defeated:
-		await _check_mind_detonation(target, target_index)
-
-	# Decrement kept dice; remove status when next echo would keep 0 dice.
-	var next_kept: int = current_kept - 1
-	if next_kept < 1:
-		_remove_status(state, "echoing_spell")
-		log_message.emit("[color=cyan]The echo dies away.[/color]")
-	else:
-		status.stat_overrides["current_kept_dice"] = next_kept
-
-# --- End Echoing Mind helpers ---
+	await Disciplines.resolve_spell_echo(status, state)
 
 func _process_statuses_hook(
 		hook: String,
@@ -1669,59 +1239,36 @@ func _end_of_round() -> void:
 	await get_tree().create_timer(0.8).timeout
 
 
-## Passive Max Wounds bonus from Tier: +1 at Tier 2, +1 again at Tier 4 (cumulative +2).
+# The pure computations below live in combat/CombatMath.gd (Phase 2 of the refactor). These
+# thin wrappers keep the original signatures/call sites and supply CombatManager context
+# (player identity, chosen cast weapon). See CombatMath for the logic + doc comments.
+
 func _tier_wound_bonus(tier: int) -> int:
-	return (1 if tier >= 2 else 0) + (1 if tier >= 4 else 0)
+	return CombatMath.tier_wound_bonus(tier)
 
 
-## Sums max_wounds bonuses from Wounds Training nodes (effect_type="training_wounds").
 func _wounds_node_bonus(state: CombatantState) -> int:
-	return _node_effect_sum(state, "training_wounds")
+	return CombatMath.wounds_node_bonus(state)
 
 
-## Returns the effective physical keep grade: max of training_keep or physical_keep nodes.
 func _physical_keep_grade(state: CombatantState) -> int:
-	return maxi(_training_keep_grade(state), _node_effect_max(state, "physical_keep"))
+	return CombatMath.physical_keep_grade(state)
 
 
-## Returns the max uses_per_combat across all purchased meat_grinder NodeLevelData entries.
 func _meat_grinder_charges(state: CombatantState) -> int:
-	var best := 0
-	for node in state.node_levels.keys():
-		var nd: NodeData = node as NodeData
-		if nd == null:
-			continue
-		var lvl: int = state.node_levels[node]
-		for i in range(mini(lvl, nd.levels_data.size())):
-			var ld: NodeLevelData = nd.levels_data[i]
-			if ld.effect_type == "meat_grinder":
-				best = maxi(best, ld.uses_per_combat)
-	return best
+	return CombatMath.meat_grinder_charges(state)
 
 
-## Returns the die size for the given defense pool on a combatant.
-## Stance = Negation, Resolve = Ingenuity, Stamina = Dominion (defensive expression).
 func _get_pool_size(state: CombatantState, pool: String) -> int:
-	match pool:
-		"stance":  return _stat_size(state, "negation")
-		"resolve": return _stat_size(state, "ingenuity")
-		"stamina": return _stat_size(state, "dominion")
-	return _stat_size(state, "negation")
+	return CombatMath.get_pool_size(state, pool)
 
 
-## Effective Tier: tier_override if set, else data.tier, capped by ActionModifier.tier_cap.
-## Pass the relevant ActionModifier (strike or defend); null or tier_cap=0 means uncapped.
 func _effective_tier(state: CombatantState, mod: ActionModifier = null) -> int:
-	var base := state.tier_override if state.tier_override > 0 else state.data.tier
-	if mod == null or mod.tier_cap == 0:
-		return base
-	return mini(base, mod.tier_cap)
+	return CombatMath.effective_tier(state, mod)
 
 
-## Flat bonus applied to attack rolls: strike ActionModifier flat + weapon_flat node bonuses.
 func _attack_flat(state: CombatantState, strike_mod: ActionModifier = null, weapon: EquipmentData = null) -> int:
-	var m := strike_mod if strike_mod != null else _get_action_modifier(state, "strike")
-	return m.flat_bonus + _node_weapon_bonus_sum(state, "weapon_flat", weapon)
+	return CombatMath.attack_flat(state, state == _player, strike_mod, weapon)
 
 
 ## Returns {item_name, mod} for the player's defense roll.
@@ -1762,164 +1309,56 @@ func _get_player_defense_modifier() -> Dictionary:
 	return {"item_name": "Bare Hands", "mod": _player.data.get_bare_hands_modifier("defend")}
 
 
-## Flat bonus applied to defense rolls: defend ActionModifier flat.
 func _guard_flat(state: CombatantState) -> int:
-	return _get_action_modifier(state, "defend").flat_bonus
+	return CombatMath.guard_flat(state, state == _player)
 
 
-## Pool size modifier from the ActionModifier for the given action key.
 func _pool_bonus(state: CombatantState, action_key: String = "strike", strike_mod: ActionModifier = null) -> int:
-	var m := strike_mod if strike_mod != null else _get_action_modifier(state, action_key)
-	return m.pool_bonus
+	return CombatMath.pool_bonus(state, state == _player, action_key, strike_mod)
 
 
-## Looks up the ActionModifier for action_key: weapon first, then bare_hands (always present).
-## For the player, weapon_override == null means bare hands (PlayerProgression.main_hand not set).
-## For enemies, weapon_override == null falls back to data.equipped_weapon (their fixed weapon).
 func _get_action_modifier(state: CombatantState, action_key: String) -> ActionModifier:
-	var w: EquipmentData
-	if state == _player:
-		w = state.weapon_override
-	else:
-		w = state.weapon_override if state.weapon_override else state.data.equipped_weapon
-	if w:
-		for mod in w.action_modifiers:
-			if mod.action_key == action_key:
-				return mod
-	return state.data.get_bare_hands_modifier(action_key)
+	return CombatMath.get_action_modifier(state, action_key, state == _player)
 
 
-## Resolves the "cast" ActionModifier from the player's chosen casting tool (_player_cast_weapon).
-## Null tool or no "cast" key → uncapped bare-hands stub (tier_cap=0, all bonuses zero = full Tier).
 func _get_cast_modifier(state: CombatantState) -> ActionModifier:
-	var tool: EquipmentData = _player_cast_weapon
-	if tool:
-		for mod in tool.action_modifiers:
-			if mod.action_key == "cast":
-				return mod
-	return state.data.get_bare_hands_modifier("cast")
+	return CombatMath.get_cast_modifier(state, _player_cast_weapon)
 
 
-## Architecture stub: applies derivation_ratio to parent's bonuses (floor). No derived actions yet.
 func _derived_modifier(mod: ActionModifier, parent: ActionModifier) -> ActionModifier:
-	var derived := mod.duplicate() as ActionModifier
-	if mod.parent_action_key != "" and mod.derivation_ratio > 0.0:
-		derived.flat_bonus  = floori(parent.flat_bonus  * mod.derivation_ratio)
-		derived.keep_bonus  = floori(parent.keep_bonus  * mod.derivation_ratio)
-		derived.pool_bonus  = floori(parent.pool_bonus  * mod.derivation_ratio)
-	return derived
+	return CombatMath.derived_modifier(mod, parent)
 
 
-## Returns all ActionModifiers for a state: main-hand + off-hand + bare_hands (always present).
 func _get_all_action_modifiers(state: CombatantState) -> Array:
-	var w: EquipmentData = state.weapon_override if state.weapon_override else state.data.equipped_weapon
-	var result: Array = []
-	if w:
-		result.append_array(w.action_modifiers)
-	if state.off_hand_override:
-		result.append_array(state.off_hand_override.action_modifiers)
-	if not state.data.bare_hands_actions.is_empty():
-		result.append_array(state.data.bare_hands_actions)
-	else:
-		result.append(state.data.get_bare_hands_modifier("strike"))
-		result.append(state.data.get_bare_hands_modifier("defend"))
-	return result
+	return CombatMath.get_all_action_modifiers(state)
 
 
-## Returns the max effect_value across all purchased NodeLevelData entries matching the given key.
 func _node_effect_max(state: CombatantState, key: String) -> int:
-	var best := 0
-	for node in state.node_levels.keys():
-		var nd: NodeData = node as NodeData
-		if nd == null:
-			continue
-		var lvl: int = state.node_levels[node]
-		for i in range(mini(lvl, nd.levels_data.size())):
-			var ld: NodeLevelData = nd.levels_data[i]
-			if ld.effect_type == key:
-				best = maxi(best, ld.effect_value)
-	return best
+	return CombatMath.node_effect_max(state, key)
 
 
-## Returns the sum of effect_value across all purchased NodeLevelData entries matching the given key.
 func _node_effect_sum(state: CombatantState, key: String) -> int:
-	var total := 0
-	for node in state.node_levels.keys():
-		var nd: NodeData = node as NodeData
-		if nd == null:
-			continue
-		var lvl: int = state.node_levels[node]
-		for i in range(mini(lvl, nd.levels_data.size())):
-			var ld: NodeLevelData = nd.levels_data[i]
-			if ld.effect_type == key:
-				total += ld.effect_value
-	return total
+	return CombatMath.node_effect_sum(state, key)
 
 
-## Returns the sum of effect_value for entries matching key where all weapon_tags match the equipped weapon.
 func _node_weapon_bonus_sum(state: CombatantState, key: String, weapon_override: EquipmentData = null) -> int:
-	var total := 0
-	var weapon: EquipmentData = weapon_override if weapon_override != null else (state.weapon_override if state.weapon_override else state.data.equipped_weapon)
-	for node in state.node_levels.keys():
-		var nd: NodeData = node as NodeData
-		if nd == null:
-			continue
-		var lvl: int = state.node_levels[node]
-		for i in range(mini(lvl, nd.levels_data.size())):
-			var ld: NodeLevelData = nd.levels_data[i]
-			if ld.effect_type != key:
-				continue
-			if ld.weapon_tags.is_empty():
-				total += ld.effect_value
-			elif weapon != null:
-				var all_match := true
-				for tag in ld.weapon_tags:
-					if not weapon.tags.has(tag):
-						all_match = false
-						break
-				if all_match:
-					total += ld.effect_value
-	return total
+	return CombatMath.node_weapon_bonus_sum(state, key, weapon_override)
 
 
-## Returns true if any purchased NodeLevelData entry has the given effect_type.
 func _has_effect_type(state: CombatantState, key: String) -> bool:
-	for node in state.node_levels.keys():
-		var nd: NodeData = node as NodeData
-		if nd == null:
-			continue
-		var lvl: int = state.node_levels[node]
-		for i in range(mini(lvl, nd.levels_data.size())):
-			if nd.levels_data[i].effect_type == key:
-				return true
-	return false
+	return CombatMath.has_effect_type(state, key)
 
 
-## Returns the effective die size for a stat, upgraded by any unlocked Core nodes.
 func _stat_size(state: CombatantState, stat: String) -> int:
-	# Status overrides take priority over all other sources.
-	for status in state.active_statuses:
-		if status.stat_overrides.has(stat):
-			return status.stat_overrides[stat] as int
-	var base: int
-	match stat:
-		"dominion":  base = state.data.dominion_size
-		"negation":  base = state.data.negation_size
-		"ingenuity": base = state.data.ingenuity_size
-		_: base = 6
-	return maxi(base, _node_effect_max(state, "stat_size_" + stat))
+	return CombatMath.stat_size(state, stat)
 
 
-## Returns the effective keep grade for a combatant: highest Training node value,
-## or data.keep_grade as fallback when no Training node is present.
 func _training_keep_grade(state: CombatantState) -> int:
-	return maxi(state.data.keep_grade, _node_effect_max(state, "training_keep"))
+	return CombatMath.training_keep_grade(state)
 
 
-## Returns the effective defensive keep grade for the given pool: max of
-## _training_keep_grade and pool-specific *_keep nodes (mirrors _physical_keep_grade architecture).
 func _defense_keep_grade(state: CombatantState, pool: String) -> int:
-	return maxi(_training_keep_grade(state), _node_effect_max(state, pool + "_keep"))
+	return CombatMath.defense_keep_grade(state, pool)
 
 
 ## Steps Fervor by `steps` track positions (positive = escalate, negative = cool).
@@ -2001,52 +1440,27 @@ func get_player_attack_preview() -> int:
 	return int(tier * (die_size + 1) / 2.0) + flat
 
 
-# ── Formatting helpers ────────────────────────────────────────────────────────
+# ── Formatting helpers (logic in combat/CombatMath.gd) ────────────────────────
 
 func _attacker_weapon_name(state: CombatantState) -> String:
-	var w: EquipmentData
-	if state == _player:
-		w = state.weapon_override
-	else:
-		w = state.weapon_override if state.weapon_override else state.data.equipped_weapon
-	return w.item_name if w else "Bare Hands"
+	return CombatMath.attacker_weapon_name(state, state == _player)
 
 
 func _fmt_attack(name: String, r: Dictionary, weapon_name: String = "") -> String:
-	var desperation: bool = r.desperation
-	var prefix := "[b][DESPERATION][/b] " if desperation else ""
-	var flat: int = r.flat as int
-	var flat_part := " + %d flat" % flat if flat != 0 else ""
-	var with_part := " with [i]%s[/i]" % weapon_name if weapon_name != "" else ""
-	return "  %s%s attacks%s: rolled %s, kept %s%s → [b]%d[/b]" % [
-		prefix, name, with_part, _arr(r.dice as Array), _arr(r.kept as Array), flat_part, r.total as int
-	]
+	return CombatMath.fmt_attack(name, r, weapon_name)
 
 
 func _fmt_spell_attack(name: String, r: Dictionary) -> String:
-	var desperation: bool = r.desperation
-	var prefix := "[b][DESPERATION][/b] " if desperation else ""
-	var fervor_roll: int = r.fervor_roll as int
-	var fervor_part := " + [color=magenta]Fervor %d[/color]" % fervor_roll if fervor_roll > 0 else ""
-	var maxed_note := " [color=magenta][b][MAX][/b][/color]" if (r.fervor_maxed as bool) else ""
-	return "  %s%s casts: rolled %s, kept %s%s → [b]%d[/b]%s" % [
-		prefix, name, _arr(r.dice as Array), _arr(r.kept as Array),
-		fervor_part, r.total as int, maxed_note
-	]
+	return CombatMath.fmt_spell_attack(name, r)
 
 
 func _fmt_speed(name: String, total: int, vt: int, fast: bool) -> String:
-	var tag := "[color=cyan]FAST[/color]" if fast else "[color=gray]slow[/color]"
-	return "  %s: %d vs VT %d → %s" % [name, total, vt, tag]
+	return CombatMath.fmt_speed(name, total, vt, fast)
 
 
 func _fmt_defense(name: String, r: Dictionary, pool_label: String) -> String:
-	var flat: int = r.flat as int
-	var flat_part := " + %d flat" % flat if flat != 0 else ""
-	return "  %s rolls %s: %s → kept %s%s → Guard [b]%d[/b]" % [
-		name, pool_label, _arr(r.dice as Array), _arr(r.kept as Array), flat_part, r.total as int
-	]
+	return CombatMath.fmt_defense(name, r, pool_label)
 
 
 func _arr(a: Array) -> String:
-	return "[" + ", ".join(a.map(func(v): return str(v))) + "]"
+	return CombatMath.arr(a)
