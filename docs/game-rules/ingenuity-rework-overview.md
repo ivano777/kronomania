@@ -20,8 +20,8 @@ _Changelog: Mental Fortress node removed; anti-Burnout intent absorbed into Luci
 
 ### Tier 1 — Foundation
 - `ing_core` (L1-L3): upgrade Ingenuity die, automatically raises Fervor cap
-- `minor_studies` (L1): base cantrips — arcane_bolt, aether_barrier (stub),
-  chrono_shift (stub)
+- `minor_studies` (L1): base cantrips — arcane_bolt, arcane_touch (both shipped);
+  aether_barrier and chrono_shift are planned but undesigned (see "Design not yet completed")
 
 ### Tier 2 — The Engine
 - `spellcasting` (L1-L3): unlocks Fervor/Escalation, injects Arcane Missile
@@ -96,7 +96,7 @@ Spells and cantrips use an explicit **casting tool** selected by the player each
 
 **Phase 1 (implemented):** direct casts (cantrip + true spell) use the chosen cast tool.
 
-**Phase 2 (implemented):** the chosen `cast_mod` is frozen into `mind_detonation_primed.stat_overrides` and `echoing_spell.stat_overrides` at prime/cast time. Keys frozen: `cast_tier`, `cast_pool_bonus`, `cast_flat_bonus` (both); `cast_keep_bonus` in bomb only (echo bakes keep into `current_kept_dice` at arming). Delayed payoffs read these keys; legacy statuses without them fall back to full Tier. `_player_cast_weapon` cleared after freeze, before Phase 2.1.
+**Phase 2 (implemented):** the chosen `cast_mod` is frozen into `mind_detonation_primed.stat_overrides` and `echoing_spell.stat_overrides` at prime/cast time. Keys frozen: `cast_tier`, `cast_pool_bonus`, `cast_flat_bonus` (both); `cast_keep_bonus` in bomb only (echo bakes keep into `current_kept_dice` at arming). Delayed payoffs read these keys; legacy statuses without them fall back to full Tier. `_player_cast_weapon` is cleared right after `cast_mod` is captured (before the freeze block and Phase 2.1); the freeze uses the captured local `cast_mod`, not the member var.
 
 ## Design not yet completed
 

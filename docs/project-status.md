@@ -19,9 +19,9 @@ Tracks what is implemented and what remains. Updated after each feature ships.
 ### Data (key files)
 - **Player**: `player_default.tres` (Tier 1, all d4 base, Iron Sword, bare_hands stub)
 - **Enemies**: `enemy_grunt.tres` (T1, d4/d4, VT 10, 2 wounds), `enemy_soldier.tres` (T1, d6/d6, VT 12, 3 wounds), `enemy_knight.tres` (T2, d8/d8, VT 15, 4 wounds, keep 1)
-- **Weapons**: `iron_sword.tres` (tier_cap=2, flat+1, Sharp), `crude_club.tres` (tier_cap=1, Blunt), `greatsword.tres` (tier_cap=2, flat+1, Sharp+TwoHanded)
-- **Nodes (43 total)**: Dominion tree (`dom_core/wounds/martial_arts/melee/ranged/dual_wield/titans_grip/disarm/brutal/meat_grinder/earthshatter`); `neg_core`, `ing_core` (multi-level, 3 levels each); pool-guard training nodes (`neg_stance`, `dom_stamina`, `ing_resolve`); ability nodes (`minor_studies`, `spellcasting` L1–L3); flavor nodes (`warrior_oath` + 15 under `flavors/`)
-- **Spells**: cantrips — `arcane_bolt`, `arcane_touch`; true spells — `arcane_missile`, `arcane_mark`
+- **Weapons**: `iron_sword.tres` (tier_cap=2, flat+1, Sharp), `crude_club.tres` (tier_cap=1, Blunt; Grunt's weapon), `greatsword.tres` (tier_cap=2, flat+1, Sharp+TwoHanded), `heater_shield.tres` (Shield). Player-equippable set (`PlayerProgression.AVAILABLE_WEAPONS`): iron_sword, greatsword, heater_shield. All four mundane weapons carry Strike/Defend/Cast modifiers.
+- **Nodes (43 total)**: Dominion tree (`dom_core/wounds/martial_arts/melee/ranged/dual_wield/titans_grip/disarm/brutal/meat_grinder/earthshatter`); `neg_core`, `ing_core` (multi-level, 3 levels each); pool-guard training nodes (`neg_stance`, `dom_stamina`, `ing_resolve`); ability nodes (`minor_studies`, `spellcasting` L1–L3, `lucidity`, `mind_detonation`, `hex_mastery`, `echoing_mind`, `chrono_tinkering`); flavor nodes (`warrior_oath` + 19 under `flavors/`)
+- **Spells**: cantrips — `arcane_bolt`, `arcane_touch`; true spells — `arcane_missile`, `arcane_mark`, `mind_detonation`, `mind_rend` (Hex Mastery), `mind_lash` (Echoing Mind), `time_lock` (Chrono-Tinkering)
 
 ### UI
 - **BattleScene** — `WorldLayer` (Node2D, combatant sprites/anchors) + `UILayer` (CanvasLayer, HUDs). `AnimatedSprite2D` stubs with ColorRect fallback.
@@ -201,7 +201,7 @@ New spell: `mind_lash.tres`. New node: `ability_echoing_mind.tres`.
 
 **Phase C2.6 ✓ — Defensive keep grade unification**
 `_defense_keep_grade` now uses `maxi(_training_keep_grade, _node_effect_max)` mirroring `_physical_keep_grade`.
-Call sites in `_resolve_attack` and `_cast_mind_rend` simplified (redundant `_training_keep_guard` sum removed).
+Call sites in `_resolve_attack`, `_cast_mind_rend`, and `_cast_time_lock` (added later in Phase C4) simplified (redundant `_training_keep_guard` sum removed).
 Defensive node effect_values shifted 0/1/2 → 1/2/3 to match their "Keep 1/2/3 dice" descriptions.
 Behavior-identical (mathematical equivalence proven and probe-tested).
 
@@ -238,7 +238,7 @@ Phase 2: chosen `cast_mod` frozen into `mind_detonation_primed.stat_overrides` (
 `cast_pool_bonus`, `cast_keep_bonus`, `cast_flat_bonus`) and `echoing_spell.stat_overrides`
 (`cast_tier`, `cast_pool_bonus`, `cast_flat_bonus`; focus keep baked into `current_kept_dice`).
 Delayed payoffs (explosion + echo) read frozen values; legacy statuses without keys fall back to
-full Tier (`_effective_tier(_player, null)`). `_player_cast_weapon` cleared after freeze, before Phase 2.1.
+full Tier (`_effective_tier(_player, null)`). `_player_cast_weapon` is cleared right after `cast_mod` is captured (before the freeze block and before Phase 2.1); the freeze reads the captured local `cast_mod`, not the member var.
 
 ---
 

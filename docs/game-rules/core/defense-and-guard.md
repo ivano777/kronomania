@@ -35,6 +35,8 @@ Features or nodes may explicitly allow extra rolls or exceptions.
 If a character must roll different defense pools in the same round,
 each additional defensive roll takes cumulative disadvantage.
 
+> _Prototype status: cumulative disadvantage on 2nd+ pools is **deferred** — not yet implemented in code (tracked in `docs/project-status.md` → Future). Each pool currently rolls independently, with no stacking penalty._
+
 ## Guard Reset
 Guard resets at the **start of each new round**.
 Any remaining Guard from the previous round does not carry over.

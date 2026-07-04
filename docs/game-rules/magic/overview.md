@@ -13,7 +13,7 @@ Cantrips are safer and simpler.
 
 ### Cantrip Access
 The **Minor Studies** node unlocks cantrip use and directly grants a set of generic cantrips (see [Cantrips](./cantrips.md)).
-Additional cantrips may be granted by spell school nodes.
+Additional cantrips may be granted by future nodes; the original spell-school nodes were removed in the Ingenuity rework — see [Ingenuity Branch Rework](../ingenuity-rework-overview.md).
 Cantrips do not require the Spellcasting node.
 
 ### True Spellcasting Access

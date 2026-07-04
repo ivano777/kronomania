@@ -41,6 +41,7 @@ It is a structured gameplay guideline that can be translated into code, tools, c
 - [Nodes](./progression/nodes.md)
 - **Trees**
   - [Dominion Path](./progression/trees/dominion.md)
+  - _Ingenuity branch: see [Ingenuity Branch Rework](./ingenuity-rework-overview.md) — no dedicated `trees/ingenuity.md` file yet_
 
 ### Magic
 - [Overview](./magic/overview.md)
@@ -49,6 +50,7 @@ It is a structured gameplay guideline that can be translated into code, tools, c
 - [Recovery](./magic/recovery.md)
 - [Spell Resolution](./magic/spell-resolution.md)
 - [Cantrips](./magic/cantrips.md)
+- [Ingenuity Branch Rework](./ingenuity-rework-overview.md) — Spellcasting L1–L3, Lucidity, the four disciplines (Mind Detonation, Hex Mastery, Echoing Mind, Chrono-Tinkering), and the casting-implement system
 
 ### Combat Options
 - [Overview](./combat-options/overview.md)

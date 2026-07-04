@@ -16,7 +16,7 @@ A character knows all cantrips granted by their unlocked nodes. There is no slot
 *Deferred: cantrip count formula (Ingenuity-based slot cap) and Minor Studies grade tiers.*
 
 ## Pool Building
-Cantrips use normal Tier-based pool building: base pool size = Tier.
+Cantrips use normal Tier-based pool building: base pool size = Tier, capped by the chosen **casting tool** (`cast_mod.tier_cap`: mundane weapons cap at 1 die; bare hands = full Tier — see [Ingenuity Branch Rework](../ingenuity-rework-overview.md) → Casting implement system).
 The die Size comes from the relevant stat or action rule (default: Ingenuity).
 Normal Keep, Advantage, and Disadvantage rules apply.
 Cantrips do not use real Fervor dice.

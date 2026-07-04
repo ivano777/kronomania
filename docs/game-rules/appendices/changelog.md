@@ -31,3 +31,18 @@
 - Desperation applies to normal pool only; real Fervor dice unaffected
 - Player character Max Wounds = 3; Defeat when Wounds >= Max Wounds
 - Safe Venting remains node-based, not baseline
+
+## Ingenuity Rework (Groups B/C, Phase D-pre)
+
+_Implemented after the Current Rewrite above. Supersedes the older Minor Studies grade model and defers some clarified-but-unimplemented rules. Full design: [Ingenuity Branch Rework](../ingenuity-rework-overview.md)._
+
+### Added
+- **Spellcasting L1–L3** — Arcane Missile (vs Stance) + Arcane Mark (vs Resolve); progressive Keep 2/3 on all arcane spells; Arcane Mark breach debuffs (Stance flat −2 at L2, keep −1 "Frattura Totale" at L3).
+- **Lucidity L1–L2** — L1 proactive Fervor cooling (lower 1 step, costs the turn, unlimited); L2 reactive anti-Burnout interrupt (1 charge/combat, Fervor stays at cap).
+- **Disciplines** — Mind Detonation (prime vs Stance → detonate vs Resolve), Hex Mastery / Mind Rend (mark on Resolve breach amplifies later wounds), Echoing Mind / Mind Lash (spell echoes each end-of-round, decaying with kept dice), Chrono-Tinkering / Time Lock (freeze an enemy guard so it does not renew).
+- **Casting implement system (Phase D-pre)** — spells/cantrips select a **casting tool** each round; pool routes through the tool's `"cast"` modifier `tier_cap` (mundane weapons cap at 1 die; bare hands = full Tier).
+
+### Superseded / deferred (relative to older entries above)
+- **Cumulative Disadvantage on 2nd+ defense pools** — clarified as a rule but **deferred**; not implemented (tracked in `docs/project-status.md` → Future).
+- **Minor Studies grade tiers (0/1/2)** — deferred; `minor_studies` currently grants base cantrips (Arcane Bolt, Arcane Touch) with no grade progression.
+- **Spell school nodes** — removed in Phase B2; ideas archived in `appendices/legacy-archive.md`.
