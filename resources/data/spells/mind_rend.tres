@@ -12,3 +12,4 @@ target_pool = "resolve"
 flat_bonus = 0
 is_cantrip = false
 tags = PackedStringArray("arcane")
+cast_handler = "mind_rend"

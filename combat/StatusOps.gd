@@ -51,17 +51,13 @@ static func tick(state: CombatantState) -> Array[String]:
 			expired.append(s)
 	for s in expired:
 		state.active_statuses.erase(s)
-		if s.status_id == "mind_detonation_primed":
-			logs.append("[color=purple]The mind-bomb goes inert. Stance was never broken.[/color]")
-		elif s.status_id == "hex_marked":
-			logs.append("[color=purple]The hex fades from %s — the brand has run its course.[/color]" % state.data.combatant_name)
-		elif s.status_id == "echoing_spell":
-			logs.append("[color=red][debug] echoing_spell expired via duration_rounds — should have self-terminated. Investigate.[/color]")
-		elif s.status_id == "time_locked":
-			var ph := s.stat_overrides.get("phase", "") as String
-			if ph == "armed":
-				logs.append("[color=cyan]The armed Time Lock dissipates — the moment slips away, unfrozen.[/color]")
-			# frozen expiry via duration_rounds is a safety net; real removal is in _end_of_round
+		# Expiry log line comes from the status's effect handler (Phase 2); "" = no line.
+		# (Time Lock frozen expiry returns "" — real removal is in _end_of_round, not here.)
+		var handler: CombatEffect = EffectRegistry.get_handler(s.status_id)
+		if handler != null:
+			var line := handler.on_expire(s, state)
+			if line != "":
+				logs.append(line)
 	return logs
 
 

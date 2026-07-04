@@ -12,3 +12,5 @@ target_pool = "stance"
 flat_bonus = 0
 is_cantrip = false
 tags = PackedStringArray("arcane")
+placement_scratch = true
+primes_status = "mind_detonation_primed"

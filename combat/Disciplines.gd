@@ -11,9 +11,9 @@ extends RefCounted
 #
 # CombatManager keeps thin delegating wrappers (`_check_mind_detonation`, `_cast_mind_rend`,
 # `_cast_time_lock`, `_resolve_spell_echo`) so its round-loop call sites and the contract tests
-# are unchanged. Two chrono snippets stay embedded in the spine on purpose: the armed→frozen
-# transition in `_resolve_attack` and the frozen-guard restore in `_end_of_round` — moving them
-# would mean editing the spine functions themselves.
+# are unchanged. This module holds the discipline CAST logic only; the spine-integrated Time Lock
+# lifecycle (armed→frozen transition, frozen-guard restore) lives in `TimeLockEffect`
+# (`combat/effects/`), fired via generic `EffectRegistry` dispatch — not inline in the spine.
 #
 # `roll_enemy_guard` unifies the enemy-defender resolve-pool guard roll that `_cast_mind_rend`
 # and `_cast_time_lock` previously copy-pasted.
@@ -81,20 +81,17 @@ static func detonate_mind_bomb(enemy: CombatantState, enemy_index: int) -> void:
 	if status == null:
 		return
 	var player: CombatantState = CombatManager._player
-	var frozen_fervor: int   = status.stat_overrides.get("fervor_at_prime", 0) as int
-	var cast_tier: int       = status.stat_overrides.get("cast_tier", CombatMath.effective_tier(player, null)) as int
-	var cast_pool_bonus: int = status.stat_overrides.get("cast_pool_bonus", 0) as int
-	var cast_keep_bonus: int = status.stat_overrides.get("cast_keep_bonus", 0) as int
-	var cast_flat_bonus: int = status.stat_overrides.get("cast_flat_bonus", 0) as int
+	var payload := MindBombPayload.from_status(status, CombatMath.effective_tier(player, null))
+	var frozen_fervor: int = payload.fervor_at_prime
 	StatusOps.remove(enemy, "mind_detonation_primed")
 
 	var md_spell: SpellData = preload("res://resources/data/spells/mind_detonation.tres")
 	var bonuses := CombatManager._collect_spell_bonuses(md_spell)
 	# Cast tool frozen at prime time governs the explosion (cap + pool/keep/flat); see Phase 2.
-	var pool: int = cast_tier + cast_pool_bonus + (bonuses["pool"] as int)
-	var keep: int = CombatMath.training_keep_grade(player) + cast_keep_bonus + (bonuses["keep"] as int)
+	var pool: int = payload.cast.tier + payload.cast.pool_bonus + (bonuses["pool"] as int)
+	var keep: int = CombatMath.training_keep_grade(player) + payload.cast.keep_bonus + (bonuses["keep"] as int)
 	var die: int  = CombatMath.stat_size(player, "ingenuity")
-	var flat: int = (bonuses["flat"] as int) + cast_flat_bonus
+	var flat: int = (bonuses["flat"] as int) + payload.cast.flat_bonus
 
 	CombatManager.log_message.emit("[color=magenta][b]MIND DETONATION![/b] The charge erupts against %s's Resolve![/color]" % enemy.data.combatant_name)
 
@@ -160,7 +157,7 @@ static func cast_time_lock(enemy: CombatantState, enemy_index: int, attack_resul
 		tl.status_id = "time_locked"
 		tl.duration_rounds = 20  # safety bound; real lifecycle driven by phase + skip_resets
 		tl.source_node_id = "chrono_tinkering"
-		tl.stat_overrides = {"phase": "armed", "locked_pool": "", "skip_resets": 0, "frozen_value": 0}
+		TimeLockPayload.new().to_status(tl)  # defaults: armed phase, no locked pool
 		StatusOps.add(enemy, tl)
 		CombatManager.log_message.emit("[color=cyan]Time Lock takes hold — the next guard you strike will be frozen.[/color]")
 	else:
@@ -181,14 +178,12 @@ static func cast_time_lock(enemy: CombatantState, enemy_index: int, attack_resul
 static func resolve_spell_echo(status: CombatStatus, state: CombatantState) -> void:
 	var player: CombatantState = CombatManager._player
 	var enemies: Array = CombatManager._enemies
-	var spell_path: String   = status.stat_overrides.get("spell_path", "") as String
-	var target_index: int    = status.stat_overrides.get("target_index", -1) as int
-	var frozen_fervor: int   = status.stat_overrides.get("frozen_fervor", 0) as int
-	var current_kept: int    = status.stat_overrides.get("current_kept_dice", 0) as int
-	var em_level: int        = status.stat_overrides.get("em_level", 1) as int
-	var cast_tier: int       = status.stat_overrides.get("cast_tier", CombatMath.effective_tier(player, null)) as int
-	var cast_pool_bonus: int = status.stat_overrides.get("cast_pool_bonus", 0) as int
-	var cast_flat_bonus: int = status.stat_overrides.get("cast_flat_bonus", 0) as int
+	var payload := EchoPayload.from_status(status, CombatMath.effective_tier(player, null))
+	var spell_path: String = payload.spell_path
+	var target_index: int  = payload.target_index
+	var frozen_fervor: int = payload.frozen_fervor
+	var current_kept: int  = payload.current_kept_dice
+	var em_level: int      = payload.em_level
 
 	if spell_path == "" or target_index < 0 or target_index >= enemies.size():
 		StatusOps.remove(state, "echoing_spell")
@@ -206,10 +201,10 @@ static func resolve_spell_echo(status: CombatStatus, state: CombatantState) -> v
 	var bonuses := CombatManager._collect_spell_bonuses(spell)
 	# Cast tool frozen at cast time governs the echo pool + flat; keep_grade carries the
 	# decaying kept-dice count (focus keep was baked into it at arming). See Phase 2.
-	var pool: int       = cast_tier + cast_pool_bonus + (bonuses["pool"] as int)
+	var pool: int       = payload.cast.tier + payload.cast.pool_bonus + (bonuses["pool"] as int)
 	var keep_grade: int = current_kept  # decaying kept-dice count; focus keep already in it
 	var die: int        = CombatMath.stat_size(player, "ingenuity")
-	var base_flat: int  = spell.flat_bonus + (bonuses["flat"] as int) + cast_flat_bonus
+	var base_flat: int  = spell.flat_bonus + (bonuses["flat"] as int) + payload.cast.flat_bonus
 	var echo_flat: int  = current_kept if em_level >= 2 else 0  # L2: flat = kept dice for this echo
 	var total_flat: int = base_flat + echo_flat
 
@@ -234,4 +229,4 @@ static func resolve_spell_echo(status: CombatStatus, state: CombatantState) -> v
 		StatusOps.remove(state, "echoing_spell")
 		CombatManager.log_message.emit("[color=cyan]The echo dies away.[/color]")
 	else:
-		status.stat_overrides["current_kept_dice"] = next_kept
+		EchoPayload.set_kept(status, next_kept)

@@ -28,3 +28,18 @@ extends Resource
 
 ## School tags matched against SpellBonusEffect.tag (e.g. "fire", "arcane").
 @export var tags: PackedStringArray = []
+
+# ── Discipline cast dispatch (data-driven; replaces spell_name string matches) ──
+
+## Which discipline cast routine handles the player attack in _resolve_round_spell.
+## "" = the standard _resolve_attack pipeline. "mind_rend" / "time_lock" = the wound-suppressing
+## discipline casts (bypass _resolve_attack). Governs Phase 2 routing only.
+@export var cast_handler: String = ""
+
+## If true, the player attack roll is a weak pool=1 Ingenuity scratch with no school bonuses
+## (Mind Detonation placement). If false, the normal cast roll is built.
+@export var placement_scratch: bool = false
+
+## status_id to prime on the target after a successful cast (Mind Detonation → "mind_detonation_primed").
+## "" = primes nothing. The payload built for the primed status is discipline-specific.
+@export var primes_status: String = ""

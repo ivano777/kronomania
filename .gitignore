@@ -13,3 +13,6 @@
 error.txt
 output.txt
 validation*.txt
+
+# repomix
+repomix-output.xml

@@ -447,21 +447,9 @@ func _resolve_round(net_advantage: int = 0, target_pool: String = "stance", brut
 		RollEngine.is_fast(p_total, target_vt)))
 
 	# ── Phase 1: Slow enemies attack first ────────────────────────────────
-	for i in _enemies.size():
-		var e: CombatantState = _enemies[i]
-		if e.is_defeated:
-			continue
-		var e_vt: int = e.data.velocity_threshold - (5 if brutal_trade and i == target_index else 0)
-		if not RollEngine.is_fast(p_total, e_vt):
-			var e_atk := RollEngine.resolve(
-				_effective_tier(e, _get_action_modifier(e, "strike")), _stat_size(e, "dominion"), _training_keep_grade(e), _attack_flat(e)
-			)
-			log_message.emit(_fmt_attack(e.data.combatant_name, e_atk, _attacker_weapon_name(e)))
-			var e_pool := target_pool if i == target_index else "stance"
-			await _resolve_attack(false, i, e_atk, e_pool)
-			if _player.is_defeated:
-				_end_combat()
-				return
+	if await _run_enemy_attacks(true, p_total, target_pool, target_index, brutal_trade):
+		_end_combat()
+		return
 
 	# ── Phase 2: Player attacks chosen target ──────────────────────────────
 	if not target.is_defeated:
@@ -476,21 +464,9 @@ func _resolve_round(net_advantage: int = 0, target_pool: String = "stance", brut
 		return
 
 	# ── Phase 3: Fast enemies attack last ─────────────────────────────────
-	for i in _enemies.size():
-		var e: CombatantState = _enemies[i]
-		if e.is_defeated:
-			continue
-		var e_vt: int = e.data.velocity_threshold - (5 if brutal_trade and i == target_index else 0)
-		if RollEngine.is_fast(p_total, e_vt):
-			var e_atk := RollEngine.resolve(
-				_effective_tier(e, _get_action_modifier(e, "strike")), _stat_size(e, "dominion"), _training_keep_grade(e), _attack_flat(e)
-			)
-			log_message.emit(_fmt_attack(e.data.combatant_name, e_atk, _attacker_weapon_name(e)))
-			var e_pool := target_pool if i == target_index else "stance"
-			await _resolve_attack(false, i, e_atk, e_pool)
-			if _player.is_defeated:
-				_end_combat()
-				return
+	if await _run_enemy_attacks(false, p_total, target_pool, target_index, brutal_trade):
+		_end_combat()
+		return
 
 	# ── Next round ─────────────────────────────────────────────────────────
 	await _end_of_round()
@@ -523,20 +499,9 @@ func _resolve_round_cantrip(spell: SpellData, target_index: int = 0) -> void:
 	log_message.emit(_fmt_speed(_player.data.combatant_name, p_total, target_vt, RollEngine.is_fast(p_total, target_vt)))
 
 	# ── Phase 1: Slow enemies attack first ────────────────────────────────
-	for i in _enemies.size():
-		var e: CombatantState = _enemies[i]
-		if e.is_defeated:
-			continue
-		if not RollEngine.is_fast(p_total, e.data.velocity_threshold):
-			var e_atk := RollEngine.resolve(
-				_effective_tier(e, _get_action_modifier(e, "strike")), _stat_size(e, "dominion"), _training_keep_grade(e), _attack_flat(e)
-			)
-			log_message.emit(_fmt_attack(e.data.combatant_name, e_atk))
-			var e_pool := spell.target_pool if i == target_index else "stance"
-			await _resolve_attack(false, i, e_atk, e_pool)
-			if _player.is_defeated:
-				_end_combat()
-				return
+	if await _run_enemy_attacks(true, p_total, spell.target_pool, target_index):
+		_end_combat()
+		return
 
 	# ── Phase 2: Player attacks chosen target ──────────────────────────────
 	var _pool_breached_before_c := _current_round_player_breaches.get(spell.target_pool, false) as bool
@@ -566,20 +531,9 @@ func _resolve_round_cantrip(spell: SpellData, target_index: int = 0) -> void:
 		return
 
 	# ── Phase 3: Fast enemies attack last ─────────────────────────────────
-	for i in _enemies.size():
-		var e: CombatantState = _enemies[i]
-		if e.is_defeated:
-			continue
-		if RollEngine.is_fast(p_total, e.data.velocity_threshold):
-			var e_atk := RollEngine.resolve(
-				_effective_tier(e, _get_action_modifier(e, "strike")), _stat_size(e, "dominion"), _training_keep_grade(e), _attack_flat(e)
-			)
-			log_message.emit(_fmt_attack(e.data.combatant_name, e_atk))
-			var e_pool := spell.target_pool if i == target_index else "stance"
-			await _resolve_attack(false, i, e_atk, e_pool)
-			if _player.is_defeated:
-				_end_combat()
-				return
+	if await _run_enemy_attacks(false, p_total, spell.target_pool, target_index):
+		_end_combat()
+		return
 
 	await _end_of_round()
 	if _all_enemies_defeated():
@@ -619,7 +573,7 @@ func _resolve_round_spell(spell: SpellData, target_index: int = 0) -> void:
 	# Bonuses (+pool, +keep) are reserved for the explosion built in Disciplines.detonate_mind_bomb.
 	# All other spells: collect school bonuses via _collect_spell_bonuses and apply to roll.
 	var p_atk: Dictionary
-	if spell.spell_name == "Mind Detonation":
+	if spell.placement_scratch:
 		p_atk = RollEngine.resolve(
 			1,
 			_stat_size(_player, "ingenuity"),
@@ -654,30 +608,20 @@ func _resolve_round_spell(spell: SpellData, target_index: int = 0) -> void:
 	log_message.emit(_fmt_speed(_player.data.combatant_name, p_total, target_vt, RollEngine.is_fast(p_total, target_vt)))
 
 	# ── Phase 1: Slow enemies attack first ────────────────────────────────
-	for i in _enemies.size():
-		var e: CombatantState = _enemies[i]
-		if e.is_defeated:
-			continue
-		if not RollEngine.is_fast(p_total, e.data.velocity_threshold):
-			var e_atk := RollEngine.resolve(
-				_effective_tier(e, _get_action_modifier(e, "strike")), _stat_size(e, "dominion"), _training_keep_grade(e), _attack_flat(e)
-			)
-			log_message.emit(_fmt_attack(e.data.combatant_name, e_atk))
-			var e_pool := spell.target_pool if i == target_index else "stance"
-			await _resolve_attack(false, i, e_atk, e_pool)
-			if _player.is_defeated:
-				_end_combat()
-				return
+	if await _run_enemy_attacks(true, p_total, spell.target_pool, target_index):
+		_end_combat()
+		return
 
 	# ── Phase 2: Player attacks chosen target ──────────────────────────────
 	var _pool_breached_before := _current_round_player_breaches.get(spell.target_pool, false) as bool
 	if not target.is_defeated:
-		if spell.spell_name == "Mind Rend":
-			await _cast_mind_rend(target, target_index, p_atk)
-		elif spell.spell_name == "Time Lock":
-			await _cast_time_lock(target, target_index, p_atk)
-		else:
-			await _resolve_attack(true, target_index, p_atk, spell.target_pool)
+		match spell.cast_handler:
+			"mind_rend":
+				await _cast_mind_rend(target, target_index, p_atk)
+			"time_lock":
+				await _cast_time_lock(target, target_index, p_atk)
+			_:
+				await _resolve_attack(true, target_index, p_atk, spell.target_pool)
 	# "breach" = this spell caused the round's FIRST breach on its target_pool.
 	# A spell that breaches an already-breached pool sets this to false.
 	# Group B mechanics that need pure per-spell breach detection should read
@@ -693,20 +637,18 @@ func _resolve_round_spell(spell: SpellData, target_index: int = 0) -> void:
 			"round_breaches": _current_round_player_breaches.duplicate()
 		})
 
-	# Mind Detonation: freeze params into the primed status right after the placement scratch.
-	if spell.spell_name == "Mind Detonation" and not target.is_defeated:
+	# Prime a discipline status on the target (Mind Detonation). The payload build is MD-specific;
+	# the flag just decides whether to prime, so no spell_name literal is needed.
+	if spell.primes_status != "" and not target.is_defeated:
 		var bomb := CombatStatus.new()
-		bomb.status_id = "mind_detonation_primed"
+		bomb.status_id = spell.primes_status
 		bomb.duration_rounds = 3
 		bomb.source_node_id = "mind_detonation"
-		bomb.stat_overrides = {
-			"fervor_at_prime": _player.fervor_size,
-			"md_level": PlayerProgression.get_node_level_by_id("mind_detonation"),
-			"cast_tier": _effective_tier(_player, cast_mod),
-			"cast_pool_bonus": cast_mod.pool_bonus,
-			"cast_keep_bonus": cast_mod.keep_bonus,
-			"cast_flat_bonus": cast_mod.flat_bonus,
-		}
+		var bomb_payload := MindBombPayload.new()
+		bomb_payload.fervor_at_prime = _player.fervor_size
+		bomb_payload.md_level = PlayerProgression.get_node_level_by_id("mind_detonation")
+		bomb_payload.cast = CastSnapshot.from_mod(_effective_tier(_player, cast_mod), cast_mod)
+		bomb_payload.to_status(bomb)
 		_add_status(target, bomb)
 		log_message.emit("[color=purple]A psychic charge is set in %s's mind...[/color]" % target.data.combatant_name)
 
@@ -730,16 +672,14 @@ func _resolve_round_spell(spell: SpellData, target_index: int = 0) -> void:
 			echo_status.status_id = "echoing_spell"
 			echo_status.duration_rounds = 20  # safety bound; real termination via current_kept_dice < 1
 			echo_status.source_node_id = "echoing_mind"
-			echo_status.stat_overrides = {
-				"spell_path": spell.resource_path,
-				"target_index": target_index,
-				"frozen_fervor": _player.fervor_size,
-				"current_kept_dice": _initial_echo_kept,
-				"em_level": PlayerProgression.get_node_level_by_id("echoing_mind"),
-				"cast_tier": _effective_tier(_player, cast_mod),
-				"cast_pool_bonus": cast_mod.pool_bonus,
-				"cast_flat_bonus": cast_mod.flat_bonus,
-			}
+			var echo_payload := EchoPayload.new()
+			echo_payload.spell_path = spell.resource_path
+			echo_payload.target_index = target_index
+			echo_payload.frozen_fervor = _player.fervor_size
+			echo_payload.current_kept_dice = _initial_echo_kept
+			echo_payload.em_level = PlayerProgression.get_node_level_by_id("echoing_mind")
+			echo_payload.cast = CastSnapshot.from_mod(_effective_tier(_player, cast_mod), cast_mod)
+			echo_payload.to_status(echo_status)
 			_add_status(_player, echo_status)
 			log_message.emit("[color=cyan]The spell begins to echo — it will resound for %d more turn(s).[/color]" % _initial_echo_kept)
 
@@ -748,20 +688,9 @@ func _resolve_round_spell(spell: SpellData, target_index: int = 0) -> void:
 		return
 
 	# ── Phase 3: Fast enemies attack last ─────────────────────────────────
-	for i in _enemies.size():
-		var e: CombatantState = _enemies[i]
-		if e.is_defeated:
-			continue
-		if RollEngine.is_fast(p_total, e.data.velocity_threshold):
-			var e_atk := RollEngine.resolve(
-				_effective_tier(e, _get_action_modifier(e, "strike")), _stat_size(e, "dominion"), _training_keep_grade(e), _attack_flat(e)
-			)
-			log_message.emit(_fmt_attack(e.data.combatant_name, e_atk))
-			var e_pool := spell.target_pool if i == target_index else "stance"
-			await _resolve_attack(false, i, e_atk, e_pool)
-			if _player.is_defeated:
-				_end_combat()
-				return
+	if await _run_enemy_attacks(false, p_total, spell.target_pool, target_index):
+		_end_combat()
+		return
 
 	# Post-resolution: Fervor escalation (rules: magic/fervor.md).
 	# Steps = count of Ingenuity-tagged dice that rolled max + 1 if Fervor die maxed.
@@ -781,6 +710,32 @@ func _resolve_round_spell(spell: SpellData, target_index: int = 0) -> void:
 # enemy_index        : index of the enemy involved (attacker if !attacker_is_player, defender if attacker_is_player)
 # attack_result      : Dictionary from RollEngine.resolve()
 # target_pool        : which pool the defender uses ("stance" | "resolve" | "stamina")
+## Resolves enemy attacks for one timing phase against the player's action, shared by all three
+## round coroutines. `slow_phase=true` runs enemies the player is SLOW against (they act before the
+## player); false runs FAST enemies (after). `player_target_pool` is the pool the player's action
+## pressures the targeted enemy — every other enemy pressures Stance. `brutal_trade` applies the
+## strike round's −5 VT to the targeted enemy only. Returns true if the player was defeated (the
+## caller must then `_end_combat()` and return).
+func _run_enemy_attacks(slow_phase: bool, p_total: int, player_target_pool: String, target_index: int, brutal_trade: bool = false) -> bool:
+	for i in _enemies.size():
+		var e: CombatantState = _enemies[i]
+		if e.is_defeated:
+			continue
+		var e_vt: int = e.data.velocity_threshold - (5 if brutal_trade and i == target_index else 0)
+		# slow phase skips fast enemies; fast phase skips slow enemies.
+		if RollEngine.is_fast(p_total, e_vt) == slow_phase:
+			continue
+		var e_atk := RollEngine.resolve(
+			_effective_tier(e, _get_action_modifier(e, "strike")), _stat_size(e, "dominion"), _training_keep_grade(e), _attack_flat(e)
+		)
+		log_message.emit(_fmt_attack(e.data.combatant_name, e_atk, _attacker_weapon_name(e)))
+		var e_pool := player_target_pool if i == target_index else "stance"
+		await _resolve_attack(false, i, e_atk, e_pool)
+		if _player.is_defeated:
+			return true
+	return false
+
+
 func _resolve_attack(attacker_is_player: bool, enemy_index: int, attack_result: Dictionary, target_pool: String = "stance") -> void:
 	var attacker: CombatantState = _player if attacker_is_player else _enemies[enemy_index]
 	var defender: CombatantState = _enemies[enemy_index] if attacker_is_player else _player
@@ -859,9 +814,18 @@ func _resolve_attack(attacker_is_player: bool, enemy_index: int, attack_result: 
 	# Breach check: attack_total >= guard (guard reaches 0 or below).
 	var current_guard: int = defender.get_guard(target_pool)
 	var force_breach := _debug_lethal and attacker_is_player and not defender_is_player
-	var did_breach := false
+	# Typed context for this attack pass; carries did_breach (Phase 1) and becomes the surface the
+	# discipline effect handlers read/mutate in Phase 2.
+	var ctx := AttackContext.new()
+	ctx.attacker_state = attacker
+	ctx.defender_state = defender
+	ctx.defender_index = defender_ei
+	ctx.attacker_is_player = attacker_is_player
+	ctx.target_pool = target_pool
+	ctx.attack_total = attack_result.total as int
+	ctx.guard_value = current_guard
 	if (attack_result.total as int) >= current_guard or force_breach:
-		did_breach = true
+		ctx.did_breach = true
 		_process_statuses_hook("on_breach", defender, {
 			"pool": target_pool,
 			"attacker": attacker
@@ -873,9 +837,14 @@ func _resolve_attack(attacker_is_player: bool, enemy_index: int, attack_result: 
 		)
 		var wounds_pending := 2 if massive else 1
 		# Hex Mastery: player breach on a hexed enemy deals +1 wound.
-		if attacker_is_player and not defender_is_player and _has_status(defender, "hex_marked"):
-			wounds_pending += 1
-			log_message.emit("  [color=purple]The hex flares — the wound cuts deeper (+1)![/color]")
+		ctx.is_massive = massive
+		ctx.wounds_pending = wounds_pending
+		# Discipline wound modifiers (e.g. Hex amplification). Player-on-enemy breaches only.
+		if attacker_is_player and not defender_is_player:
+			for st in defender.active_statuses.duplicate():
+				var wh: CombatEffect = EffectRegistry.get_handler(st.status_id)
+				if wh != null:
+					wounds_pending += wh.on_wound_calc(st, ctx)
 		if massive and not attacker_is_player and defender_is_player:
 			var interrupts := _find_interrupts(defender, "on_massive_wound")
 			for handler in interrupts:
@@ -929,26 +898,13 @@ func _resolve_attack(attacker_is_player: bool, enemy_index: int, attack_result: 
 	# Publish final guard value after consumption.
 	guard_changed.emit(defender_is_player, defender_ei, target_pool, defender.get_guard(target_pool))
 
-	# Chrono-Tinkering: armed→frozen transition fires after ANY player attack on this enemy.
-	# Echoes and explosions also route through _resolve_attack with attacker_is_player=true — intended.
-	# Time Lock's own Resolve attack uses _cast_time_lock (bypasses this path); status is armed
-	# after that function returns, so the transition cannot self-trigger from the casting attack.
-	if attacker_is_player and not defender_is_player and _has_status(defender, "time_locked"):
-		var tl := _get_status(defender, "time_locked")
-		if tl != null:
-			var phase := tl.stat_overrides.get("phase", "") as String
-			var post_val: int = 0 if did_breach else defender.get_guard(target_pool)
-			if phase == "armed":
-				var chrono_level: int = PlayerProgression.get_node_level_by_id("chrono_tinkering")
-				tl.stat_overrides["phase"] = "frozen"
-				tl.stat_overrides["locked_pool"] = target_pool
-				tl.stat_overrides["skip_resets"] = chrono_level
-				tl.stat_overrides["frozen_value"] = post_val
-				log_message.emit("[color=cyan]Time frozen! %s's %s guard is locked at %d — it will not renew for %d round(s).[/color]" % [
-					defender.data.combatant_name, target_pool, post_val, chrono_level
-				])
-			elif phase == "frozen" and (tl.stat_overrides.get("locked_pool", "") as String) == target_pool:
-				tl.stat_overrides["frozen_value"] = post_val
+	# Discipline post-attack hooks (e.g. Time Lock armed→frozen). Player-on-enemy attacks only.
+	# Echoes and MD explosions route here too (attacker_is_player=true) — intended.
+	if attacker_is_player and not defender_is_player:
+		for st in defender.active_statuses.duplicate():
+			var ph: CombatEffect = EffectRegistry.get_handler(st.status_id)
+			if ph != null:
+				ph.on_player_attack_resolved(st, ctx)
 
 
 func _end_combat() -> void:
@@ -1143,8 +1099,9 @@ func _collect_spell_bonuses(spell: SpellData) -> Dictionary:
 
 # --- Discipline helpers — logic in combat/Disciplines.gd (Phase 4) ---
 # Thin wrappers over the Disciplines module; round-loop call sites + contract tests unchanged.
-# The armed→frozen transition (in _resolve_attack) and frozen-guard restore (in _end_of_round)
-# stay inline in the spine — see the fragile-areas notes there.
+# The Time Lock armed→frozen transition and frozen-guard restore are NOT inline in the spine:
+# they live in TimeLockEffect (combat/effects/), fired via generic EffectRegistry dispatch from
+# _resolve_attack (on_player_attack_resolved) and _end_of_round (on_guard_reset).
 
 func _check_mind_detonation(enemy: CombatantState, enemy_index: int) -> void:
 	await Disciplines.check_mind_detonation(enemy, enemy_index)
@@ -1166,24 +1123,16 @@ func _process_statuses_hook(
 		state: CombatantState,
 		context: Dictionary = {}
 ) -> void:
-	## Dispatches status effects for the given hook and combatant.
-	## HARD RULE: logic lives here via match on status_id, NEVER inside CombatStatus itself.
-	## .duplicate() prevents mutation of the array if a future case adds/removes statuses mid-loop.
+	## Dispatches status effects for the given hook via the EffectRegistry (Phase 2). Logic lives in
+	## the CombatEffect handlers, never in CombatStatus. Only end_of_round currently drives async work
+	## (Echo); start_of_round / on_breach have no handler methods, so they no-op as before.
+	## .duplicate() guards against a handler adding/removing statuses mid-loop.
 	for status in state.active_statuses.duplicate():
-		match status.status_id:
-			"mind_detonation_primed":
-				pass  # Breach-driven via _check_mind_detonation at Phase 2.1 (post player-attack);
-				      # not hook-driven. The bomb does nothing on start_of_round / end_of_round hooks.
-			"hex_marked":
-				pass  # Amplification is breach-driven via _resolve_attack; not hook-driven.
-			"time_locked":
-				pass  # Two-phase mechanic (armed→frozen). Transition fires in _resolve_attack;
-				      # freeze preservation fires in _end_of_round. No hook-driven work.
-			"echoing_spell":
-				if hook == "end_of_round":
-					await _resolve_spell_echo(status, state)
-			_:
-				pass
+		var handler: CombatEffect = EffectRegistry.get_handler(status.status_id)
+		if handler == null:
+			continue
+		if hook == "end_of_round":
+			await handler.on_end_of_round(status, state)
 
 
 func _end_of_round() -> void:
@@ -1206,35 +1155,15 @@ func _end_of_round() -> void:
 		guard_changed.emit(true, -1, pool, 0)
 	for i in _enemies.size():
 		var e: CombatantState = _enemies[i]
-		# Chrono-Tinkering: read frozen_value stored at transition time (breach-aware).
-		# Capture BEFORE reset so it survives reset_guard(). Echoes may have updated
-		# frozen_value via _resolve_attack in the end_of_round hooks above — correct.
-		var frozen_pool := ""
-		var frozen_val := 0
-		var ct_status := _get_status(e, "time_locked")
-		if ct_status != null \
-				and (ct_status.stat_overrides.get("phase", "") as String) == "frozen" \
-				and (ct_status.stat_overrides.get("skip_resets", 0) as int) > 0:
-			frozen_pool = ct_status.stat_overrides.get("locked_pool", "") as String
-			frozen_val = ct_status.stat_overrides.get("frozen_value", 0) as int
 		e.reset_guard()
 		for pool in POOL_NAMES:
 			guard_changed.emit(false, i, pool, 0)
-		# Restore frozen pool after reset; mark it rolled so it won't re-roll next round.
-		if frozen_pool != "":
-			e.set_guard_val(frozen_pool, frozen_val)
-			e.set_pool_rolled(frozen_pool, true)
-			guard_changed.emit(false, i, frozen_pool, frozen_val)
-			ct_status.stat_overrides["skip_resets"] = (ct_status.stat_overrides["skip_resets"] as int) - 1
-			log_message.emit("[color=cyan]%s's %s remains frozen at %d (%d round(s) left).[/color]" % [
-				e.data.combatant_name, frozen_pool, frozen_val,
-				ct_status.stat_overrides["skip_resets"] as int
-			])
-			if (ct_status.stat_overrides["skip_resets"] as int) <= 0:
-				_remove_status(e, "time_locked")
-				log_message.emit("[color=cyan]The time-freeze on %s's %s expires.[/color]" % [
-					e.data.combatant_name, frozen_pool
-				])
+		# Discipline guard-reset hooks (e.g. Time Lock frozen-pool restore). Fire after the reset;
+		# a handler restores + marks-rolled any pool it wants preserved this round.
+		for st in e.active_statuses.duplicate():
+			var gh: CombatEffect = EffectRegistry.get_handler(st.status_id)
+			if gh != null:
+				gh.on_guard_reset(st, e, i)
 
 	await get_tree().create_timer(0.8).timeout
 
