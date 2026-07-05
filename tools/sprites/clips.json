@@ -1,0 +1,10 @@
+{
+  "clips": [
+    {
+      "name": "Fireball",
+      "frames": ["fireball_start", "fireball_mid", "fireball_end"],
+      "fps": 12,
+      "loop": true
+    }
+  ]
+}

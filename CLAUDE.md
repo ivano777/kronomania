@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Godot binary resolved automatically (see "Running all checks" for priority order).
 - Headless validation: `python scripts/run_headless.py` · Unit + integration tests: `python scripts/run_tests.py`
 - **GUT 9.6.0** at `addons/gut/`; tests in `tests/`.
-- After adding a new addon, set `GODOT` and run `python scripts/run_headless.py --import` once to register class names before testing.
+- After adding a new addon or asset (PNG etc.), run `"$GODOT" --headless --import --path .` once to import resources / register class names before testing. (`run_headless.py` has no `--import` flag.)
 - No build step, no linter — Godot parses scripts on load.
 
 ## Committing and pushing
@@ -73,6 +73,13 @@ Godot binary resolved from (in order): 1) `GODOT` env var; 2) `.env.local` in pr
 - No `class_name` on test files (avoids polluting the global class cache). Test-only helpers (e.g. `combat_rules_helper.gd`) live beside the test, extend `RefCounted`, no `class_name`.
 - Debug widgets (`scenes/debug/`) are never tested directly.
 
+## Art pipeline (pixel-sprites skill)
+
+- Sprites are authored as XPM text frames in `tools/sprites/frames/`, compiled by `python tools/sprites/compile.py [--check] tools/sprites` (Pillow — `tools/sprites/requirements.txt`). Full workflow lives in the **pixel-sprites skill** — invoke it for any sprite/art-asset work; never hand-draw PNGs.
+- `.xpm` / `clips.json` writes are auto-validated by the PostToolUse hook (same `.claude/hooks/validate_godot.py`; sprite branch skips the Godot launch). `tools/sprites/out/` is generated and gitignored; visual previews at `out/preview/*@8x.png`.
+- Install conventions (convention-loaded, **no `.tres` edits**): icons → `assets/sprites/icons/{weapons|spells|nodes}/<key>.png` (key = name lowercased, spaces→underscores; node icons use `node_id`); animated effects → `assets/sprites/effects/<Clip>_sheet.png` + `.json`, loaded via `SpriteRegistry.get_effect_frames(clip)` (animation `"default"`, fps/loop from JSON).
+- After installing a new PNG run `"$GODOT" --headless --import --path .`, commit PNG + `.png.import`. The Fireball clip is the loader's test fixture (`tests/integration/test_sprite_registry.gd`) — keep it.
+
 ## Project structure
 
 ```
@@ -86,10 +93,12 @@ scenes/campfire/    # CampfireScene (rest, weapon selector, Constellation nav, G
 scenes/constellation/  # ConstellationScene (skill tree)
 scenes/debug/       # Debug widgets — removable at release; never imported by production code
 scripts/            # gen_project_index.py — regenerates docs/project-index.md
+tools/sprites/      # XPM→PNG sprite pipeline: compile.py, frames/*.xpm, clips.json; out/ is generated + gitignored
+assets/sprites/     # icons/{weapons,spells,nodes}/, effects/, combatants/ — convention-loaded by SpriteRegistry
 docs/game-rules/    # Design source of truth — TOC at index.md; load on demand
 docs/impl/          # per-group implementation specs
 docs/               # project-status.md (roadmap), project-index.md (generated map)
-.claude/            # agents/docs-alignment-auditor.md, commands/audit-docs.md + refresh-index.md
+.claude/            # agents/docs-alignment-auditor.md, commands/, hooks/validate_godot.py (PostToolUse), skills/pixel-sprites
 ```
 
 ## Architecture

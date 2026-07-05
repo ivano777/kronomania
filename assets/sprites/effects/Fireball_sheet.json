@@ -1,0 +1,15 @@
+{
+  "name": "Fireball",
+  "sheet": "Fireball_sheet.png",
+  "frame_width": 16,
+  "frame_height": 16,
+  "frame_count": 3,
+  "frames": [
+    "fireball_start",
+    "fireball_mid",
+    "fireball_end"
+  ],
+  "fps": 12,
+  "loop": true,
+  "layout": "horizontal_strip"
+}

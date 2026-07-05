@@ -38,6 +38,7 @@ Tracks what is implemented and what remains. Updated after each feature ships.
 ### Tooling
 - `/ship`, `/audit-docs`, headless validation, `docs-alignment-auditor` agent, `DebugManager` (F12 toggle, 6 debug widgets).
 - Theme: `res://theme/dark_fantasy.tres` — dark purple panels, parchment text, gold accents.
+- **Sprite pipeline (pixel-sprites skill)** — XPM frames in `tools/sprites/frames/` compiled to PNG/sheets by `tools/sprites/compile.py` (Pillow); per-clip size validation, `out/preview/*@8x.png` for visual checks; `.xpm`/`clips.json` writes auto-validated by the PostToolUse hook. Icons install to `assets/sprites/icons/<cat>/`, effect sheets to `assets/sprites/effects/` — loaded by `SpriteRegistry.get_icon` / new `get_effect_frames` (AtlasTexture slices from sheet+JSON; covered by `tests/integration/test_sprite_registry.gd` with the Fireball fixture).
 
 ---
 
@@ -346,10 +347,10 @@ Depends on Groups 7 and 7.5.
 - [x] **Manual Mode** (default): waits for player to navigate cascading menus.
 - [x] **Auto Mode** flow in `CombatManager._begin_round()` via `_try_auto_execute()`:
   1. Complete path (attack_weapon + attack_action both set, weapon name matches) → execute immediately;
-     log `"[Auto] Strike → Stance (default)"`.
+	 log `"[Auto] Strike → Stance (default)"`.
   2. Magic default set → execute cantrip/spell immediately; log `"[Auto] Cast Fire Orb (default)"`.
   3. Any step undefined → call `_auto_best_action()` and execute; log
-     `"[Auto-Best] Strike → Stance (score: 6.5)"`.
+	 `"[Auto-Best] Strike → Stance (score: 6.5)"`.
 
 **Phase B — `_auto_best_action()` in `CombatManager`**
 - [x] Private helper `_auto_best_action() -> Dictionary`. Returns `{ target_pool, score }`.

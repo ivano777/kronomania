@@ -6,12 +6,29 @@ import re
 from pathlib import Path
 
 data = json.load(sys.stdin)
-fp = data.get("file_path", "")
+# PostToolUse nests the tool arguments under "tool_input"; keep the flat
+# lookup as a fallback for older payload shapes.
+fp = data.get("tool_input", {}).get("file_path", "") or data.get("file_path", "")
+
+PROJECT = Path(__file__).parent.parent.parent
+
+# Sprite frames/clips: validate with the sprite compiler (fast, no Godot).
+_norm = fp.replace("\\", "/")
+if _norm.endswith(".xpm") or _norm.endswith("tools/sprites/clips.json"):
+    result = subprocess.run(
+        [sys.executable, str(PROJECT / "tools" / "sprites" / "compile.py"),
+         "--check", str(PROJECT / "tools" / "sprites")],
+        capture_output=True, text=True, timeout=30,
+        encoding="utf-8", errors="replace",
+    )
+    if result.returncode != 0:
+        print("=== Sprite validation failed ===")
+        print(result.stdout + result.stderr)
+        sys.exit(2)
+    sys.exit(0)
 
 if not (fp.endswith(".gd") or fp.endswith(".tres")):
     sys.exit(0)
-
-PROJECT = Path(__file__).parent.parent.parent
 
 
 def find_godot() -> str:
