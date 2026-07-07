@@ -27,7 +27,7 @@ func _ready() -> void:
 
 func _on_toggle() -> void:
 	_panel.visible = not _panel.visible
-	_toggle.text = "💀 Combat ▾" if _panel.visible else "💀 Combat ▸"
+	_toggle.text = "• Combat ▼" if _panel.visible else "• Combat ▶"
 
 
 func _on_refill_hp() -> void:

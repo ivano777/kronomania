@@ -5,11 +5,14 @@ const COLOR_PLAYER := Color(0.20, 0.35, 0.80, 1.0)
 const COLOR_ENEMY  := Color(0.80, 0.20, 0.20, 1.0)
 
 var _is_dead := false
-var _idle_timer: SceneTreeTimer = null
 
 @onready var _body:       ColorRect        = $Body
 @onready var _sprite:     AnimatedSprite2D = $Sprite
 @onready var _name_label: Label            = $NameLabel
+
+
+func _ready() -> void:
+	_sprite.animation_finished.connect(_on_animation_finished)
 
 
 func setup(data: CombatantData, is_player: bool) -> void:
@@ -24,49 +27,43 @@ func setup(data: CombatantData, is_player: bool) -> void:
 	_body.visible = _sprite.sprite_frames == null
 
 
-func _cancel_idle_timer() -> void:
-	if _idle_timer != null and _idle_timer.timeout.is_connected(play_idle):
-		_idle_timer.timeout.disconnect(play_idle)
-	_idle_timer = null
-
-
-func _schedule_idle(delay: float) -> void:
-	_cancel_idle_timer()
-	_idle_timer = get_tree().create_timer(delay)
-	_idle_timer.timeout.connect(play_idle, CONNECT_ONE_SHOT)
+func _on_animation_finished() -> void:
+	# Non-looping anims (attack/cast/hurt) hand back to idle; the death anim
+	# stays frozen on its last frame.
+	if _is_dead:
+		return
+	if _sprite.animation != "idle":
+		_play("idle")
 
 
 func _play(anim_name: String) -> void:
-	if _sprite.sprite_frames != null and _sprite.sprite_frames.has_animation(anim_name):
-		_sprite.play(anim_name)
+	if _sprite.sprite_frames == null:
+		return
+	if not _sprite.sprite_frames.has_animation(anim_name):
+		return
+	if _sprite.sprite_frames.get_frame_count(anim_name) == 0:
+		return
+	_sprite.play(anim_name)
 
 
 func play_idle() -> void:
 	if _is_dead:
 		return
-	_idle_timer = null
 	_play("idle")
 
 
 func play_attack_melee() -> void:
-	_cancel_idle_timer()
 	_play("attack_melee")
-	_schedule_idle(0.5)
 
 
 func play_cast_spell() -> void:
-	_cancel_idle_timer()
 	_play("cast_spell")
-	_schedule_idle(0.5)
 
 
 func play_hurt() -> void:
-	_cancel_idle_timer()
 	_play("hurt")
-	_schedule_idle(0.6)
 
 
 func play_die() -> void:
-	_cancel_idle_timer()
 	_is_dead = true
 	_play("die")

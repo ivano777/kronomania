@@ -16,7 +16,8 @@ var _weapon_btns: Array[Button] = []
 var _equip_slot: String = "main"  # "main" or "off"
 var _main_slot_btn: Button
 var _off_slot_btn: Button
-var _slot_status_label: Label
+var _main_slot_label: Label
+var _off_slot_label: Label
 
 # Save popup
 var _save_overlay: ColorRect
@@ -50,24 +51,24 @@ func _ready() -> void:
 
 	# Left panel — fixed width, full height.
 	var left_panel := PanelContainer.new()
-	left_panel.custom_minimum_size = Vector2(340, 0)
+	left_panel.custom_minimum_size = Vector2(176, 0)
 	left_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	main_layout.add_child(left_panel)
 
 	var panel_margin := MarginContainer.new()
 	panel_margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	for side in ["margin_top", "margin_left", "margin_right", "margin_bottom"]:
-		panel_margin.add_theme_constant_override(side, 20)
+		panel_margin.add_theme_constant_override(side, 8)
 	left_panel.add_child(panel_margin)
 
 	var vbox := VBoxContainer.new()
 	vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	vbox.add_theme_constant_override("separation", 12)
+	vbox.add_theme_constant_override("separation", 3)
 	panel_margin.add_child(vbox)
 
 	# --- Header + status ---
 	var header := Label.new()
-	header.text = "◆  CAMPFIRE  ◆"
+	header.text = "♦  CAMPFIRE  ♦"
 	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(header)
 
@@ -85,12 +86,8 @@ func _ready() -> void:
 	vbox.add_child(HSeparator.new())
 
 	# --- Equipment ---
-	var equip_header := Label.new()
-	equip_header.text = "Equipment"
-	vbox.add_child(equip_header)
-
 	var slot_row := HBoxContainer.new()
-	slot_row.add_theme_constant_override("separation", 6)
+	slot_row.add_theme_constant_override("separation", 3)
 	vbox.add_child(slot_row)
 
 	_main_slot_btn = Button.new()
@@ -107,10 +104,14 @@ func _ready() -> void:
 	)
 	slot_row.add_child(_off_slot_btn)
 
-	_slot_status_label = Label.new()
-	vbox.add_child(_slot_status_label)
+	_main_slot_label = Label.new()
+	vbox.add_child(_main_slot_label)
 
-	var weapon_row := HBoxContainer.new()
+	_off_slot_label = Label.new()
+	vbox.add_child(_off_slot_label)
+
+	var weapon_row := VBoxContainer.new()
+	weapon_row.add_theme_constant_override("separation", 2)
 	vbox.add_child(weapon_row)
 	for w in PlayerProgression.AVAILABLE_WEAPONS:
 		var btn := Button.new()
@@ -129,10 +130,12 @@ func _ready() -> void:
 	vbox.add_child(const_btn)
 
 	_short_rest_btn = Button.new()
+	_short_rest_btn.tooltip_text = "-1 wound, step down Fervor, clear Burnout. Once per run."
 	_short_rest_btn.pressed.connect(_on_short_rest)
 	vbox.add_child(_short_rest_btn)
 
 	_long_rest_btn = Button.new()
+	_long_rest_btn.tooltip_text = "Full heal + reset Fervor. 50% ambush risk. Once per run."
 	_long_rest_btn.pressed.connect(_on_long_rest)
 	vbox.add_child(_long_rest_btn)
 
@@ -155,7 +158,7 @@ func _ready() -> void:
 	# --- Footer: Continue (prominent), Give Up + Exit (de-emphasized) ---
 	_continue_btn = Button.new()
 	_continue_btn.text = "▶  Continue"
-	_continue_btn.custom_minimum_size = Vector2(0, 48)
+	_continue_btn.custom_minimum_size = Vector2(0, 20)
 	_continue_btn.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3))
 	_continue_btn.pressed.connect(_on_continue)
 	vbox.add_child(_continue_btn)
@@ -163,26 +166,39 @@ func _ready() -> void:
 	var flat_style := StyleBoxFlat.new()
 	flat_style.bg_color = Color(0.0, 0.0, 0.0, 0.0)
 
+	var footer_row := HBoxContainer.new()
+	vbox.add_child(footer_row)
+
 	var give_up_btn := Button.new()
 	give_up_btn.text = "Give Up"
+	give_up_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	give_up_btn.add_theme_color_override("font_color", Color(0.55, 0.38, 0.38))
 	for state in ["normal", "hover", "pressed", "focus"]:
 		give_up_btn.add_theme_stylebox_override(state, flat_style)
 	give_up_btn.pressed.connect(_on_give_up)
-	vbox.add_child(give_up_btn)
+	footer_row.add_child(give_up_btn)
 
 	var exit_btn := Button.new()
 	exit_btn.text = "Exit to Menu"
+	exit_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	exit_btn.add_theme_color_override("font_color", Color(0.50, 0.45, 0.45))
 	for state in ["normal", "hover", "pressed", "focus"]:
 		exit_btn.add_theme_stylebox_override(state, flat_style)
 	exit_btn.pressed.connect(_on_exit_pressed)
-	vbox.add_child(exit_btn)
+	footer_row.add_child(exit_btn)
 
-	# Right area — placeholder for future campfire visual.
+	# Right area — campfire visual (CC0 background when installed; empty otherwise).
 	var right_area := Control.new()
 	right_area.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	main_layout.add_child(right_area)
+	var bg_tex := SpriteRegistry.get_background("campfire")
+	if bg_tex != null:
+		var bg_rect := TextureRect.new()
+		bg_rect.texture = bg_tex
+		bg_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		bg_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		bg_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+		right_area.add_child(bg_rect)
 
 	# Overlays must be added last so they render on top.
 	_build_save_popup()
@@ -219,18 +235,18 @@ func _build_save_popup() -> void:
 	add_child(_save_popup)
 
 	var popup_margin := MarginContainer.new()
-	popup_margin.add_theme_constant_override("margin_top", 24)
-	popup_margin.add_theme_constant_override("margin_left", 24)
-	popup_margin.add_theme_constant_override("margin_right", 24)
-	popup_margin.add_theme_constant_override("margin_bottom", 24)
+	popup_margin.add_theme_constant_override("margin_top", 12)
+	popup_margin.add_theme_constant_override("margin_left", 12)
+	popup_margin.add_theme_constant_override("margin_right", 12)
+	popup_margin.add_theme_constant_override("margin_bottom", 12)
 	_save_popup.add_child(popup_margin)
 
 	var popup_vbox := VBoxContainer.new()
-	popup_vbox.add_theme_constant_override("separation", 14)
+	popup_vbox.add_theme_constant_override("separation", 8)
 	popup_margin.add_child(popup_vbox)
 
 	var popup_header := Label.new()
-	popup_header.text = "◆  SAVE GAME  ◆"
+	popup_header.text = "♦  SAVE GAME  ♦"
 	popup_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	popup_vbox.add_child(popup_header)
 
@@ -238,7 +254,7 @@ func _build_save_popup() -> void:
 
 	for i in range(1, 4):
 		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 8)
+		row.add_theme_constant_override("separation", 4)
 		popup_vbox.add_child(row)
 
 		var slot_lbl := Label.new()
@@ -288,17 +304,17 @@ func _build_save_indicator() -> void:
 	panel.anchor_right  = 1.0
 	panel.anchor_top    = 0.0
 	panel.anchor_bottom = 0.0
-	panel.offset_left   = -172.0
-	panel.offset_right  = -8.0
-	panel.offset_top    = 8.0
-	panel.offset_bottom = 44.0
+	panel.offset_left   = -86.0
+	panel.offset_right  = -4.0
+	panel.offset_top    = 4.0
+	panel.offset_bottom = 22.0
 	panel.mouse_filter  = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(panel)
 
 	var margin := MarginContainer.new()
 	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	for side in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
-		margin.add_theme_constant_override(side, 8)
+		margin.add_theme_constant_override(side, 4)
 	panel.add_child(margin)
 
 	var lbl := Label.new()
@@ -364,8 +380,9 @@ func _refresh() -> void:
 	_off_slot_btn.disabled = mh_two_handed
 
 	var mh_name := mh.item_name if mh else "(empty)"
-	var oh_name := "—— (2H)" if mh_two_handed else (oh.item_name if oh else "(empty)")
-	_slot_status_label.text = "Main: %s  |  Off: %s" % [mh_name, oh_name]
+	var oh_name := "— (2H)" if mh_two_handed else (oh.item_name if oh else "(empty)")
+	_main_slot_label.text = "Main: %s" % mh_name
+	_off_slot_label.text = "Off:  %s" % oh_name
 
 	for i in _weapon_btns.size():
 		var w: EquipmentData = PlayerProgression.AVAILABLE_WEAPONS[i] as EquipmentData
@@ -378,14 +395,14 @@ func _refresh() -> void:
 		_short_rest_btn.text = "Short Rest  (used)"
 		_short_rest_btn.disabled = true
 	else:
-		_short_rest_btn.text = "Short Rest  (−1 wound, step down Fervor, clear Burnout)"
+		_short_rest_btn.text = "Short Rest"
 		_short_rest_btn.disabled = false
 
 	if DungeonManager.long_rest_used:
 		_long_rest_btn.text = "Long Rest  (used)"
 		_long_rest_btn.disabled = true
 	else:
-		_long_rest_btn.text = "Long Rest  (full heal + reset Fervor; 50% ambush risk)"
+		_long_rest_btn.text = "Long Rest"
 		_long_rest_btn.disabled = false
 
 
@@ -477,7 +494,7 @@ func _on_short_rest() -> void:
 func _on_long_rest() -> void:
 	var result := DungeonManager.attempt_long_rest()
 	if result.get("ambushed", false):
-		_rest_feedback.text = "⚠ Ambushed during rest! Fight incoming..."
+		_rest_feedback.text = "! Ambushed during rest! Fight incoming..."
 		_rest_feedback.show()
 		await get_tree().create_timer(1.5).timeout
 		get_tree().change_scene_to_file("res://scenes/battle/BattleScene.tscn")

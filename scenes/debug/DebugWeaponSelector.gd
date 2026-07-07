@@ -29,7 +29,7 @@ func _ready() -> void:
 
 func _on_toggle() -> void:
 	_panel.visible = not _panel.visible
-	_toggle.text = "⚔ Weapon ▾" if _panel.visible else "⚔ Weapon ▸"
+	_toggle.text = "× Weapon ▼" if _panel.visible else "× Weapon ▶"
 
 
 func _set_slot(slot: String) -> void:

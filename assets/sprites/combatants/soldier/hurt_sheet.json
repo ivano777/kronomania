@@ -1,0 +1,11 @@
+{
+  "name": "soldier_hurt",
+  "sheet": "hurt_sheet.png",
+  "frame_width": 96,
+  "frame_height": 55,
+  "frame_count": 4,
+  "fps": 10,
+  "loop": false,
+  "layout": "horizontal_strip",
+  "source": "Medieval Warrior Pack 2 by LuizMelo (CC0) \u2014 https://luizmelo.itch.io/medieval-warrior-pack-2"
+}

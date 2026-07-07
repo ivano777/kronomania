@@ -43,6 +43,10 @@ signal wounds_changed(is_player: bool, enemy_index: int, current: int, max_wound
 ## pool: "stance" | "resolve" | "stamina"
 signal guard_changed(is_player: bool, enemy_index: int, pool: String, guard_value: int)
 
+## Emitted when a combatant's attack is about to resolve — drives attack
+## animations on the battle visuals (enemy_index -1 when is_player is true).
+signal combatant_attacking(is_player: bool, enemy_index: int)
+
 ## Emitted once combat ends.
 signal combat_ended(winner_name: String)
 
@@ -327,7 +331,7 @@ func _begin_round() -> void:
 
 	round_started.emit(_round)
 	log_message.emit("")
-	log_message.emit("[b]═══ Round %d ═══[/b]" % _round)
+	log_message.emit("[b]——— Round %d ———[/b]" % _round)
 	phase_changed.emit("Choose your action")
 
 	_waiting_for_player = true
@@ -729,6 +733,7 @@ func _run_enemy_attacks(slow_phase: bool, p_total: int, player_target_pool: Stri
 			_effective_tier(e, _get_action_modifier(e, "strike")), _stat_size(e, "dominion"), _training_keep_grade(e), _attack_flat(e)
 		)
 		log_message.emit(_fmt_attack(e.data.combatant_name, e_atk, _attacker_weapon_name(e)))
+		combatant_attacking.emit(false, i)
 		var e_pool := player_target_pool if i == target_index else "stance"
 		await _resolve_attack(false, i, e_atk, e_pool)
 		if _player.is_defeated:

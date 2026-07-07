@@ -1,0 +1,11 @@
+{
+  "name": "player_hurt",
+  "sheet": "hurt_sheet.png",
+  "frame_width": 128,
+  "frame_height": 69,
+  "frame_count": 4,
+  "fps": 10,
+  "loop": false,
+  "layout": "horizontal_strip",
+  "source": "Martial Hero by LuizMelo (CC0) \u2014 https://luizmelo.itch.io/martial-hero"
+}

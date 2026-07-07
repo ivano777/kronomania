@@ -35,7 +35,7 @@ func _input(event: InputEvent) -> void:
 func show_for(resource: Resource, screen_pos: Vector2, source: Control = null) -> void:
 	_active_control = source
 	_tooltip.populate(resource)
-	_tooltip.size = Vector2(260, 600)
+	_tooltip.size = Vector2(150, 320)
 	_tooltip.modulate.a = 0.0
 	_tooltip.show()
 	await get_tree().process_frame
@@ -49,7 +49,7 @@ func show_for(resource: Resource, screen_pos: Vector2, source: Control = null) -
 func show_delta(node: NodeData, screen_pos: Vector2, source: Control = null) -> void:
 	_active_control = source
 	_tooltip.populate_delta(node)
-	_tooltip.size = Vector2(260, 600)
+	_tooltip.size = Vector2(150, 320)
 	_tooltip.modulate.a = 0.0
 	_tooltip.show()
 	await get_tree().process_frame
@@ -100,11 +100,11 @@ func attach_delta(control: Control, node: NodeData) -> void:
 # ── Positioning ────────────────────────────────────────────────────────────────
 
 func _position_tooltip(screen_pos: Vector2) -> void:
-	var offset := Vector2(16, 16)
+	var offset := Vector2(8, 8)
 	var viewport_size := get_viewport().get_visible_rect().size
 	var tip_size: Vector2 = _tooltip.get_minimum_size()
 	if tip_size == Vector2.ZERO:
-		tip_size = Vector2(240, 120)
+		tip_size = Vector2(140, 70)
 	var pos := screen_pos + offset
 	if pos.x + tip_size.x > viewport_size.x:
 		pos.x = screen_pos.x - tip_size.x - offset.x

@@ -1,0 +1,11 @@
+{
+  "name": "grunt_idle",
+  "sheet": "idle_sheet.png",
+  "frame_width": 88,
+  "frame_height": 46,
+  "frame_count": 4,
+  "fps": 6,
+  "loop": true,
+  "layout": "horizontal_strip",
+  "source": "Monsters & Creatures Fantasy (Goblin) by LuizMelo (CC0) \u2014 https://luizmelo.itch.io/monsters-creatures-fantasy"
+}

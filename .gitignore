@@ -19,3 +19,7 @@ repomix-output.xml
 
 # Sprite pipeline — generated output (previews, compiled PNGs)
 tools/sprites/out/
+
+# CC0 asset-pack staging (zips + extractions; re-download via links in
+# assets/sprites/combatants/LICENSE.md)
+tools/sprites/packs/

@@ -48,6 +48,7 @@ anything else.
    | Node icon | `out/frames/<key>.png` | `assets/sprites/icons/nodes/<key>.png` | `node_id` as-is |
    | Item/consumable icon | `out/frames/<key>.png` | `assets/sprites/icons/items/<key>.png` | future item system; same lowering rule |
    | Animated effect | `out/<Clip>_sheet.png` + `out/<Clip>_sheet.json` | `assets/sprites/effects/` | clip `name` from clips.json, verbatim |
+   | Combatant anims | — not from this pipeline — | `assets/sprites/combatants/<key>/` | converted from CC0 packs by `import_pack.py` (see combatant section) |
 
 6. **Import**: run `"$GODOT" --headless --import --path .` so Godot generates
    the `.png.import` file — without it the texture is invisible to
@@ -62,7 +63,12 @@ anything else.
 
 ## Canvas and style rules
 
-- **Items / icons: 16x16.** Projectiles and effects: 16x16. Larger objects: 32x32 max.
+- **Global pixel grid: 640x360** (project viewport; integer-scaled 2x into a
+  1280x720 window). Every sprite is authored at the size it occupies on that
+  grid and installed at **scale 1** — never upscale at install time.
+- **Items / icons: 16x16.** Projectiles and effects: 16x16 (up to 32x32 for
+  big blasts). Characters are pack-sourced (~46–70px figures) — see the
+  combatant section; keep effect sizes proportionate to them.
 - Mixed sizes are allowed across frames; **all frames of one clip must share
   the same size** (validator enforces per-clip).
 - Transparent background (`None`), symbol `.`
@@ -73,9 +79,37 @@ anything else.
 - Keep silhouettes readable at 1x: if the object isn't recognizable from
   the outline alone, redesign the outline before adding detail.
 
-## Standard material palettes (reuse for coherence)
+## Craft rules for large effects / VFX (16px+ pieces)
 
-Always reuse these symbols/colors so the item set looks consistent:
+1. **Unified hue-shifted ramps** — pick 3–4 ramps per sprite from the character
+   palette below; shadows shift cool/purple, never just darker. One hot accent
+   (blood red) per figure maximum.
+2. **Selective outline** — near-black `K #181420` on the outer silhouette
+   ONLY; interior forms separate by value steps, never by black lines.
+3. **Cluster shading** — pixel clusters sculpt volume (chest planes, cloth
+   folds); no flat fill larger than ~4x4; light from top-left.
+4. **Dynamic asymmetric pose** — weight shift, weapon on a diagonal, strong
+   silhouette readable at 1x. No symmetric mannequins.
+5. **Heroic proportions** — small head (~1:6 of figure), long legs, oversized
+   weapons. Draw weapons as separate solid parts blitted over the body
+   (inline weapon pixels smear into the silhouette).
+
+### Extended palette (large effects, ramp-shaded pieces)
+
+```
+K c #181420   outline / darkest (purple-black)
+A c #2E3A44   steel dark        B c #51707D   steel mid
+C c #7FA5AD   steel light       D c #C6E2DE   steel glint
+E c #2E1622   wine darkest      F c #5C2438   wine dark      N c #93424E   wine light
+P c #847258   parchment dark    Q c #BFA98C   parchment mid  w c #EFDFC0   parchment light
+T c #7A4A44   skin dark         s c #B0745C   skin shadow    S c #E8B088   skin light
+U c #C89040   gold              V c #F0C060   gold bright
+R c #A82838   blood red         r c #D84848   blood light
+l c #3E5A22   goblin dark       L c #6E923A   goblin mid     X c #A6C05C   goblin light
+h c #4E3018   hair dark         H c #6B4226   hair brown
+```
+
+### Icon / effect palette (16px items — legacy, still canonical for icons)
 
 ```
 # c #202020   outline
@@ -130,11 +164,32 @@ The compiler emits a horizontal strip sheet plus metadata
 `AtlasTexture` frames automatically. (Reference sample: the Fireball clip,
 also used as the loader's test fixture — don't delete it.)
 
-## Out of scope
+## Combatant battle sprites — SOURCED FROM CC0 PACKS, NOT THIS PIPELINE
 
-Combatant battle sprites (`assets/sprites/combatants/<key>/idle.png` etc.)
-are larger multi-animation art — not authorable at 16–32 px. Leave them to a
-dedicated art pass.
+Combatant art (player/grunt/soldier/knight) is **not authored as XPM**. It is
+converted from CC0 asset packs (LuizMelo, itch.io — see
+`assets/sprites/combatants/LICENSE.md`) by `tools/sprites/import_pack.py`
+driven by `tools/sprites/packs.json`:
+
+- Manifest maps pack strips → anims (`idle`/`attack_melee`/`cast_spell`/
+  `hurt`/`die`) with fps/loop; `flip: true` mirrors a left-facing pack to the
+  project's facing-RIGHT convention (player is `flip_h`-mirrored in-game to
+  face the enemies on its left; enemies render unflipped).
+- Converter slices horizontal strips (square frames), crops to the **union
+  content bbox across all of a character's anims** (keeps feet aligned), and
+  emits `assets/sprites/combatants/<key>/<anim>_sheet.{png,json}` — the
+  format `SpriteRegistry.get_combatant_frames()` loads.
+- `die` must have `loop: false` (AnimatedSprite2D freezes on the last frame =
+  corpse). `Combatant.gd` returns to idle on `animation_finished` for the
+  other non-looping anims.
+- Pack ZIPs live in `tools/sprites/packs/` (gitignored); re-download via the
+  LICENSE.md links, re-run `python tools/sprites/import_pack.py`, then
+  `"$GODOT" --headless --import --path .`.
+- To swap or add a combatant: verify the pack license (CC0 preferred), add a
+  manifest entry, convert, update `tests/integration/test_sprite_registry.gd`.
+
+**This XPM pipeline's scope: icons, spell/skill VFX, particles, effects, UI
+art** — everything except combatants.
 
 ## Quality checklist (before declaring done)
 

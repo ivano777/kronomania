@@ -4,7 +4,6 @@
 [ext_resource type="Script" path="res://scenes/debug/DebugAdvantageControl.gd" id="2_dbgscr"]
 
 [node name="RoundHUD" type="VBoxContainer"]
-custom_minimum_size = Vector2(360, 0)
 script = ExtResource("1_rhudscr")
 
 [node name="RoundLabel" type="Label" parent="."]
@@ -45,12 +44,12 @@ layout_mode = 2
 
 [node name="LogHeader" type="Label" parent="."]
 layout_mode = 2
-text = "═══ Combat Log ═══"
+text = "——— Combat Log ———"
 horizontal_alignment = 1
 
 [node name="LogScroll" type="ScrollContainer" parent="."]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 280)
+custom_minimum_size = Vector2(0, 120)
 size_flags_vertical = 3
 
 [node name="LogText" type="RichTextLabel" parent="LogScroll"]

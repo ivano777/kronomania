@@ -71,7 +71,7 @@ func _refresh_wounds(current: int) -> void:
 	# Grow the slot pool if max_wounds exceeds the baked-in scene nodes.
 	while _slot_nodes.size() < _max_wounds:
 		var slot := ColorRect.new()
-		slot.custom_minimum_size = Vector2(22, 22)
+		slot.custom_minimum_size = Vector2(10, 10)
 		_wound_slots.add_child(slot)
 		_slot_nodes.append(slot)
 

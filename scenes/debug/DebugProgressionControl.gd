@@ -35,7 +35,7 @@ func _ready() -> void:
 
 func _on_toggle() -> void:
 	_panel.visible = !_panel.visible
-	_toggle.text = "★ Prog ▾" if _panel.visible else "★ Prog ▸"
+	_toggle.text = "* Prog ▼" if _panel.visible else "* Prog ▶"
 
 
 func _on_pts_minus() -> void:

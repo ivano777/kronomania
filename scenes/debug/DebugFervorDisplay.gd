@@ -23,7 +23,7 @@ func _ready() -> void:
 
 func _on_toggle() -> void:
 	_panel.visible = not _panel.visible
-	_toggle.text = "✦ Fervor ▾" if _panel.visible else "✦ Fervor ▸"
+	_toggle.text = "♦ Fervor ▼" if _panel.visible else "♦ Fervor ▶"
 
 
 func _on_fervor_changed(is_player: bool, fervor_size: int, fervor_cap: int, is_burned_out: bool) -> void:

@@ -1,0 +1,10 @@
+monogram (extended variant) — pixel font by Vinícius Menézio (datagoblin)
+
+License: CC0 (Creative Commons Zero v1.0 Universal) — free for commercial
+and non-commercial use, no attribution required (credited here anyway).
+
+Source: https://datagoblin.itch.io/monogram
+File obtained from the author's own site: https://menez.io/css/font/monogram-extended.ttf
+
+Usage in this project: theme default_font at size 16 (the font's native
+pixel-grid size — glyphs are on-grid only at multiples of 16). Titles use 32.

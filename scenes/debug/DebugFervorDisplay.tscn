@@ -7,13 +7,13 @@ anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -300.0
-offset_top = -200.0
-offset_bottom = -10.0
+offset_left = -150.0
+offset_top = -100.0
+offset_bottom = -5.0
 script = ExtResource("1_fervscr")
 
 [node name="ToggleButton" type="Button" parent="."]
-text = "✦ Fervor ▸"
+text = "♦ Fervor ▶"
 
 [node name="Panel" type="VBoxContainer" parent="."]
 visible = false

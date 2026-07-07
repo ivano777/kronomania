@@ -15,18 +15,18 @@ color = Color(0.06, 0.06, 0.1, 1)
 [node name="Main" type="VBoxContainer" parent="."]
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 20.0
-offset_top = 20.0
-offset_right = -20.0
-offset_bottom = -20.0
-add_theme_constant_override("separation") = 10
+offset_left = 10.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = -10.0
+add_theme_constant_override("separation") = 6
 
 [node name="Header" type="HBoxContainer" parent="Main"]
-add_theme_constant_override("separation") = 16
+add_theme_constant_override("separation") = 8
 
 [node name="TitleLabel" type="Label" parent="Main/Header"]
 text = "Constellation"
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 32
 
 [node name="Spacer" type="Control" parent="Main/Header"]
 size_flags_horizontal = 3
@@ -65,11 +65,11 @@ horizontal_scroll_mode = 0
 
 [node name="TraitsBox" type="VBoxContainer" parent="Main/TabContainer/Traits"]
 size_flags_horizontal = 3
-add_theme_constant_override("separation") = 6
+add_theme_constant_override("separation") = 4
 
 [node name="TraitsHeader" type="Label" parent="Main/TabContainer/Traits/TraitsBox"]
 text = "Background / Traits"
-theme_override_font_sizes/font_size = 15
+theme_override_font_sizes/font_size = 16
 
 [node name="Separator2" type="HSeparator" parent="Main"]
 

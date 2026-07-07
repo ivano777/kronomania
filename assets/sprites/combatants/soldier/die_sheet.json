@@ -1,0 +1,11 @@
+{
+  "name": "soldier_die",
+  "sheet": "die_sheet.png",
+  "frame_width": 96,
+  "frame_height": 55,
+  "frame_count": 6,
+  "fps": 8,
+  "loop": false,
+  "layout": "horizontal_strip",
+  "source": "Medieval Warrior Pack 2 by LuizMelo (CC0) \u2014 https://luizmelo.itch.io/medieval-warrior-pack-2"
+}

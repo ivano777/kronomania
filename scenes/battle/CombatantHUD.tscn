@@ -3,7 +3,7 @@
 [ext_resource type="Script" uid="uid://h7i8j9k0l1m2n" path="res://scenes/battle/CombatantHUD.gd" id="1_hudscr"]
 
 [node name="CombatantHUD" type="VBoxContainer"]
-custom_minimum_size = Vector2(180, 0)
+custom_minimum_size = Vector2(96, 0)
 script = ExtResource("1_hudscr")
 
 [node name="NameLabel" type="Label" parent="."]
@@ -23,17 +23,17 @@ layout_mode = 2
 
 [node name="Slot0" type="ColorRect" parent="WoundsRow/WoundSlots"]
 layout_mode = 2
-custom_minimum_size = Vector2(22, 22)
+custom_minimum_size = Vector2(10, 10)
 color = Color(0.25, 0.25, 0.25, 1)
 
 [node name="Slot1" type="ColorRect" parent="WoundsRow/WoundSlots"]
 layout_mode = 2
-custom_minimum_size = Vector2(22, 22)
+custom_minimum_size = Vector2(10, 10)
 color = Color(0.25, 0.25, 0.25, 1)
 
 [node name="Slot2" type="ColorRect" parent="WoundsRow/WoundSlots"]
 layout_mode = 2
-custom_minimum_size = Vector2(22, 22)
+custom_minimum_size = Vector2(10, 10)
 color = Color(0.25, 0.25, 0.25, 1)
 
 [node name="StanceRow" type="HBoxContainer" parent="."]

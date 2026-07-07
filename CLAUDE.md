@@ -75,9 +75,13 @@ Godot binary resolved from (in order): 1) `GODOT` env var; 2) `.env.local` in pr
 
 ## Art pipeline (pixel-sprites skill)
 
-- Sprites are authored as XPM text frames in `tools/sprites/frames/`, compiled by `python tools/sprites/compile.py [--check] tools/sprites` (Pillow — `tools/sprites/requirements.txt`). Full workflow lives in the **pixel-sprites skill** — invoke it for any sprite/art-asset work; never hand-draw PNGs.
+- **Global pixel grid 640x360** — project viewport is 640x360, integer-scaled 2x into a 1280x720 window (`window_width_override`); do not "fix" the small viewport numbers in project.godot. Standard characters ≈64px tall (player 64x72, grunt 56x48, soldier 64x72, knight 64x80). UI text = **monogram pixel font** (`assets/fonts/monogram-extended.ttf`, CC0) as theme `default_font` @16 (titles 32); font import has AA/hinting/subpixel disabled. monogram is on-grid at 16 (its native em) — sizes must be multiples of 16. VT323 (the old font) was replaced because at 16px it rendered off-grid (uneven 1–3px strokes = "glitchy" text). monogram lacks some symbol glyphs (◆⚔★✦⊕═○●⚠🧘…); UI strings use only covered glyphs (♦ × • · ▶ ▼ * + − —) — do not reintroduce uncovered symbols or `allow_system_fallback` pulls AA'd system glyphs.
+- Sprites are authored as XPM text frames in `tools/sprites/frames/` at native grid size (install at **scale 1** — the old `--scale 15` convention is dead), compiled by `python tools/sprites/compile.py [--check] tools/sprites` (Pillow — `tools/sprites/requirements.txt`). Full workflow lives in the **pixel-sprites skill** — invoke it for any sprite/art-asset work; never hand-draw PNGs.
 - `.xpm` / `clips.json` writes are auto-validated by the PostToolUse hook (same `.claude/hooks/validate_godot.py`; sprite branch skips the Godot launch). `tools/sprites/out/` is generated and gitignored; visual previews at `out/preview/*@8x.png`.
 - Install conventions (convention-loaded, **no `.tres` edits**): icons → `assets/sprites/icons/{weapons|spells|nodes}/<key>.png` (key = name lowercased, spaces→underscores; node icons use `node_id`); animated effects → `assets/sprites/effects/<Clip>_sheet.png` + `.json`, loaded via `SpriteRegistry.get_effect_frames(clip)` (animation `"default"`, fps/loop from JSON).
+- Combatant battle sprites are **NOT pipeline art** — converted from CC0 packs (LuizMelo; license + links in `assets/sprites/combatants/LICENSE.md`) by `tools/sprites/import_pack.py` + manifest `tools/sprites/packs.json` (strip slicing, union-bbox crop for feet alignment, `flip` to face right, per-anim fps/loop). Output = `<anim>_sheet.{png,json}` per combatant, loaded by `SpriteRegistry.get_combatant_frames`. All 5 anims populated for the player, 4 for enemies (no cast). `die` has `loop=false` (freeze = corpse); `Combatant.gd` returns to idle via `animation_finished`, no timers. Enemy attacks animate via the `combatant_attacking` signal → `BattleScene._on_combatant_attacking`. Pack ZIPs in `tools/sprites/packs/` (gitignored). The XPM pipeline's scope = icons, spell/skill VFX, particles, effects, UI.
+- Scene **backgrounds** are **NOT pipeline art** — composited from CC0 packs (ansimuz Gothicvania; license + links in `assets/sprites/backgrounds/LICENSE.md`) by `tools/sprites/import_env.py` + manifest `tools/sprites/env.json` (layers listed back→front, integer NEAREST upscale to cover 640x360, center-crop, optional `darken`). Output = `assets/sprites/backgrounds/<key>.png`, loaded by `SpriteRegistry.get_background(key)` (silent null on miss → scenes keep their flat-color fallback). Wired null-safe into `battle`/`campfire`/`menu` (`_ready` adds a `TextureRect` with `expand_mode=EXPAND_IGNORE_SIZE` — required, else the texture's native size blows out container layout; the `test_ui_bounds.gd` regression test guards this).
+- **UI skin** is **NOT pipeline art** — 9-slice frames baked from the CC0 Kenney Fantasy UI Borders pack (license in `assets/sprites/ui/LICENSE.md`) by `tools/sprites/bake_ui.py` (composites a two-tone frame: dark fill + parchment/gold ring, colours mirror `theme/dark_fantasy.tres`). Output = `assets/sprites/ui/{panel,button_*}.png`, referenced as `StyleBoxTexture` (texture_margin 6) in the theme. Re-run `bake_ui.py` if the theme palette changes.
 - After installing a new PNG run `"$GODOT" --headless --import --path .`, commit PNG + `.png.import`. The Fireball clip is the loader's test fixture (`tests/integration/test_sprite_registry.gd`) — keep it.
 
 ## Project structure
@@ -93,8 +97,9 @@ scenes/campfire/    # CampfireScene (rest, weapon selector, Constellation nav, G
 scenes/constellation/  # ConstellationScene (skill tree)
 scenes/debug/       # Debug widgets — removable at release; never imported by production code
 scripts/            # gen_project_index.py — regenerates docs/project-index.md
-tools/sprites/      # XPM→PNG sprite pipeline: compile.py, frames/*.xpm, clips.json; out/ is generated + gitignored
-assets/sprites/     # icons/{weapons,spells,nodes}/, effects/, combatants/ — convention-loaded by SpriteRegistry
+tools/sprites/      # XPM→PNG pipeline (compile.py, frames/, clips.json; out/ gitignored) + CC0 pack converters (import_pack.py combatants, import_env.py backgrounds, bake_ui.py UI skin; packs.json/env.json; packs/ gitignored)
+assets/sprites/     # icons/{weapons,spells,nodes}/, effects/, combatants/, backgrounds/, ui/ — convention-loaded by SpriteRegistry
+assets/fonts/       # monogram pixel font (CC0) — theme default_font
 docs/game-rules/    # Design source of truth — TOC at index.md; load on demand
 docs/impl/          # per-group implementation specs
 docs/               # project-status.md (roadmap), project-index.md (generated map)
@@ -129,7 +134,7 @@ Signatures/signals are in `docs/project-index.md`. Gotchas:
 **`RollEngine`** — stateless. Returns `Dictionary`; always cast with `as int` / `as Array` (the inferencer can't infer through `Dictionary`). `resolve()` optional args: `fervor_size` (additive post-Keep Fervor die), `aspect_stat_size` + `aspect_count` (mixed-pool spells), `post_keep_bonus_size` (post-Keep bonus die, e.g. Earthshatter). Returns `primary_dice_maxed_count` (escalation) and `post_keep_bonus_roll`.
 
 **`CombatManager`** — all output via signals; nothing returned. Disconnect all signals before `reload_current_scene()`.
-- *Signals:* `player_intents_available`, `fervor_changed`, `player_magic_available`, `player_massive_incoming`, `player_burnout_imminent` (L2, before `_burnout_decision_gate`), `player_defense_incoming`, `player_defense_item_choice`. Coroutine gates: `_massive_decision_gate(use_charge)`, `_burnout_decision_gate(use_charge)`.
+- *Signals:* `player_intents_available`, `fervor_changed`, `player_magic_available`, `player_massive_incoming`, `player_burnout_imminent` (L2, before `_burnout_decision_gate`), `player_defense_incoming`, `player_defense_item_choice`, `combatant_attacking(is_player, enemy_index)` (pre-resolve, drives enemy attack anims). Coroutine gates: `_massive_decision_gate(use_charge)`, `_burnout_decision_gate(use_charge)`.
 - *Public:* lifecycle `start_combat(player, enemies)`, `reset_item_charges(rest_type)`; actions `player_chose_strike(net_adv, pool, brutal, idx, weapon)`, `player_chose_cantrip(spell, idx, source_weapon)`, `player_chose_spell(spell, idx, source_weapon)`, `player_chose_lucidity()` (L1); interrupts `player_chose_degrade_wound(use)` (MftG), `player_chose_prevent_burnout(use)` (L2); UI `player_acknowledged_defense()`, `player_chose_defense_item(mod)`, `player_auto_execute_attack(idx, net_adv)`; debug `debug_set_fervor`, `debug_refill_hp`, `debug_set_immortal`, `debug_set_lethal`, `debug_set_player_off_hand`; reads `get_player_bare_hands_modifier(key)`, `get_player_attack_preview()`.
 - *Key helpers:* `_get_action_modifier(state, key)` (weapon→bare_hands→zero stub), `_effective_tier(state, mod)` (mod.tier_cap=0 = uncapped), `_attack_flat`/`_guard_flat`/`_pool_bonus` (delegate to `_get_action_modifier`). `_get_cast_modifier(state)` resolves the player's chosen `_player_cast_weapon`'s `"cast"` modifier; bare-hands fallback (tier_cap=0 = full Tier). Cantrip and true-spell pools route through `_get_cast_modifier`, never `_get_action_modifier(_, "strike")`. `_collect_spell_bonuses(spell)` sums pool/keep/flat across purchased nodes (shared by `_resolve_round_spell`, `_detonate_mind_bomb`, `_resolve_spell_echo`). Discipline entry points: `_check_mind_detonation`, `_detonate_mind_bomb`, `_cast_mind_rend`, `_resolve_spell_echo`, `_cast_time_lock` — behavior in Game rules summary. The Time Lock armed→frozen transition + frozen-guard restore + hex amplification + echo dispatch are NO LONGER inline in the spine — they live in `combat/effects/` handlers fired by the generic registry loops (see the Discipline effect-handler layer above).
 
@@ -152,15 +157,15 @@ _begin_round()
   → player presses Strike/Cantrip/Spell → BattleScene → player_chose_*
   → _resolve_round / _resolve_round_cantrip / _resolve_round_spell
   → rolls attacks, VT check, _resolve_attack() × N (Slow enemies → Player → Fast enemies)
-      → on breach: _process_statuses_hook("on_breach", defender, {pool, attacker})
-      → interrupt check: _find_interrupts(defender, trigger) → await _resolve_interrupt() each
+	  → on breach: _process_statuses_hook("on_breach", defender, {pool, attacker})
+	  → interrupt check: _find_interrupts(defender, trigger) → await _resolve_interrupt() each
   → [Phase 2.1, post player-attack] await _check_mind_detonation(target, idx) — all 3 round types
   → [spell only] _escalate_fervor(steps), steps = primary_dice_maxed_count + (1 if fervor_maxed)
 
 await _end_of_round()
   → await _process_statuses_hook("end_of_round", player/enemy×N)
-      → [Echoing Mind] "echoing_spell": await _resolve_spell_echo → _resolve_attack (frozen Fervor,
-        no escalation) → if target alive, await _check_mind_detonation → decrement current_kept_dice
+	  → [Echoing Mind] "echoing_spell": await _resolve_spell_echo → _resolve_attack (frozen Fervor,
+		no escalation) → if target alive, await _check_mind_detonation → decrement current_kept_dice
   → if _all_enemies_defeated(): _end_combat(); return   ← echo may have killed last enemy
   → _tick_statuses(...)
   → guard reset for all combatants (+ guard_changed signals)

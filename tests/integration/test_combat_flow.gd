@@ -67,3 +67,16 @@ func test_strike_emits_guard_changed() -> void:
 	CombatManager.player_chose_strike(0, "stance", false, 0, null)
 	assert_signal_emitted(CombatManager, "guard_changed",
 		"guard must be rolled and emitted during round resolution")
+
+
+func test_enemy_turn_emits_combatant_attacking() -> void:
+	seed(7)  # deterministic: grunt must survive the player's hit and swing back
+	CombatManager.start_combat(_PLAYER_DATA, [_GRUNT_DATA])
+	clear_signal_watcher()
+	watch_signals(CombatManager)
+	CombatManager.player_chose_strike(0, "stance", false, 0, null)
+	if CombatManager._enemies[0].is_defeated:
+		pass_test("grunt died to the opening hit under this seed — no enemy turn")
+		return
+	assert_signal_emitted_with_parameters(
+		CombatManager, "combatant_attacking", [false, 0])

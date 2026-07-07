@@ -1,0 +1,11 @@
+{
+  "name": "knight_attack_melee",
+  "sheet": "attack_melee_sheet.png",
+  "frame_width": 95,
+  "frame_height": 70,
+  "frame_count": 7,
+  "fps": 12,
+  "loop": false,
+  "layout": "horizontal_strip",
+  "source": "Hero Knight by LuizMelo (CC0) \u2014 https://luizmelo.itch.io/hero-knight"
+}

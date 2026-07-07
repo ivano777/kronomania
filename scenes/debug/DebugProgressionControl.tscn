@@ -7,13 +7,13 @@ anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -240.0
-offset_top = -310.0
-offset_bottom = -10.0
+offset_left = -120.0
+offset_top = -155.0
+offset_bottom = -5.0
 script = ExtResource("1_progscr")
 
 [node name="ToggleButton" type="Button" parent="."]
-text = "★ Prog ▸"
+text = "* Prog ▶"
 
 [node name="Panel" type="VBoxContainer" parent="."]
 visible = false

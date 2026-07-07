@@ -9,16 +9,16 @@ var _desc: RichTextLabel
 
 func _ready() -> void:
 	mouse_filter = MOUSE_FILTER_IGNORE
-	custom_minimum_size = Vector2(240, 0)
+	custom_minimum_size = Vector2(140, 0)
 
 	var margin := MarginContainer.new()
 	for side in ["margin_top", "margin_left", "margin_right", "margin_bottom"]:
-		margin.add_theme_constant_override(side, 10)
+		margin.add_theme_constant_override(side, 6)
 	margin.mouse_filter = MOUSE_FILTER_IGNORE
 	add_child(margin)
 
 	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 6)
+	vbox.add_theme_constant_override("separation", 4)
 	vbox.mouse_filter = MOUSE_FILTER_IGNORE
 	margin.add_child(vbox)
 
@@ -28,12 +28,12 @@ func _ready() -> void:
 
 	_title = Label.new()
 	_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_title.add_theme_font_size_override("font_size", 13)
+	_title.add_theme_font_size_override("font_size", 16)
 	_title.mouse_filter = MOUSE_FILTER_IGNORE
 	header_row.add_child(_title)
 
 	_category = Label.new()
-	_category.add_theme_font_size_override("font_size", 10)
+	_category.add_theme_font_size_override("font_size", 16)
 	_category.modulate = Color(1, 1, 1, 0.6)
 	_category.mouse_filter = MOUSE_FILTER_IGNORE
 	header_row.add_child(_category)
@@ -41,7 +41,7 @@ func _ready() -> void:
 	vbox.add_child(_make_separator())
 
 	_stats = VBoxContainer.new()
-	_stats.add_theme_constant_override("separation", 4)
+	_stats.add_theme_constant_override("separation", 2)
 	_stats.mouse_filter = MOUSE_FILTER_IGNORE
 	vbox.add_child(_stats)
 
@@ -52,9 +52,9 @@ func _ready() -> void:
 	_desc.bbcode_enabled = true
 	_desc.fit_content = true
 	_desc.scroll_active = false
-	_desc.add_theme_font_size_override("font_size", 11)
+	_desc.add_theme_font_size_override("font_size", 16)
 	_desc.mouse_filter = MOUSE_FILTER_IGNORE
-	_desc.custom_minimum_size = Vector2(220, 0)
+	_desc.custom_minimum_size = Vector2(128, 0)
 	vbox.add_child(_desc)
 
 
@@ -96,7 +96,7 @@ func populate_delta(node: NodeData) -> void:
 	divider.text = "▼  Next Level"
 	divider.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	divider.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3))
-	divider.add_theme_font_size_override("font_size", 11)
+	divider.add_theme_font_size_override("font_size", 16)
 	divider.mouse_filter = MOUSE_FILTER_IGNORE
 	_stats.add_child(divider)
 
@@ -220,13 +220,13 @@ func _add_row(label: String, value: String, dimmed: bool = false) -> void:
 
 	var lbl := Label.new()
 	lbl.text = label
-	lbl.add_theme_font_size_override("font_size", 11)
+	lbl.add_theme_font_size_override("font_size", 16)
 	lbl.mouse_filter = MOUSE_FILTER_IGNORE
 	row.add_child(lbl)
 
 	var val := Label.new()
 	val.text = value
-	val.add_theme_font_size_override("font_size", 11)
+	val.add_theme_font_size_override("font_size", 16)
 	val.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	val.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	val.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT

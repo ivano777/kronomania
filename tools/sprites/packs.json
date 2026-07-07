@@ -1,0 +1,54 @@
+{
+  "_comment": "CC0 pack -> combatant conversion manifest. Paths relative to tools/sprites/packs/. flip=true mirrors horizontally so the character faces RIGHT (project convention).",
+  "characters": [
+    {
+      "key": "player",
+      "source": "Martial Hero by LuizMelo (CC0) — https://luizmelo.itch.io/martial-hero",
+      "dir": "martial_hero/Martial Hero/Sprites",
+      "flip": true,
+      "anims": {
+        "idle":         {"file": "Idle.png",     "fps": 8,  "loop": true},
+        "attack_melee": {"file": "Attack1.png",  "fps": 12, "loop": false},
+        "cast_spell":   {"file": "Attack2.png",  "fps": 12, "loop": false},
+        "hurt":         {"file": "Take Hit.png", "fps": 10, "loop": false},
+        "die":          {"file": "Death.png",    "fps": 8,  "loop": false}
+      }
+    },
+    {
+      "key": "grunt",
+      "source": "Monsters & Creatures Fantasy (Goblin) by LuizMelo (CC0) — https://luizmelo.itch.io/monsters-creatures-fantasy",
+      "dir": "monsters_creatures_fantasy/Monsters_Creatures_Fantasy/Goblin",
+      "flip": true,
+      "anims": {
+        "idle":         {"file": "Idle.png",     "fps": 6,  "loop": true},
+        "attack_melee": {"file": "Attack.png",   "fps": 12, "loop": false},
+        "hurt":         {"file": "Take Hit.png", "fps": 10, "loop": false},
+        "die":          {"file": "Death.png",    "fps": 8,  "loop": false}
+      }
+    },
+    {
+      "key": "soldier",
+      "source": "Medieval Warrior Pack 2 by LuizMelo (CC0) — https://luizmelo.itch.io/medieval-warrior-pack-2",
+      "dir": "medieval_warrior_2/Medieval Warrior Pack 2/Sprites",
+      "flip": false,
+      "anims": {
+        "idle":         {"file": "Idle.png",     "fps": 8,  "loop": true},
+        "attack_melee": {"file": "Attack1.png",  "fps": 12, "loop": false},
+        "hurt":         {"file": "Take Hit.png", "fps": 10, "loop": false},
+        "die":          {"file": "Death.png",    "fps": 8,  "loop": false}
+      }
+    },
+    {
+      "key": "knight",
+      "source": "Hero Knight by LuizMelo (CC0) — https://luizmelo.itch.io/hero-knight",
+      "dir": "hero_knight/Hero Knight/Sprites",
+      "flip": false,
+      "anims": {
+        "idle":         {"file": "Idle.png",     "fps": 10, "loop": true},
+        "attack_melee": {"file": "Attack1.png",  "fps": 12, "loop": false},
+        "hurt":         {"file": "Take Hit.png", "fps": 10, "loop": false},
+        "die":          {"file": "Death.png",    "fps": 8,  "loop": false}
+      }
+    }
+  ]
+}

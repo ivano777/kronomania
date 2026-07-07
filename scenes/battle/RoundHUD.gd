@@ -122,16 +122,16 @@ func show_intents(intents: Array[String]) -> void:
 		var btn := Button.new()
 		match intent:
 			"attack":
-				btn.text = "⚔  Attack"
+				btn.text = "×  Attack"
 				btn.pressed.connect(_on_intent_attack)
 			"magic":
-				btn.text = "✦  Magic"
+				btn.text = "♦  Magic"
 				btn.pressed.connect(_on_intent_magic)
 			"lucidity":
-				btn.text = "🧘  Lucidity (cool Fervor)"
+				btn.text = "−  Lucidity (cool Fervor)"
 				btn.pressed.connect(_on_intent_lucidity)
 			"item":
-				btn.text = "⊕  Item  (coming soon)"
+				btn.text = "+  Item  (coming soon)"
 				btn.disabled = true
 		_action_panel.add_child(btn)
 
@@ -188,7 +188,7 @@ func show_defense_item_choice(options: Array) -> void:
 		# Pin button — saves default defense item, mirroring ATK weapon pin.
 		var _wk := item_name
 		var pin_btn := Button.new()
-		pin_btn.text = "✓" if _wk == saved_wk else "★"
+		pin_btn.text = "✓" if _wk == saved_wk else "*"
 		pin_btn.pressed.connect(func() -> void:
 			PlayerProgression.combat_prefs.defaults["defend_weapon"] = _wk
 			show_defense_item_choice(options)
@@ -291,7 +291,7 @@ func _show_tool_panel(intent: String) -> void:
 			var _wk: String = entry["weapon_key"] as String
 			var _intent_copy := intent
 			var pin_btn := Button.new()
-			pin_btn.text = "✓" if _wk == saved_wk else "★"
+			pin_btn.text = "✓" if _wk == saved_wk else "*"
 			pin_btn.pressed.connect(func() -> void:
 				PlayerProgression.combat_prefs.defaults[pref_key] = _wk
 				_show_tool_panel(_intent_copy)
@@ -407,7 +407,7 @@ func _show_action_panel(weapon_item) -> void:
 		row.add_child(info_lbl)
 		var pin_btn := Button.new()
 		var _ak := mod.action_key
-		pin_btn.text = "✓" if _ak == saved_ak else "★"
+		pin_btn.text = "✓" if _ak == saved_ak else "*"
 		pin_btn.pressed.connect(func() -> void:
 			PlayerProgression.combat_prefs.defaults["attack_action"] = _ak
 			_show_action_panel(_current_weapon_item)
@@ -459,7 +459,7 @@ func _show_execution_magic(cast_tool: EquipmentData = null) -> void:
 			)
 			row.add_child(cast_btn)
 			var pin_btn := Button.new()
-			pin_btn.text = "★"
+			pin_btn.text = "*"
 			var _sn := sp.spell_name
 			pin_btn.pressed.connect(func() -> void:
 				PlayerProgression.combat_prefs.defaults["magic"] = _sn
@@ -485,7 +485,7 @@ func _show_execution_magic(cast_tool: EquipmentData = null) -> void:
 			)
 			row.add_child(cast_btn)
 			var pin_btn := Button.new()
-			pin_btn.text = "★"
+			pin_btn.text = "*"
 			var _sn := sp.spell_name
 			pin_btn.pressed.connect(func() -> void:
 				PlayerProgression.combat_prefs.defaults["magic"] = _sn

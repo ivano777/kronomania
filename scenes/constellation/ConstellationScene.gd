@@ -26,11 +26,11 @@ var _pan_offset: Vector2 = Vector2.ZERO
 var _is_panning: bool = false
 var _pan_last_mouse: Vector2 = Vector2.ZERO
 
-const DOM_VERTEX := Vector2(450, 60)
-const ING_VERTEX := Vector2(100, 620)
-const NEG_VERTEX := Vector2(800, 620)
-const CENTROID   := Vector2(450, 433)
-const CARD_SIZE  := Vector2(108, 56)
+const DOM_VERTEX := Vector2(225, 30)
+const ING_VERTEX := Vector2(50, 310)
+const NEG_VERTEX := Vector2(400, 310)
+const CENTROID   := Vector2(225, 217)
+const CARD_SIZE  := Vector2(70, 32)
 
 const _ALWAYS_VISIBLE: Dictionary = {
 	"dom_core": true, "ing_core": true, "neg_core": true,
@@ -47,27 +47,27 @@ const _INGENUITY_SUBTREE: Dictionary = {
 }
 const _NODE_POSITIONS: Dictionary = {
 	# Always-visible triangle vertices + centre
-	"dom_core":         Vector2(396,  70),
-	"ing_core":         Vector2( 46, 590),
-	"neg_core":         Vector2(746, 590),
+	"dom_core":         Vector2(198,  35),
+	"ing_core":         Vector2( 23, 295),
+	"neg_core":         Vector2(373, 295),
 	# Default guard training — always visible, adjacent to their core vertices
-	"dom_stamina":      Vector2(280,  70),
-	"neg_stance":       Vector2(860, 590),
-	"ing_resolve":      Vector2(-70, 590),
+	"dom_stamina":      Vector2(140,  35),
+	"neg_stance":       Vector2(430, 295),
+	"ing_resolve":      Vector2(-35, 295),
 	# DOM subtree — expands UPWARD (negative Y) from dom_core
-	"dom_wounds":       Vector2(220,  -50),
-	"dom_martial_arts": Vector2(580,  -50),
-	"dom_meat_grinder": Vector2( 70, -170),
-	"dom_melee":        Vector2(460, -170),
-	"dom_ranged":       Vector2(710, -170),
-	"dom_dual_wield":   Vector2(310, -300),
-	"dom_disarm":       Vector2(460, -300),
-	"dom_titans_grip":  Vector2(610, -300),
-	"dom_brutal":       Vector2(610, -430),
-	"dom_earthshatter": Vector2(610, -560),
+	"dom_wounds":       Vector2(110,  -25),
+	"dom_martial_arts": Vector2(290,  -25),
+	"dom_meat_grinder": Vector2( 35,  -85),
+	"dom_melee":        Vector2(230,  -85),
+	"dom_ranged":       Vector2(355,  -85),
+	"dom_dual_wield":   Vector2(155, -150),
+	"dom_disarm":       Vector2(230, -150),
+	"dom_titans_grip":  Vector2(305, -150),
+	"dom_brutal":       Vector2(305, -215),
+	"dom_earthshatter": Vector2(305, -280),
 	# ING subtree — expands LEFTWARD (negative X) from ing_core
-	"minor_studies":    Vector2(-110, 620),
-	"spellcasting":     Vector2(-260, 620),
+	"minor_studies":    Vector2(-55, 310),
+	"spellcasting":     Vector2(-130, 310),
 }
 
 const _VERTEX_NAMES: Dictionary = {
@@ -97,8 +97,8 @@ func _populate_canvas() -> void:
 			_card_layer.add_child(card)
 
 	_heart_label = Label.new()
-	_heart_label.position = CENTROID - Vector2(54, 10)
-	_heart_label.add_theme_font_size_override("font_size", 14)
+	_heart_label.position = CENTROID - Vector2(27, 5)
+	_heart_label.add_theme_font_size_override("font_size", 16)
 	_card_layer.add_child(_heart_label)
 
 
@@ -116,19 +116,19 @@ func _make_card(node: NodeData) -> PanelContainer:
 
 	var name_lbl := Label.new()
 	name_lbl.text = node.display_name
-	name_lbl.add_theme_font_size_override("font_size", 11)
+	name_lbl.add_theme_font_size_override("font_size", 16)
 	name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_lbl.clip_text = true
 	header_row.add_child(name_lbl)
 
 	var level_lbl := Label.new()
 	level_lbl.text = "L0/%d" % node.max_levels
-	level_lbl.add_theme_font_size_override("font_size", 10)
+	level_lbl.add_theme_font_size_override("font_size", 16)
 	header_row.add_child(level_lbl)
 
 	var pip_lbl := Label.new()
-	pip_lbl.text = "○".repeat(node.max_levels)
-	pip_lbl.add_theme_font_size_override("font_size", 11)
+	pip_lbl.text = "·".repeat(node.max_levels)
+	pip_lbl.add_theme_font_size_override("font_size", 16)
 	vbox.add_child(pip_lbl)
 
 	var btn := Button.new()
@@ -179,7 +179,7 @@ func _refresh() -> void:
 			tier_locked = tier < (nd.levels_data[lvl] as NodeLevelData).required_tier
 
 		level_lbl.text = "L%d/%d" % [lvl, max_lvl]
-		pip_lbl.text = "●".repeat(lvl) + "○".repeat(max_lvl - lvl)
+		pip_lbl.text = "•".repeat(lvl) + "·".repeat(max_lvl - lvl)
 
 		if at_max:
 			btn.text = "Max"
@@ -231,9 +231,9 @@ func _draw_triangle_lines() -> void:
 	_add_line(ING_VERTEX + dc, NEG_VERTEX + dc, color)
 	_add_line(NEG_VERTEX + dc, DOM_VERTEX + dc, color)
 
-	_add_vertex_label("DOMINION",  DOM_VERTEX + Vector2(-10, -20))
-	_add_vertex_label("INGENUITY", ING_VERTEX + Vector2(-20, 60))
-	_add_vertex_label("NEGATION",  NEG_VERTEX + Vector2(-20, 60))
+	_add_vertex_label("DOMINION",  DOM_VERTEX + Vector2(-5, -12))
+	_add_vertex_label("INGENUITY", ING_VERTEX + Vector2(-10, 30))
+	_add_vertex_label("NEGATION",  NEG_VERTEX + Vector2(-10, 30))
 
 
 func _draw_connection_lines() -> void:
@@ -274,7 +274,7 @@ func _add_line(from: Vector2, to: Vector2, color: Color) -> void:
 	line.add_point(from)
 	line.add_point(to)
 	line.default_color = color
-	line.width = 2.0
+	line.width = 1.0
 	_line_layer.add_child(line)
 
 
@@ -282,7 +282,7 @@ func _add_vertex_label(text_str: String, pos: Vector2) -> void:
 	var lbl := Label.new()
 	lbl.text = text_str
 	lbl.position = pos
-	lbl.add_theme_font_size_override("font_size", 12)
+	lbl.add_theme_font_size_override("font_size", 16)
 	_line_layer.add_child(lbl)
 
 
@@ -322,8 +322,8 @@ func _center_on_nodes(node_ids: Array) -> void:
 		max_p = max_p.max(p + CARD_SIZE)
 	if min_p.x == INF:
 		return
-	min_p -= Vector2(30, 30)
-	max_p += Vector2(30, 30)
+	min_p -= Vector2(15, 15)
+	max_p += Vector2(15, 15)
 	var panel_size := _skills_panel.size
 	var content_size := max_p - min_p
 	_zoom = clamp(minf(panel_size.x / content_size.x, panel_size.y / content_size.y), 0.25, 1.5)

@@ -1,0 +1,11 @@
+{
+  "name": "knight_idle",
+  "sheet": "idle_sheet.png",
+  "frame_width": 95,
+  "frame_height": 70,
+  "frame_count": 11,
+  "fps": 10,
+  "loop": true,
+  "layout": "horizontal_strip",
+  "source": "Hero Knight by LuizMelo (CC0) \u2014 https://luizmelo.itch.io/hero-knight"
+}

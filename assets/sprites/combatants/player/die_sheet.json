@@ -1,0 +1,11 @@
+{
+  "name": "player_die",
+  "sheet": "die_sheet.png",
+  "frame_width": 128,
+  "frame_height": 69,
+  "frame_count": 6,
+  "fps": 8,
+  "loop": false,
+  "layout": "horizontal_strip",
+  "source": "Martial Hero by LuizMelo (CC0) \u2014 https://luizmelo.itch.io/martial-hero"
+}

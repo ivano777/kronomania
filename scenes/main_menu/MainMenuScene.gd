@@ -17,12 +17,23 @@ var _ng_overwrite_confirm: ConfirmationDialog
 
 
 func _ready() -> void:
+	# CC0 town backdrop (import_env.py output), darkened so menu text stays readable.
+	var bg_tex := SpriteRegistry.get_background("menu")
+	if bg_tex != null:
+		var bg_rect := TextureRect.new()
+		bg_rect.texture = bg_tex
+		bg_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		bg_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		bg_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+		bg_rect.modulate = Color(0.5, 0.5, 0.6)
+		add_child(bg_rect)
+
 	var margin := MarginContainer.new()
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	margin.add_theme_constant_override("margin_top", 24)
-	margin.add_theme_constant_override("margin_left", 36)
-	margin.add_theme_constant_override("margin_right", 36)
-	margin.add_theme_constant_override("margin_bottom", 24)
+	margin.add_theme_constant_override("margin_top", 12)
+	margin.add_theme_constant_override("margin_left", 18)
+	margin.add_theme_constant_override("margin_right", 18)
+	margin.add_theme_constant_override("margin_bottom", 12)
 	add_child(margin)
 
 	var scroll := ScrollContainer.new()
@@ -32,11 +43,11 @@ func _ready() -> void:
 
 	var vbox := VBoxContainer.new()
 	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	vbox.add_theme_constant_override("separation", 14)
+	vbox.add_theme_constant_override("separation", 8)
 	scroll.add_child(vbox)
 
 	var title := Label.new()
-	title.text = "◆  KRONOMANIA  ◆"
+	title.text = "♦  KRONOMANIA  ♦"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(title)
 
@@ -55,7 +66,7 @@ func _ready() -> void:
 
 	for i in range(1, 4):
 		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 8)
+		row.add_theme_constant_override("separation", 4)
 		vbox.add_child(row)
 
 		var slot_lbl := Label.new()
@@ -145,15 +156,15 @@ func _show_new_game_popup() -> void:
 
 	var popup_margin := MarginContainer.new()
 	for side in ["margin_top", "margin_left", "margin_right", "margin_bottom"]:
-		popup_margin.add_theme_constant_override(side, 24)
+		popup_margin.add_theme_constant_override(side, 12)
 	popup.add_child(popup_margin)
 
 	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 12)
+	vbox.add_theme_constant_override("separation", 6)
 	popup_margin.add_child(vbox)
 
 	var title := Label.new()
-	title.text = "◆  NEW GAME  ◆"
+	title.text = "♦  NEW GAME  ♦"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(title)
 
@@ -173,7 +184,7 @@ func _show_new_game_popup() -> void:
 	for i in range(1, 4):
 		var meta := SaveManager.get_slot_meta(i)
 		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 8)
+		row.add_theme_constant_override("separation", 4)
 		vbox.add_child(row)
 
 		var slot_lbl := Label.new()

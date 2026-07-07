@@ -1,0 +1,11 @@
+{
+  "name": "grunt_attack_melee",
+  "sheet": "attack_melee_sheet.png",
+  "frame_width": 88,
+  "frame_height": 46,
+  "frame_count": 8,
+  "fps": 12,
+  "loop": false,
+  "layout": "horizontal_strip",
+  "source": "Monsters & Creatures Fantasy (Goblin) by LuizMelo (CC0) \u2014 https://luizmelo.itch.io/monsters-creatures-fantasy"
+}

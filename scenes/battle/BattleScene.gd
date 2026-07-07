@@ -47,6 +47,15 @@ func _ready() -> void:
 
 	_defeat_panel.hide()
 
+	# CC0 arena background (import_env.py output); ColorRect fallback stays on miss.
+	var bg_tex := SpriteRegistry.get_background("battle")
+	if bg_tex != null:
+		var bg_rect := TextureRect.new()
+		bg_rect.texture = bg_tex
+		bg_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		bg_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+		$WorldLayer/Background.add_child(bg_rect)
+
 	# Player side.
 	_player_visual.setup(PLAYER_DATA, true)
 	_player_hud.setup(PLAYER_DATA, true)
@@ -99,6 +108,7 @@ func _ready() -> void:
 	CombatManager.round_started.connect(_on_round_started)
 	CombatManager.phase_changed.connect(_on_phase_changed)
 	CombatManager.wounds_changed.connect(_on_wounds_changed)
+	CombatManager.combatant_attacking.connect(_on_combatant_attacking)
 	CombatManager.guard_changed.connect(_on_guard_changed)
 	CombatManager.combat_ended.connect(_on_combat_ended)
 	CombatManager.player_intents_available.connect(_on_intents_available)
@@ -165,6 +175,12 @@ func _on_wounds_changed(is_player: bool, enemy_index: int, current: int, max_wou
 		vis.play_die()
 	else:
 		vis.play_hurt()
+
+
+func _on_combatant_attacking(is_player: bool, enemy_index: int) -> void:
+	if is_player:
+		return  # player attack anims are triggered at action confirm
+	_enemy_visuals[enemy_index].play_attack_melee()
 
 
 func _on_guard_changed(is_player: bool, enemy_index: int, pool: String, guard_value: int) -> void:
@@ -279,6 +295,7 @@ func _teardown_signals() -> void:
 	CombatManager.round_started.disconnect(_on_round_started)
 	CombatManager.phase_changed.disconnect(_on_phase_changed)
 	CombatManager.wounds_changed.disconnect(_on_wounds_changed)
+	CombatManager.combatant_attacking.disconnect(_on_combatant_attacking)
 	CombatManager.guard_changed.disconnect(_on_guard_changed)
 	CombatManager.combat_ended.disconnect(_on_combat_ended)
 	CombatManager.player_intents_available.disconnect(_on_intents_available)

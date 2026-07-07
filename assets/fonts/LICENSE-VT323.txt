@@ -1,0 +1,4 @@
+VT323 — designed by Peter Hull.
+Licensed under the SIL Open Font License, Version 1.1 (OFL-1.1).
+Source: https://github.com/google/fonts/tree/main/ofl/vt323
+Full license text: https://openfontlicense.org
