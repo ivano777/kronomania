@@ -350,12 +350,21 @@ Depends on Groups 7 and 7.5.
 - [x] `RoundHUD`: ATK toggle button (`"ATK: Manual"` / `"ATK: Auto"`) reads/writes
   `CombatPreferences.atk_mode`. Persistent strip above the action panel.
 - [x] **Manual Mode** (default): waits for player to navigate cascading menus.
-- [x] **Auto Mode** flow in `CombatManager._begin_round()` via `_try_auto_execute()`:
-  1. Complete path (attack_weapon + attack_action both set, weapon name matches) → execute immediately;
-	 log `"[Auto] Strike → Stance (default)"`.
-  2. Magic default set → execute cantrip/spell immediately; log `"[Auto] Cast Fire Orb (default)"`.
-  3. Any step undefined → call `_auto_best_action()` and execute; log
-	 `"[Auto-Best] Strike → Stance (score: 6.5)"`.
+- [x] **Auto Mode** — the tool + execution panels are skipped; the player still clicks the
+  **intent** (Attack vs Magic is a meaningful choice), then the pinned default fires. Two
+  intent-triggered paths (there is no `_try_auto_execute()` in `_begin_round()`):
+  - **Attack** → `RoundHUD._on_intent_attack` emits `auto_attack_requested` →
+	`CombatManager.player_auto_execute_attack()`:
+	1. Complete path (attack_weapon + attack_action both set, weapon name matches) → execute
+	   immediately; log `"[Auto] Strike → Stance (default)"`.
+	2. Any step undefined → `_auto_best_action()` heuristic; log
+	   `"[Auto-Best] Strike → Stance (score: 6.5)"`.
+  - **Magic** → `RoundHUD._on_intent_magic` → `_try_auto_magic()`: resolves the pinned
+	`defaults["magic"]` to a known cantrip/true-spell (+ optional `defaults["cast_weapon"]`,
+	else bare hands) and emits the existing `cantrip_selected`/`spell_selected` chain
+	(→ `player_chose_cantrip/spell`); log `"[Auto] Cast <spell> (default)"`. No default /
+	unlearned / not currently castable (e.g. Burnout blocks a pinned true spell) → falls
+	through to the manual panel. No magic heuristic — Strike-only (see Phase B).
 
 **Phase B — `_auto_best_action()` in `CombatManager`**
 - [x] Private helper `_auto_best_action() -> Dictionary`. Returns `{ target_pool, score }`.

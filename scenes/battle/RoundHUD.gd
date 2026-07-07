@@ -258,7 +258,50 @@ func _on_intent_attack() -> void:
 
 func _on_intent_magic() -> void:
 	_current_intent = "magic"
+	if PlayerProgression.combat_prefs.atk_mode == "auto" and _try_auto_magic():
+		return
 	_show_tool_panel("magic")
+
+
+## ATK Auto: cast the pinned magic default without opening the panels (mirrors Strike auto).
+## Returns true if it fired; false to fall through to the manual magic cascade.
+func _try_auto_magic() -> bool:
+	var saved: String = PlayerProgression.combat_prefs.defaults.get("magic", "")
+	if saved == "":
+		return false  # no default; magic has no auto heuristic (Strike-only) — open manual panel
+	# Resolve the pinned spell name to a known SpellData (cantrips first, then true spells).
+	var sp: SpellData = null
+	for c in PlayerProgression.get_known_cantrips():
+		if (c as SpellData).spell_name == saved:
+			sp = c as SpellData
+			break
+	if sp == null:
+		for s in PlayerProgression.get_known_spells():
+			if (s as SpellData).spell_name == saved:
+				sp = s as SpellData
+				break
+	if sp == null:
+		return false  # unlearned / renamed default
+	# Availability gate: the pinned kind must be castable right now.
+	if sp.is_cantrip and not _can_cantrip:
+		return false
+	if not sp.is_cantrip and not _can_cast_spell:
+		return false  # e.g. Burnout blocks true spells — let the manual panel offer cantrips
+	# Resolve the pinned cast tool (optional; bare hands = full Tier if unset/unmatched).
+	var cast_tool: EquipmentData = null
+	var saved_ct: String = PlayerProgression.combat_prefs.defaults.get("cast_weapon", "")
+	if saved_ct != "" and saved_ct != "bare_hands":
+		for e in _build_tool_entries("magic"):
+			if (e.get("weapon_key", "") as String) == saved_ct:
+				cast_tool = e.get("item", null) as EquipmentData
+				break
+	CombatManager.log_message.emit("[color=gray][Auto] Cast %s (default)[/color]" % sp.spell_name)
+	disable_actions()
+	if sp.is_cantrip:
+		cantrip_selected.emit(sp, cast_tool)
+	else:
+		spell_selected.emit(sp, cast_tool)
+	return true
 
 
 func _on_intent_lucidity() -> void:
