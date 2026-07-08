@@ -2,7 +2,7 @@
 
 The Dominion path specialises in raw offensive force, melee mastery, and physical endurance. It is the primary driver for close-quarters combat and max-wounds growth.
 
-**Total level-ups available: 24 across 11 nodes.**
+**Total budget-consuming level-ups: 24 across 11 nodes** (plus Martial Arts' free L1 baseline, which is auto-granted at run start and costs no slot).
 The tier budget (5 Combat slots × 4 Tiers = 20 total) means players will choose 20 out of 24 possible level-ups. Not every node can be maxed — meaningful sacrifice is intended.
 
 ---
@@ -17,7 +17,8 @@ Core Dominion (L1 / L2 / L3)
     │     [L3 req: Wounds L2 + Core Dominion L3]
     │     └── Meat for the Grinder (L1 / L2)  [req: Wounds L2]
     │
-    └── Martial Arts (L1 / L2)  [req: Core Dominion L2]
+    └── Martial Arts (L1 free / L2 / L3)
+            [L2 req: Core Dominion L1]  [L3 req: Martial Arts L2 + Core Dominion L2, Tier 2]
             ├── Melee (L1 / L2)  [req: Martial Arts L1]
             │     ├── Dual Wield (L1 / L2)    [req: Melee L1]
             │     ├── Titan's Grip (L1 / L2)  [req: Melee L1]
@@ -67,13 +68,16 @@ Core Dominion (L1 / L2 / L3)
 | | |
 |---|---|
 | **Category** | Training |
-| **Max Level** | 2 |
-| **Prerequisites** | Core Dominion L2 |
+| **Max Level** | 3 |
+| **Prerequisites** | L1: none (free baseline) · L2: Core Dominion L1 · L3 (Tier 2): Martial Arts L2 + Core Dominion L2 |
 
 | Level | Effect |
 |---|---|
-| L1 | Keep 2 on all physical attacks |
-| L2 | Keep 3 on all physical attacks |
+| L1 | **Free baseline** — auto-granted at run start, 0 slot cost. Keep 1 die on physical attacks. |
+| L2 | Keep 2 dice on physical attacks. |
+| L3 | Keep 3 dice on physical attacks. |
+
+> Martial Arts L1 is auto-granted at run start (mirroring the Stance / Stamina / Resolve guard baselines) and consumes no Combat slot; only L2 and L3 cost slots. Convention (post-C2.5/C2.6): effect value **N = keep N dice**.
 
 ---
 
@@ -203,4 +207,4 @@ Core Dominion (L1 / L2 / L3)
 - **Brutal L2 (Cleave)** requires multi-enemy routing and is deferred to Group 5.
 - **Melee L2 (Space Domination)** grants an Advantage flag on the player's next Stamina defense roll this combat. The flag persists until triggered, then clears. This requires a stateful flag on `CombatantState`.
 - **Earthshatter** is deliberately narrow: Stance-pool attacks and melee physical attacks only. It does not apply to magical attacks or Resolve/Stamina-pool physical options.
-- The **base Dominion stat starts at d4**. This is a change from the current `player_default.tres` (d6). The implementation plan (Group 4.8) flags this for confirmation before authoring data files.
+- The **base Dominion stat starts at d4**. This is now shipped — `player_default.tres` carries no explicit stat sizes, so all stats use the d4 default; Core Dominion L1–L3 raise it to d6 / d8 / d10.
