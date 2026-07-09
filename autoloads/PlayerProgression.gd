@@ -53,6 +53,8 @@ const AVAILABLE_WEAPONS: Array = [
 	preload("res://resources/data/weapons/iron_sword.tres"),
 	preload("res://resources/data/weapons/greatsword.tres"),
 	preload("res://resources/data/weapons/heater_shield.tres"),
+	preload("res://resources/data/weapons/arcane_focus.tres"),
+	preload("res://resources/data/weapons/wizard_staff.tres"),
 ]
 
 ## Currently equipped main-hand weapon. null = fall back to player_default.tres equipped_weapon.

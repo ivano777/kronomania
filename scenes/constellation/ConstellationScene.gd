@@ -26,10 +26,10 @@ var _pan_offset: Vector2 = Vector2.ZERO
 var _is_panning: bool = false
 var _pan_last_mouse: Vector2 = Vector2.ZERO
 
-const DOM_VERTEX := Vector2(225, 30)
-const ING_VERTEX := Vector2(50, 310)
-const NEG_VERTEX := Vector2(400, 310)
-const CENTROID   := Vector2(225, 217)
+const DOM_VERTEX := Vector2(210, 35)
+const ING_VERTEX := Vector2(23, 295)
+const NEG_VERTEX := Vector2(373, 295)
+const CENTROID   := Vector2(202, 208)
 const CARD_SIZE  := Vector2(70, 32)
 
 const _ALWAYS_VISIBLE: Dictionary = {
@@ -43,31 +43,40 @@ const _DOMINION_SUBTREE: Dictionary = {
 	"dom_earthshatter": true, "dom_stamina": true
 }
 const _INGENUITY_SUBTREE: Dictionary = {
-	"minor_studies": true, "spellcasting": true
+	"minor_studies": true, "spellcasting": true, "lucidity": true,
+	"mind_detonation": true, "hex_mastery": true,
+	"echoing_mind": true, "chrono_tinkering": true
 }
 const _NODE_POSITIONS: Dictionary = {
+	# Uniform grid: STEP_X = 90 (card 70 + 20 gap), STEP_Y = 60 (card 32 + 28 gap)
 	# Always-visible triangle vertices + centre
-	"dom_core":         Vector2(198,  35),
+	"dom_core":         Vector2(210,  35),
 	"ing_core":         Vector2( 23, 295),
 	"neg_core":         Vector2(373, 295),
 	# Default guard training — always visible, adjacent to their core vertices
-	"dom_stamina":      Vector2(140,  35),
-	"neg_stance":       Vector2(430, 295),
-	"ing_resolve":      Vector2(-35, 295),
+	"dom_stamina":      Vector2(120,  35),
+	"neg_stance":       Vector2(463, 295),
+	"ing_resolve":      Vector2(-67, 295),
 	# DOM subtree — expands UPWARD (negative Y) from dom_core
-	"dom_wounds":       Vector2(110,  -25),
-	"dom_martial_arts": Vector2(290,  -25),
-	"dom_meat_grinder": Vector2( 35,  -85),
-	"dom_melee":        Vector2(230,  -85),
-	"dom_ranged":       Vector2(355,  -85),
-	"dom_dual_wield":   Vector2(155, -150),
-	"dom_disarm":       Vector2(230, -150),
-	"dom_titans_grip":  Vector2(305, -150),
-	"dom_brutal":       Vector2(305, -215),
-	"dom_earthshatter": Vector2(305, -280),
+	"dom_wounds":       Vector2(120,  -25),
+	"dom_martial_arts": Vector2(300,  -25),
+	"dom_meat_grinder": Vector2( 30,  -85),
+	"dom_melee":        Vector2(210,  -85),
+	"dom_ranged":       Vector2(390,  -85),
+	"dom_dual_wield":   Vector2(120, -145),
+	"dom_disarm":       Vector2(210, -145),
+	"dom_titans_grip":  Vector2(300, -145),
+	"dom_brutal":       Vector2(300, -205),
+	"dom_earthshatter": Vector2(300, -265),
 	# ING subtree — expands LEFTWARD (negative X) from ing_core
-	"minor_studies":    Vector2(-55, 310),
-	"spellcasting":     Vector2(-130, 310),
+	"minor_studies":    Vector2(-157, 295),
+	"spellcasting":     Vector2(-247, 295),
+	"lucidity":         Vector2(-157, 235),
+	# Disciplines — column left of spellcasting, spread vertically
+	"mind_detonation":  Vector2(-337, 175),
+	"hex_mastery":      Vector2(-337, 235),
+	"echoing_mind":     Vector2(-337, 295),
+	"chrono_tinkering": Vector2(-337, 355),
 }
 
 const _VERTEX_NAMES: Dictionary = {

@@ -5,12 +5,9 @@ extends RefCounted
 
 
 ## Mirrors CombatManager._effective_tier().
-## tier_override > 0 overrides base_tier; result is then capped by tier_cap (0 = uncapped).
-func effective_tier(base_tier: int, tier_override: int, tier_cap: int) -> int:
-	var base: int = tier_override if tier_override > 0 else base_tier
-	if tier_cap == 0:
-		return base
-	return mini(base, tier_cap)
+## tier_override > 0 overrides base_tier. Items never cap Tier (equip-requirements rework).
+func effective_tier(base_tier: int, tier_override: int) -> int:
+	return tier_override if tier_override > 0 else base_tier
 
 
 ## Delegates to the real CombatMath.tier_wound_bonus (single source of truth after Phase 2).

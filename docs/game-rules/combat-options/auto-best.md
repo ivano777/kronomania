@@ -33,7 +33,7 @@ score = effective_tier × (1 + dominion_size) / 2 + flat_bonus
 
 | Variable | Source |
 |---|---|
-| `effective_tier` | `_effective_tier(_player, mod)` — respects `ActionModifier.tier_cap` |
+| `effective_tier` | `_effective_tier(_player)` — full Tier (items never cap Tier) |
 | `dominion_size` | `_stat_size(_player, "dominion")` — die face integer (4 / 6 / 8 / 10) |
 | `flat_bonus` | `_attack_flat(_player)` — weapon flat + node flat bonuses |
 

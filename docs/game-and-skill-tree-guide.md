@@ -365,16 +365,22 @@ the same mark.
 
 ### Casting implements ✅
 
-Just as you pick a weapon to strike with, you pick a **casting tool** each round.
-The tool's "cast" profile sets your spell pool:
+Casting is gated by your hands, not capped by them (equip-requirements rework):
 
-`pool = effective Tier (capped by the tool) + tool pool bonus + school bonus`
+- **Cantrips** need **truly empty hands** (both slots) or an equipped **Magic Focus**.
+- **True spells** always need an equipped **Magic Focus** — steel in both hands means
+  no spellcasting at all until you swap gear at a campfire.
+- Focus content: **Arcane Focus** (one hand, Cast flat +1) and **Wizard Staff**
+  (two-handed, Cast flat +1 and pool +1, can also bonk).
 
-- **Mundane weapons** cap the cast pool to **1 die** (casting with a sword in hand
-  is clumsy).
-- **Bare hands** (or any tool with no cast profile) → **full Tier**, no bonuses.
-- **Magic foci** (future content) → any combination of caps/bonuses.
-- **Mind Detonation's placement** is always gear-independent (pool = 1).
+The chosen conduit's "cast" profile adds its bonuses to your spell pool:
+
+`pool = full Tier + tool pool bonus + school bonus`
+
+- Items never cap Tier — your expressed dice are throttled by keep grades (training).
+- **Bare hands** (cantrips only) → full Tier, no bonuses.
+- **Mind Detonation's placement** is always gear-independent (pool = 1), but priming
+  it is a true-spell cast, so it still needs a focus in hand.
 
 ---
 

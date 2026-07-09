@@ -26,13 +26,11 @@ static func roll_enemy_guard(enemy: CombatantState, enemy_index: int, pool: Stri
 	if not enemy.is_pool_rolled(pool):
 		var defend_mod: ActionModifier = CombatMath.get_action_modifier(enemy, "defend", false)
 		var ew := enemy.weapon_override if enemy.weapon_override else enemy.data.equipped_weapon
-		var cap_str := "uncapped" if defend_mod.tier_cap == 0 else "cap %d" % defend_mod.tier_cap
-		CombatManager.log_message.emit("  %s defends with [i]%s[/i] (%s, Tier %d → %d dice)" % [
+		var dname: String = ew.item_name if ew else (defend_mod.action_name if defend_mod.action_name != "" else "Bare Hands")
+		CombatManager.log_message.emit("  %s defends with [i]%s[/i] (Tier %d)" % [
 			enemy.data.combatant_name,
-			ew.item_name if ew else "Bare Hands",
-			cap_str,
-			enemy.data.tier,
-			CombatMath.effective_tier(enemy, defend_mod),
+			dname,
+			CombatMath.effective_tier(enemy),
 		])
 		var flat_debuff: int = 0
 		var keep_debuff: int = 0
@@ -46,7 +44,7 @@ static func roll_enemy_guard(enemy: CombatantState, enemy_index: int, pool: Stri
 					flat_debuff, keep_debuff, enemy.data.combatant_name, pool_label
 				])
 		var def_result := RollEngine.resolve(
-			CombatMath.effective_tier(enemy, defend_mod), CombatMath.get_pool_size(enemy, pool),
+			CombatMath.effective_tier(enemy), CombatMath.get_pool_size(enemy, pool),
 			maxi(1, CombatMath.defense_keep_grade(enemy, pool) + keep_debuff),
 			defend_mod.flat_bonus, 0
 		)
@@ -81,7 +79,7 @@ static func detonate_mind_bomb(enemy: CombatantState, enemy_index: int) -> void:
 	if status == null:
 		return
 	var player: CombatantState = CombatManager._player
-	var payload := MindBombPayload.from_status(status, CombatMath.effective_tier(player, null))
+	var payload := MindBombPayload.from_status(status, CombatMath.effective_tier(player))
 	var frozen_fervor: int = payload.fervor_at_prime
 	StatusOps.remove(enemy, "mind_detonation_primed")
 
@@ -178,7 +176,7 @@ static func cast_time_lock(enemy: CombatantState, enemy_index: int, attack_resul
 static func resolve_spell_echo(status: CombatStatus, state: CombatantState) -> void:
 	var player: CombatantState = CombatManager._player
 	var enemies: Array = CombatManager._enemies
-	var payload := EchoPayload.from_status(status, CombatMath.effective_tier(player, null))
+	var payload := EchoPayload.from_status(status, CombatMath.effective_tier(player))
 	var spell_path: String = payload.spell_path
 	var target_index: int  = payload.target_index
 	var frozen_fervor: int = payload.frozen_fervor

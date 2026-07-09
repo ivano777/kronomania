@@ -125,8 +125,12 @@ func show_intents(intents: Array[String]) -> void:
 				btn.text = "×  Attack"
 				btn.pressed.connect(_on_intent_attack)
 			"magic":
-				btn.text = "♦  Magic"
-				btn.pressed.connect(_on_intent_magic)
+				if _magic_gear_ok():
+					btn.text = "♦  Magic"
+					btn.pressed.connect(_on_intent_magic)
+				else:
+					btn.text = "♦  Magic — needs focus / empty hands"
+					btn.disabled = true
 			"lucidity":
 				btn.text = "−  Lucidity (cool Fervor)"
 				btn.pressed.connect(_on_intent_lucidity)
@@ -180,9 +184,8 @@ func show_defense_item_choice(options: Array) -> void:
 		var row := HBoxContainer.new()
 		var mod: ActionModifier = opt["mod"] as ActionModifier
 		var item_name: String = opt["item_name"]
-		var cap_str := "uncapped" if mod.tier_cap == 0 else "cap T%d" % mod.tier_cap
 		var name_lbl := Label.new()
-		name_lbl.text = "%s  (Flat %+d  %s)" % [item_name, mod.flat_bonus, cap_str]
+		name_lbl.text = "%s  (Flat %+d)" % [item_name, mod.flat_bonus]
 		name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(name_lbl)
 		# Pin button — saves default defense item, mirroring ATK weapon pin.
@@ -287,14 +290,22 @@ func _try_auto_magic() -> bool:
 		return false
 	if not sp.is_cantrip and not _can_cast_spell:
 		return false  # e.g. Burnout blocks true spells — let the manual panel offer cantrips
-	# Resolve the pinned cast tool (optional; bare hands = full Tier if unset/unmatched).
+	# Resolve the pinned cast tool; unset/unmatched pins fall back to the first
+	# legal conduit (equipped focus, or bare hands when truly empty).
+	var conduits := _build_tool_entries("magic")
 	var cast_tool: EquipmentData = null
 	var saved_ct: String = PlayerProgression.combat_prefs.defaults.get("cast_weapon", "")
-	if saved_ct != "" and saved_ct != "bare_hands":
-		for e in _build_tool_entries("magic"):
+	var pin_matched := false
+	if saved_ct != "":
+		for e in conduits:
 			if (e.get("weapon_key", "") as String) == saved_ct:
 				cast_tool = e.get("item", null) as EquipmentData
+				pin_matched = true
 				break
+	if not pin_matched:
+		if conduits.is_empty():
+			return false  # no legal conduit — let the manual cascade show the gate
+		cast_tool = conduits[0].get("item", null) as EquipmentData
 	CombatManager.log_message.emit("[color=gray][Auto] Cast %s (default)[/color]" % sp.spell_name)
 	disable_actions()
 	if sp.is_cantrip:
@@ -307,6 +318,17 @@ func _try_auto_magic() -> bool:
 func _on_intent_lucidity() -> void:
 	disable_actions()
 	CombatManager.player_chose_lucidity()
+
+
+## Equip-requirements gate (UI mirror of CombatMath.can_channel_cantrips/spells):
+## magic is reachable with truly empty hands (cantrips) or an equipped Magic Focus.
+func _magic_gear_ok() -> bool:
+	if PlayerProgression.main_hand == null and PlayerProgression.off_hand == null:
+		return true
+	for w: EquipmentData in [PlayerProgression.main_hand, PlayerProgression.off_hand]:
+		if w != null and w.tags.has(CombatMath.MAGIC_FOCUS_TAG):
+			return true
+	return false
 
 
 # ── Tool layer ────────────────────────────────────────────────────────────────
@@ -365,24 +387,22 @@ func _build_tool_entries(intent: String) -> Array:
 			if not added_any:
 				entries.append({"name": "Bare Hands", "summary": "", "weapon_key": "bare_hands", "item": null})
 		"magic":
-			var added_any := false
+			# Equip-requirements: only Magic Focus items channel casts; bare hands
+			# are a conduit only when both slots are truly empty (cantrips).
 			for slot_w: EquipmentData in [PlayerProgression.main_hand, PlayerProgression.off_hand]:
-				if slot_w == null:
+				if slot_w == null or not slot_w.tags.has(CombatMath.MAGIC_FOCUS_TAG):
 					continue
 				for mod: ActionModifier in slot_w.action_modifiers:
 					if mod.action_key == "cast":
 						entries.append({"name": slot_w.item_name, "summary": _format_cast_summary(mod), "weapon_key": slot_w.item_name, "item": slot_w})
-						added_any = true
 						break
-			if not added_any:
+			if PlayerProgression.main_hand == null and PlayerProgression.off_hand == null:
 				entries.append({"name": "Bare Hands", "summary": "Full Tier", "weapon_key": "bare_hands", "item": null})
 	return entries
 
 
 func _format_cast_summary(mod: ActionModifier) -> String:
 	var parts: Array[String] = []
-	if mod.tier_cap > 0:
-		parts.append("Tier ≤ %d" % mod.tier_cap)
 	if mod.pool_bonus != 0:
 		parts.append("Pool %+d" % mod.pool_bonus)
 	if mod.keep_bonus != 0:
@@ -396,8 +416,6 @@ func _format_modifier_summary(mod: ActionModifier) -> String:
 	var parts: Array[String] = []
 	if mod.flat_bonus != 0:
 		parts.append("Flat %+d" % mod.flat_bonus)
-	if mod.tier_cap > 0:
-		parts.append("Tier ≤ %d" % mod.tier_cap)
 	return "  ".join(parts)
 
 

@@ -22,7 +22,15 @@ func _show_player(label: Label, data: CombatantData) -> void:
 
 
 func _show(label: Label, data: CombatantData) -> void:
-	label.text = "%s: %s" % [data.combatant_name, _weapon_line(data.equipped_weapon)]
+	if data.equipped_weapon != null:
+		label.text = "%s: %s" % [data.combatant_name, _weapon_line(data.equipped_weapon)]
+	else:
+		# Weaponless enemy (enemy = tier + action list): summarize its actions.
+		var parts: Array[String] = []
+		for m: ActionModifier in data.bare_hands_actions:
+			var flat_str := " %+d" % m.flat_bonus if m.flat_bonus != 0 else ""
+			parts.append("%s (%s%s)" % [m.action_name, m.action_key, flat_str])
+		label.text = "%s: %s" % [data.combatant_name, " | ".join(parts) if not parts.is_empty() else "(no actions)"]
 
 
 func _weapon_line(w: EquipmentData) -> String:
@@ -38,7 +46,7 @@ func _weapon_line(w: EquipmentData) -> String:
 			pool_b   = mod.pool_bonus
 		elif mod.action_key == "defend":
 			def_flat = mod.flat_bonus
-	return "%s  Pot %d | Atk+%d Def+%d Pool%+d Wounds+%d | [%s]" % [
-		w.item_name, w.potency, atk_flat, def_flat,
+	return "%s  Atk+%d Def+%d Pool%+d Wounds+%d | [%s]" % [
+		w.item_name, atk_flat, def_flat,
 		pool_b, w.max_wounds_bonus, tag_str,
 	]

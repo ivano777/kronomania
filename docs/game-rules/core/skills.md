@@ -62,9 +62,8 @@ Powerful Slash
 Bare hands are always available as implicit equipment.
 
 Default bare-hands properties:
-- **Potency 1** — Tier expression capped at 1 regardless of actual Tier.
-- No tag — bare-hand actions do not carry weapon tags and cannot satisfy tag prerequisites.
+- Full Tier expression — items and bare hands never cap Tier; expressed dice are throttled by training keep grades.
+- No tag — bare-hand actions do not carry weapon tags and cannot satisfy tag prerequisites (e.g. bare hands are not a `[MagicFocus]`).
+- **Truly empty hands** (both slots empty) count as a casting conduit for **cantrips only**; true spells still require an equipped `[MagicFocus]` item. See [Equipment — Tags](./equipment.md).
 - A small set of basic unarmed strikes is available without any node.
-
-To scale unarmed combat beyond Potency 1, unlock the **Unarmed Combat** node.
-See [Nodes — Unarmed Combat](../progression/nodes.md).
+- No bonuses of any kind; unarmed-specific skills and bonuses come from the **Unarmed Combat** node. See [Nodes — Unarmed Combat](../progression/nodes.md).

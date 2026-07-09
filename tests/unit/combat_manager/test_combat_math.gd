@@ -28,16 +28,9 @@ func test_effective_tier_override_beats_base() -> void:
 	assert_eq(CombatMath.effective_tier(_state), 3, "tier_override wins over data.tier")
 
 
-func test_effective_tier_cap_limits() -> void:
+func test_effective_tier_never_item_capped() -> void:
 	_state.tier_override = 4
-	var mod := ActionModifier.new()
-	mod.tier_cap = 2
-	assert_eq(CombatMath.effective_tier(_state, mod), 2, "tier_cap caps the effective tier")
-
-
-func test_effective_tier_null_mod_uncapped() -> void:
-	_state.tier_override = 4
-	assert_eq(CombatMath.effective_tier(_state, null), 4, "null mod → uncapped")
+	assert_eq(CombatMath.effective_tier(_state), 4, "items never cap Tier (equip-requirements rework)")
 
 
 # ── get_action_modifier / get_cast_modifier ──────────────────────────────────
@@ -53,6 +46,20 @@ func test_get_cast_modifier_bare_hands_when_no_tool() -> void:
 	var mod := CombatMath.get_cast_modifier(_state, null)
 	assert_not_null(mod, "cast modifier resolves to bare-hands stub with no tool")
 	assert_eq(mod.action_key, "cast", "resolves the cast action")
+
+
+func test_weaponless_enemy_resolves_actions_from_data() -> void:
+	# Enemy weapon strip: enemies carry no equipped_weapon; actions live in
+	# bare_hands_actions and flavor the combat log via action_name.
+	var e := CombatantState.new()
+	e.init(preload("res://resources/data/enemies/enemy_soldier.tres"))
+	var m := CombatMath.get_action_modifier(e, "strike", false)
+	assert_eq(m.action_name, "Sword Slash", "enemy strike resolves from bare_hands_actions")
+	assert_eq(m.flat_bonus, 1, "weapon flat bonus preserved on the native action")
+	assert_eq(CombatMath.attacker_weapon_name(e, false), "Sword Slash",
+		"weaponless enemy attack flavored by the strike action name")
+	assert_eq(CombatMath.get_action_modifier(e, "defend", false).action_name, "Guard",
+		"enemy defend resolves from bare_hands_actions")
 
 
 # ── Consistency + node lookups ───────────────────────────────────────────────

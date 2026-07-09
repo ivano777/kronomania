@@ -22,8 +22,8 @@ Tracks what is implemented and what remains. Updated after each feature ships.
 
 ### Data (key files)
 - **Player**: `player_default.tres` (Tier 1, all d4 base, Iron Sword, bare_hands stub)
-- **Enemies**: `enemy_grunt.tres` (T1, d4/d4, VT 10, 2 wounds), `enemy_soldier.tres` (T1, d6/d6, VT 12, 3 wounds), `enemy_knight.tres` (T2, d8/d8, VT 15, 4 wounds, keep 1)
-- **Weapons**: `iron_sword.tres` (tier_cap=2, flat+1, Sharp), `crude_club.tres` (tier_cap=1, Blunt; Grunt's weapon), `greatsword.tres` (tier_cap=2, flat+1, Sharp+TwoHanded), `heater_shield.tres` (Shield). Player-equippable set (`PlayerProgression.AVAILABLE_WEAPONS`): iron_sword, greatsword, heater_shield. All four mundane weapons carry Strike/Defend/Cast modifiers.
+- **Enemies**: weaponless — enemy = tier + stats + native action list in `bare_hands_actions` (matches `enemy-guidelines.md`; log flavor via `action_name`). `enemy_grunt.tres` (T1, d4/d4, VT 10, 2 wounds; Club Smash), `enemy_soldier.tres` (T1, d6/d6, VT 12, 3 wounds; Sword Slash flat+1), `enemy_knight.tres` (T2, d8/d8, VT 15, 4 wounds, keep 2; Greatsword Cleave flat+1)
+- **Weapons** (player armoury): `iron_sword.tres` (flat+1, Sharp), `crude_club.tres` (Blunt; unused, data library), `greatsword.tres` (flat+1, Sharp+TwoHanded), `heater_shield.tres` (Shield), `arcane_focus.tres` (MagicFocus, cast flat+1), `wizard_staff.tres` (TwoHanded+MagicFocus+Blunt, cast flat+1 pool+1). No item caps Tier (equip-requirements rework). Player-equippable set (`PlayerProgression.AVAILABLE_WEAPONS`): iron_sword, greatsword, heater_shield, arcane_focus, wizard_staff.
 - **Nodes (43 total)**: Dominion tree (`dom_core/wounds/martial_arts/melee/ranged/dual_wield/titans_grip/disarm/brutal/meat_grinder/earthshatter`); `neg_core`, `ing_core` (multi-level, 3 levels each); pool-guard training nodes (`neg_stance`, `dom_stamina`, `ing_resolve`); ability nodes (`minor_studies`, `spellcasting` L1–L3, `lucidity`, `mind_detonation`, `hex_mastery`, `echoing_mind`, `chrono_tinkering`); flavor nodes (`warrior_oath` + 19 under `flavors/`)
 - **Spells**: cantrips — `arcane_bolt`, `arcane_touch`; true spells — `arcane_missile`, `arcane_mark`, `mind_detonation`, `mind_rend` (Hex Mastery), `mind_lash` (Echoing Mind), `time_lock` (Chrono-Tinkering)
 
@@ -55,7 +55,7 @@ Ordered by dependency. Items within a group can be parallelized.
 Advantage/Disadvantage (`net_advantage` on `RollEngine`; net ≤ 0 → Desperation). Multiple defense pools (Stance/Resolve/Stamina tracked independently per combatant).
 
 ### ✓ Group 2 — Equipment and effect system
-`EquipmentData` with Potency/Forging/Warding/Fortitude/Surge/Drain. All effects applied at combat init/roll time via helpers in CombatManager.
+`EquipmentData` with Potency/Forging/Warding/Fortitude/Surge/Drain. All effects applied at combat init/roll time via helpers in CombatManager. *(Potency later deleted by the Equip-Requirements Rework — items no longer cap Tier.)*
 
 ### ✓ Group 3 — Progression / Constellation
 `NodeData` resource + Training keep-grade nodes. `ConstellationScene` + `PlayerProgression` autoload. Tier advancement + node prerequisites. *(Schema superseded by Group 4.8.)*
@@ -249,6 +249,28 @@ Phase 2: chosen `cast_mod` frozen into `mind_detonation_primed.stat_overrides` (
 (`cast_tier`, `cast_pool_bonus`, `cast_flat_bonus`; focus keep baked into `current_kept_dice`).
 Delayed payoffs (explosion + echo) read frozen values; legacy statuses without keys fall back to
 full Tier (`_effective_tier(_player, null)`). `_player_cast_weapon` is cleared right after `cast_mod` is captured (before the freeze block and before Phase 2.1); the freeze reads the captured local `cast_mod`, not the member var.
+*(Cap language superseded by the Equip-Requirements Rework below — `tier_cap` deleted; the tool-selection flow, freeze mechanics, and pin/star UI are unchanged.)*
+
+**✓ Equip-Requirements Rework — COMPLETE** (plan: `docs/impl/equip-requirements-rework.md`)
+Items never cap Tier: `ActionModifier.tier_cap` + `EquipmentData.potency` deleted;
+`CombatMath.effective_tier(state)` is tier_override/data.tier only — the sole throttle on
+expressed dice is node keep grades. Casting is equipment-gated instead:
+`CombatMath.can_channel_cantrips` (truly empty hands OR equipped `MagicFocus` tag) /
+`can_channel_spells` (`MagicFocus` always), enforced at `player_magic_available` emission,
+defensively in `player_chose_cantrip/_spell`, in the RoundHUD magic intent (greyed +
+"needs focus / empty hands"), cast-tool list (foci only; bare hands only when truly empty)
+and ATK-Auto magic (falls back to first legal conduit; aborts if none). New conduit items
+`arcane_focus.tres` + `wizard_staff.tres` (+ pipeline icons) in `AVAILABLE_WEAPONS`;
+campfire weapon list became a 2-column grid to stay inside 640x360. Tests: `test_cast_gating.gd`
+matrix + rewritten `test_cast_modifier.gd`; 152 green + headless clean.
+**Enemy weapon strip (follow-up, COMPLETE):** enemies carry no `equipped_weapon` — native
+actions in `bare_hands_actions` (Club Smash / Sword Slash flat+1 / Greatsword Cleave flat+1 +
+Guard defend), mechanically identical to the old weapon mods. Log flavor: weaponless enemies
+name their strike action (`CombatMath.attacker_weapon_name` strike-action fallback; defend
+lines use the defend action_name). Matches the `enemy-guidelines.md` actor model (enemy =
+wounds + stats + action list). 153 tests green. Still deferred: named weapon-gated strike
+skills, multi-attack/trigger enemy schema, Knight guard retune (defends 2d8 keep 2 since the
+Phase 1 uncap — needs playtest).
 
 ---
 
@@ -291,7 +313,7 @@ ConstellationScene ──Back (run_active)───► CampfireScene
 Deferred stubs: consumable items, money deduction on ambush, ambush as extra encounter.
 
 ### ✓ Group 7 — Action System Foundation
-`ActionModifier` resource (action_key, tier_cap, flat/keep/pool bonus, rest_type, uses_per_rest, target_pool). `EquipmentData.action_modifiers` array replaces flat fields (old fields kept as deprecated shims). `CombatManager`: `_get_action_modifier()` with bare_hands fallback, `item_action_charges` on `CombatantState`, `reset_item_charges()`. `CombatPreferences` (atk_mode, def_mode, defaults dict) on `PlayerProgression`.
+`ActionModifier` resource (action_key, flat/keep/pool bonus, rest_type, uses_per_rest, target_pool; the original `tier_cap` field was deleted by the Equip-Requirements Rework). `EquipmentData.action_modifiers` array replaces flat fields (old fields kept as deprecated shims). `CombatManager`: `_get_action_modifier()` with bare_hands fallback, `item_action_charges` on `CombatantState`, `reset_item_charges()`. `CombatPreferences` (atk_mode, def_mode, defaults dict) on `PlayerProgression`.
 
 ---
 

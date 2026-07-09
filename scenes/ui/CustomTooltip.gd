@@ -132,14 +132,11 @@ func _populate_equipment(eq: EquipmentData) -> void:
 	_category.text = "  ·  ".join(eq.tags) if not eq.tags.is_empty() else "Equipment"
 
 	_add_row("Hands", str(eq.get_hands_required()))
-	_add_row("Potency", str(eq.potency))
 
 	for raw_mod in eq.action_modifiers:
 		var mod := raw_mod as ActionModifier
 		match mod.action_key:
 			"strike":
-				if mod.tier_cap > 0:
-					_add_row("Strike  Tier cap", str(mod.tier_cap))
 				if mod.flat_bonus != 0:
 					_add_row("Strike  Flat", "%+d" % mod.flat_bonus)
 				if mod.pool_bonus != 0:
@@ -150,8 +147,6 @@ func _populate_equipment(eq: EquipmentData) -> void:
 				if mod.flat_bonus != 0:
 					_add_row("Defend  Flat", "%+d" % mod.flat_bonus)
 			"cast":
-				if mod.tier_cap > 0:
-					_add_row("Cast  Tier cap", str(mod.tier_cap))
 				if mod.pool_bonus != 0:
 					_add_row("Cast  Pool", "%+d" % mod.pool_bonus)
 				if mod.keep_bonus != 0:

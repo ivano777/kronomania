@@ -19,7 +19,7 @@ var flat_bonus: int = 0
 
 
 ## Captures the chosen cast tool's bonuses at cast time. `cast_tier` is the already-resolved
-## effective tier (caller applies the tool's tier_cap via CombatMath.effective_tier).
+## effective tier (CombatMath.effective_tier at capture time).
 static func from_mod(cast_tier: int, cast_mod: ActionModifier) -> CastSnapshot:
 	var s := CastSnapshot.new()
 	s.tier = cast_tier

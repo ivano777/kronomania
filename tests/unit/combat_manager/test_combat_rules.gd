@@ -23,34 +23,19 @@ func test_tier_wound_bonus(params = use_parameters([[1, 0], [2, 1], [3, 1], [4, 
 
 # ── effective_tier ────────────────────────────────────────────────────────────
 
-func test_effective_tier_no_override_no_cap() -> void:
-	# base_tier=2, no override (0), no cap (0) → returns base_tier
-	assert_eq(_h.effective_tier(2, 0, 0), 2, "no override, no cap → base_tier")
+func test_effective_tier_no_override() -> void:
+	# base_tier=2, no override (0) → returns base_tier
+	assert_eq(_h.effective_tier(2, 0), 2, "no override → base_tier")
 
 
 func test_effective_tier_with_override() -> void:
-	# tier_override=3 overrides base_tier=2; no cap → 3
-	assert_eq(_h.effective_tier(2, 3, 0), 3, "tier_override wins over base_tier")
+	# tier_override=3 overrides base_tier=2 → 3
+	assert_eq(_h.effective_tier(2, 3), 3, "tier_override wins over base_tier")
 
 
 func test_effective_tier_override_less_than_base() -> void:
 	# tier_override=1 overrides base_tier=2 → 1
-	assert_eq(_h.effective_tier(2, 1, 0), 1, "tier_override can be lower than base_tier")
-
-
-func test_effective_tier_cap_limits_result() -> void:
-	# base_tier=3, no override, tier_cap=2 → capped at 2
-	assert_eq(_h.effective_tier(3, 0, 2), 2, "tier_cap limits effective tier")
-
-
-func test_effective_tier_cap_below_override() -> void:
-	# tier_override=4, cap=2 → mini(4, 2) = 2
-	assert_eq(_h.effective_tier(1, 4, 2), 2, "cap applied after override")
-
-
-func test_effective_tier_cap_zero_means_uncapped() -> void:
-	# tier_cap=0 is sentinel for "uncapped"
-	assert_eq(_h.effective_tier(4, 0, 0), 4, "tier_cap=0 → uncapped")
+	assert_eq(_h.effective_tier(2, 1), 1, "tier_override can be lower than base_tier")
 
 
 # ── is_fast (VT check) ────────────────────────────────────────────────────────

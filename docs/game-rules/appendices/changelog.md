@@ -1,5 +1,16 @@
 # Changelog
 
+## Equip-Requirements Rework (2026-07)
+
+- **Items never cap Tier** — `ActionModifier.tier_cap` and `EquipmentData.potency`
+  removed; the only throttle on expressed dice is node keep grades (training).
+- **Casting is equipment-gated**: cantrips need truly empty hands OR an equipped
+  `[MagicFocus]` item; true spells always need a `[MagicFocus]` item.
+- New conduit items: Arcane Focus (1H, Cast flat +1), Wizard Staff (2H, Cast flat +1 / pool +1).
+- "Inefficiency" (untrained-equipment Potency penalty) removed with the Potency concept.
+- Skill tag-prerequisite system (skills.md) unchanged and now the single gating model;
+  named weapon-gated strike skills remain future work.
+
 ## Current Rewrite
 
 ### Standardized

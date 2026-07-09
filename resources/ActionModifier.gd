@@ -3,8 +3,6 @@ extends Resource
 
 @export var action_key: String = ""
 @export var action_name: String = ""
-## Caps the effective tier for this action. 0 = uncapped.
-@export var tier_cap: int = 0
 @export var flat_bonus: int = 0
 @export var keep_bonus: int = 0
 @export var pool_bonus: int = 0

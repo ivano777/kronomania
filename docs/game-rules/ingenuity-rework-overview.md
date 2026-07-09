@@ -85,14 +85,23 @@ _Changelog: Mental Fortress node removed; anti-Burnout intent absorbed into Luci
 
 Spells and cantrips use an explicit **casting tool** selected by the player each round — structurally identical to the strike weapon-selection flow.
 
-**Pool formula:** `pool = effective_tier(cast_mod) + cast_mod.pool_bonus + school_pool_bonus`
-- `cast_mod` = the chosen tool's `"cast"` ActionModifier (or bare-hands stub if none)
-- `_effective_tier(player, cast_mod)` = `mini(tier, cast_mod.tier_cap)` if tier_cap > 0, else full Tier
-- Mundane weapons: `tier_cap = 1` — casting while holding steel caps the pool to 1 die
-- Bare Hands (or no item with `"cast"` key): `tier_cap = 0` → full Tier, all bonuses zero
-- Magic foci (future content): any `tier_cap`/`pool_bonus`/`keep_bonus`/`flat_bonus` combination
+**Conduit gate (equip-requirements rework):** casting is gated by equipment, not capped by it.
+- **Cantrip**: truly empty hands (both slots) OR an equipped `[MagicFocus]` item.
+- **True spell**: an equipped `[MagicFocus]` item, always (empty hands are not enough).
+- Gate lives in `CombatMath.can_channel_cantrips/can_channel_spells` (checked at
+  `player_magic_available` emission and defensively in `player_chose_cantrip/_spell`);
+  the RoundHUD magic intent greys out with a reason when no conduit is equipped, and
+  the cast tool list offers only `[MagicFocus]` items (bare hands only when truly empty).
 
-**Mind Detonation placement** is gear-independent: pool=1 always.
+**Pool formula:** `pool = effective_tier + cast_mod.pool_bonus + school_pool_bonus`
+- `cast_mod` = the chosen conduit's `"cast"` ActionModifier (or bare-hands stub if none)
+- `effective_tier` = full Tier (tier_override or data.tier) — items never cap Tier
+- Bare Hands (cantrips only): all bonuses zero
+- Magic foci: any `pool_bonus`/`keep_bonus`/`flat_bonus` combination
+  (current content: Arcane Focus 1H flat +1; Wizard Staff 2H flat +1, pool +1)
+
+**Mind Detonation placement** is gear-independent: pool=1 always (but priming it is a
+true-spell cast, so the conduit gate applies to the cast itself).
 
 **Phase 1 (implemented):** direct casts (cantrip + true spell) use the chosen cast tool.
 

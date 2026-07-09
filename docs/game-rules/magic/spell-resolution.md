@@ -4,7 +4,7 @@ True spells use the shared action engine with the Fervor subsystem layered on to
 
 ## Full Resolution Order
 
-1. Determine the **normal spell pool** from Tier (+ Advantage/Disadvantage), capped by the chosen **casting tool** (`cast_mod.tier_cap`: mundane weapons cap at 1 die; bare hands = full Tier — see [Ingenuity Branch Rework](../ingenuity-rework-overview.md)).
+1. **Conduit check:** true spells require an equipped `[MagicFocus]` item (empty hands are not enough — see [Equipment — Tags](../core/equipment.md)). Then determine the **normal spell pool** from full Tier (+ Advantage/Disadvantage) plus the chosen casting tool's bonuses; items never cap Tier (see [Ingenuity Branch Rework](../ingenuity-rework-overview.md)).
 2. Split the normal pool into **aspect dice** and **Ingenuity-tagged dice** per the spell's `aspect_dice` count.
    - `aspect_dice` dice use the spell's `aspect_stat` die size.
    - The remaining `(Tier − aspect_dice)` dice use Ingenuity die size and are **Fervor-tagged**.

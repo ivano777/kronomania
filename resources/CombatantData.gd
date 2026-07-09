@@ -31,7 +31,7 @@ extends Resource
 ## Maximum Wounds before Defeat.
 @export_range(1, 6) var max_wounds: int = 3
 
-## Optional equipped weapon. Applies Potency cap, Forging/Warding flat bonuses,
+## Optional equipped weapon. Applies Forging/Warding flat bonuses,
 ## Fortitude max-wounds bonus, Surge/Drain pool modifier, and stores tags.
 @export var equipped_weapon: EquipmentData = null
 

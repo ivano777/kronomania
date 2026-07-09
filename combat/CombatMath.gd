@@ -1,6 +1,9 @@
 class_name CombatMath
 extends RefCounted
 
+## Equip-requirements rework: items tagged with this act as casting conduits.
+const MAGIC_FOCUS_TAG := "MagicFocus"
+
 # Pure combat math — Layer 1 of the CombatManager refactor (Phase 2).
 #
 # Stateless static helpers over CombatantState + purchased NodeData. No signals, no await,
@@ -53,13 +56,10 @@ static func get_pool_size(state: CombatantState, pool: String) -> int:
 	return stat_size(state, "negation")
 
 
-## Effective Tier: tier_override if set, else data.tier, capped by ActionModifier.tier_cap.
-## Pass the relevant ActionModifier (strike or defend); null or tier_cap=0 means uncapped.
-static func effective_tier(state: CombatantState, mod: ActionModifier = null) -> int:
-	var base := state.tier_override if state.tier_override > 0 else state.data.tier
-	if mod == null or mod.tier_cap == 0:
-		return base
-	return mini(base, mod.tier_cap)
+## Effective Tier: tier_override if set, else data.tier. Items never cap Tier —
+## the throttle on expressed dice is the node keep grades (equip-requirements rework).
+static func effective_tier(state: CombatantState) -> int:
+	return state.tier_override if state.tier_override > 0 else state.data.tier
 
 
 ## Flat bonus applied to attack rolls: strike ActionModifier flat + weapon_flat node bonuses.
@@ -94,8 +94,32 @@ static func get_action_modifier(state: CombatantState, action_key: String, is_pl
 	return state.data.get_bare_hands_modifier(action_key)
 
 
+## Equip-requirements: true when either of the player's hand slots carries the tag.
+## Player-only — reads the override slots directly (null = empty hand, no data fallback).
+static func player_has_equipped_tag(state: CombatantState, tag: String) -> bool:
+	for w in [state.weapon_override, state.off_hand_override]:
+		if w != null and (w as EquipmentData).tags.has(tag):
+			return true
+	return false
+
+
+## True when both player hand slots are empty (bare hands). Player-only.
+static func player_hands_empty(state: CombatantState) -> bool:
+	return state.weapon_override == null and state.off_hand_override == null
+
+
+## Cantrips channel through truly empty hands or an equipped Magic Focus.
+static func can_channel_cantrips(state: CombatantState) -> bool:
+	return player_hands_empty(state) or player_has_equipped_tag(state, MAGIC_FOCUS_TAG)
+
+
+## True spells always require an equipped Magic Focus (empty hands are not enough).
+static func can_channel_spells(state: CombatantState) -> bool:
+	return player_has_equipped_tag(state, MAGIC_FOCUS_TAG)
+
+
 ## Resolves the "cast" ActionModifier from the player's chosen casting tool.
-## Null tool or no "cast" key → uncapped bare-hands stub (tier_cap=0, all bonuses zero = full Tier).
+## Null tool or no "cast" key → bare-hands stub (all bonuses zero).
 static func get_cast_modifier(state: CombatantState, cast_weapon: EquipmentData) -> ActionModifier:
 	if cast_weapon:
 		for mod in cast_weapon.action_modifiers:
@@ -234,7 +258,14 @@ static func attacker_weapon_name(state: CombatantState, is_player: bool) -> Stri
 		w = state.weapon_override
 	else:
 		w = state.weapon_override if state.weapon_override else state.data.equipped_weapon
-	return w.item_name if w else "Bare Hands"
+	if w:
+		return w.item_name
+	if not is_player:
+		# Weaponless enemies (enemy = tier + action list): flavor from the strike action's name.
+		var m := get_action_modifier(state, "strike", false)
+		if m.action_name != "":
+			return m.action_name
+	return "Bare Hands"
 
 
 static func fmt_attack(name: String, r: Dictionary, weapon_name: String = "") -> String:

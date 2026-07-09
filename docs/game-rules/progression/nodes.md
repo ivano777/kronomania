@@ -57,15 +57,18 @@ Minor Studies unlocks cantrip use and directly grants a set of generic cantrips.
 
 ## Unarmed Combat Node Pattern
 
-Bare hands are always available as implicit equipment with **Potency 1** (Tier expression capped at 1).
-The Unarmed Combat node is tiered. Each tier raises the bare-hands Potency cap by 1 step and may unlock unarmed-specific skills, abilities, or features.
+Bare hands are always available as implicit equipment at full Tier (items never
+cap Tier — expressed dice are throttled by keep grades). The Unarmed Combat node
+is tiered: each grade unlocks unarmed-specific skills, abilities, or bonuses.
 
-Use this progression consistently:
+| Node | May Unlock |
+|---|---|
+| Unarmed Combat (Unlock / Grade 0) | basic unarmed strikes |
+| Unarmed Combat I (Grade 1) | additional unarmed skills |
+| Unarmed Combat II (Grade 2) | advanced unarmed skills |
 
-| Node | Potency Cap | May Unlock |
-|---|---|---|
-| Unarmed Combat (Unlock / Grade 0) | 2 | basic unarmed strikes |
-| Unarmed Combat I (Grade 1) | 3 | additional unarmed skills |
-| Unarmed Combat II (Grade 2) | 4 (full Tier at T4) | advanced unarmed skills |
+*The per-grade skill lists are part of the deferred skill-tree requirement rework.*
 
 Bare hands carry no weapon tags and cannot satisfy tag prerequisites on skills.
+Truly empty hands (both slots) do count as a casting conduit for cantrips —
+see [Equipment — Tags](../core/equipment.md).

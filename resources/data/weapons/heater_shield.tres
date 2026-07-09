@@ -7,8 +7,6 @@
 script = ExtResource("2_amscr")
 action_key = "strike"
 action_name = "Strike"
-tier_cap = 1
-
 [sub_resource type="Resource" id="Defend"]
 script = ExtResource("2_amscr")
 action_key = "defend"
@@ -18,8 +16,6 @@ action_name = "Defend"
 script = ExtResource("2_amscr")
 action_key = "cast"
 action_name = "Cast"
-tier_cap = 1
-
 [resource]
 script = ExtResource("1_eqscr")
 item_name = "Heater Shield"

@@ -1,7 +1,17 @@
 [gd_resource type="Resource" script_class="CombatantData" format=3 uid="uid://cae2h5m8q1t4f"]
 
 [ext_resource type="Script" uid="uid://t8js5de36gq8" path="res://resources/CombatantData.gd" id="1_cdscr"]
-[ext_resource type="Resource" uid="uid://a5t6xn3qw8dkf" path="res://resources/data/weapons/crude_club.tres" id="2_weapon"]
+[ext_resource type="Script" uid="uid://cp3jgc35libgl" path="res://resources/ActionModifier.gd" id="2_amscr"]
+
+[sub_resource type="Resource" id="Strike"]
+script = ExtResource("2_amscr")
+action_key = "strike"
+action_name = "Club Smash"
+
+[sub_resource type="Resource" id="Defend"]
+script = ExtResource("2_amscr")
+action_key = "defend"
+action_name = "Guard"
 
 [resource]
 script = ExtResource("1_cdscr")
@@ -12,4 +22,4 @@ negation_size = 4
 ingenuity_size = 4
 velocity_threshold = 10
 max_wounds = 2
-equipped_weapon = ExtResource("2_weapon")
+bare_hands_actions = Array[ExtResource("2_amscr")]([SubResource("Strike"), SubResource("Defend")])

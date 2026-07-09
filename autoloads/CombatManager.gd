@@ -214,6 +214,14 @@ func player_chose_strike(net_advantage: int = 0, target_pool: String = "stance",
 func player_chose_cantrip(spell: SpellData, target_index: int = 0, source_weapon: EquipmentData = null) -> void:
 	if not _waiting_for_player:
 		return
+	if not CombatMath.can_channel_cantrips(_player):
+		log_message.emit("[color=orange]No conduit! Cantrips need empty hands or an equipped Magic Focus.[/color]")
+		_emit_player_intents()
+		player_magic_available.emit(false,
+			_player.known_spells.size() > 0 and not _player.is_burned_out
+				and CombatMath.can_channel_spells(_player))
+		player_action_required.emit()
+		return
 	_waiting_for_player = false
 	_player_cast_weapon = source_weapon
 	_resolve_round_cantrip(spell, target_index)
@@ -227,7 +235,15 @@ func player_chose_spell(spell: SpellData, target_index: int = 0, source_weapon: 
 	if _player.is_burned_out:
 		log_message.emit("[color=orange]Burnout! True spells are blocked — choose Strike or Cantrip.[/color]")
 		_emit_player_intents()
-		player_magic_available.emit(_player.known_cantrips.size() > 0, false)
+		player_magic_available.emit(
+			_player.known_cantrips.size() > 0 and CombatMath.can_channel_cantrips(_player), false)
+		player_action_required.emit()
+		return
+	if not CombatMath.can_channel_spells(_player):
+		log_message.emit("[color=orange]No focus! True spells require an equipped Magic Focus.[/color]")
+		_emit_player_intents()
+		player_magic_available.emit(
+			_player.known_cantrips.size() > 0 and CombatMath.can_channel_cantrips(_player), false)
 		player_action_required.emit()
 		return
 	_waiting_for_player = false
@@ -337,8 +353,9 @@ func _begin_round() -> void:
 	_waiting_for_player = true
 	_emit_player_intents()
 	player_magic_available.emit(
-		_player.known_cantrips.size() > 0,
+		_player.known_cantrips.size() > 0 and CombatMath.can_channel_cantrips(_player),
 		_player.known_spells.size() > 0 and not _player.is_burned_out
+			and CombatMath.can_channel_spells(_player)
 	)
 	player_action_required.emit()
 
@@ -396,7 +413,7 @@ func _auto_best_action() -> Dictionary:
 	var mod := _get_action_modifier(_player, "strike")
 	if mod == null:
 		return {}
-	var tier := _effective_tier(_player, mod)
+	var tier := _effective_tier(_player)
 	var die_size := _stat_size(_player, "dominion")
 	var flat := _attack_flat(_player)
 	var score: float = tier * (1.0 + die_size) / 2.0 + flat
@@ -435,7 +452,7 @@ func _resolve_round(net_advantage: int = 0, target_pool: String = "stance", brut
 		log_message.emit("  [color=cyan]Earthshatter![/color] Post-keep Dominion d%d added." % earthshatter_size)
 
 	var p_atk := RollEngine.resolve(
-		_effective_tier(_player, _strike_mod), _stat_size(_player, "dominion"), keep_grade,
+		_effective_tier(_player), _stat_size(_player, "dominion"), keep_grade,
 		_attack_flat(_player, _strike_mod, chosen_weapon) + brutal_flat,
 		net_advantage + _pool_bonus(_player, "strike", _strike_mod),
 		0, 0, 0, earthshatter_size
@@ -491,7 +508,7 @@ func _resolve_round_cantrip(spell: SpellData, target_index: int = 0) -> void:
 	var cast_mod := _get_cast_modifier(_player)
 	_player_cast_weapon = null
 	var p_atk := RollEngine.resolve(
-		_effective_tier(_player, cast_mod) + cast_mod.pool_bonus,
+		_effective_tier(_player) + cast_mod.pool_bonus,
 		_stat_size(_player, "ingenuity"),
 		_training_keep_grade(_player) + cast_mod.keep_bonus,
 		spell.flat_bonus + cast_mod.flat_bonus, 0
@@ -599,7 +616,7 @@ func _resolve_round_spell(spell: SpellData, target_index: int = 0) -> void:
 				parts.append("+%d flat" % spell_flat_bonus)
 			log_message.emit("  [color=yellow]School bonus: %s[/color]" % ", ".join(parts))
 		p_atk = RollEngine.resolve(
-			_effective_tier(_player, cast_mod) + spell_pool_bonus + cast_mod.pool_bonus,
+			_effective_tier(_player) + spell_pool_bonus + cast_mod.pool_bonus,
 			_stat_size(_player, "ingenuity"),
 			_training_keep_grade(_player) + spell_keep_bonus + cast_mod.keep_bonus,
 			spell.flat_bonus + spell_flat_bonus + cast_mod.flat_bonus, 0, _player.fervor_size,
@@ -651,7 +668,7 @@ func _resolve_round_spell(spell: SpellData, target_index: int = 0) -> void:
 		var bomb_payload := MindBombPayload.new()
 		bomb_payload.fervor_at_prime = _player.fervor_size
 		bomb_payload.md_level = PlayerProgression.get_node_level_by_id("mind_detonation")
-		bomb_payload.cast = CastSnapshot.from_mod(_effective_tier(_player, cast_mod), cast_mod)
+		bomb_payload.cast = CastSnapshot.from_mod(_effective_tier(_player), cast_mod)
 		bomb_payload.to_status(bomb)
 		_add_status(target, bomb)
 		log_message.emit("[color=purple]A psychic charge is set in %s's mind...[/color]" % target.data.combatant_name)
@@ -682,7 +699,7 @@ func _resolve_round_spell(spell: SpellData, target_index: int = 0) -> void:
 			echo_payload.frozen_fervor = _player.fervor_size
 			echo_payload.current_kept_dice = _initial_echo_kept
 			echo_payload.em_level = PlayerProgression.get_node_level_by_id("echoing_mind")
-			echo_payload.cast = CastSnapshot.from_mod(_effective_tier(_player, cast_mod), cast_mod)
+			echo_payload.cast = CastSnapshot.from_mod(_effective_tier(_player), cast_mod)
 			echo_payload.to_status(echo_status)
 			_add_status(_player, echo_status)
 			log_message.emit("[color=cyan]The spell begins to echo — it will resound for %d more turn(s).[/color]" % _initial_echo_kept)
@@ -730,7 +747,7 @@ func _run_enemy_attacks(slow_phase: bool, p_total: int, player_target_pool: Stri
 		if RollEngine.is_fast(p_total, e_vt) == slow_phase:
 			continue
 		var e_atk := RollEngine.resolve(
-			_effective_tier(e, _get_action_modifier(e, "strike")), _stat_size(e, "dominion"), _training_keep_grade(e), _attack_flat(e)
+			_effective_tier(e), _stat_size(e, "dominion"), _training_keep_grade(e), _attack_flat(e)
 		)
 		log_message.emit(_fmt_attack(e.data.combatant_name, e_atk, _attacker_weapon_name(e)))
 		combatant_attacking.emit(false, i)
@@ -772,14 +789,12 @@ func _resolve_attack(attacker_is_player: bool, enemy_index: int, attack_result: 
 		else:
 			var _dm := _get_action_modifier(defender, "defend")
 			var _ew := defender.weapon_override if defender.weapon_override else defender.data.equipped_weapon
-			defend_entry = {"item_name": _ew.item_name if _ew else "Bare Hands", "mod": _dm}
+			var _dname: String = _ew.item_name if _ew else (_dm.action_name if _dm.action_name != "" else "Bare Hands")
+			defend_entry = {"item_name": _dname, "mod": _dm}
 		var defend_mod: ActionModifier = defend_entry["mod"] as ActionModifier
 		var weapon_name: String = defend_entry["item_name"]
-		var cap_str := "uncapped" if defend_mod.tier_cap == 0 else "cap %d" % defend_mod.tier_cap
-		var base_tier := defender.tier_override if defender.tier_override > 0 else defender.data.tier
-		log_message.emit("  %s defends with [i]%s[/i] (%s, Tier %d → %d dice)" % [
-			defender.data.combatant_name, weapon_name, cap_str,
-			base_tier, _effective_tier(defender, defend_mod)
+		log_message.emit("  %s defends with [i]%s[/i] (Tier %d)" % [
+			defender.data.combatant_name, weapon_name, _effective_tier(defender)
 		])
 		var sd_adv := 0
 		if defender_is_player and target_pool == "stamina" and _player.space_domination_active:
@@ -799,7 +814,7 @@ func _resolve_attack(attacker_is_player: bool, enemy_index: int, attack_result: 
 					flat_debuff, keep_debuff, defender.data.combatant_name, pool_label
 				])
 		var def_result := RollEngine.resolve(
-				_effective_tier(defender, defend_mod), defensive_size,
+				_effective_tier(defender), defensive_size,
 				maxi(1, _defense_keep_grade(defender, target_pool) + keep_debuff), defend_mod.flat_bonus,
 				sd_adv
 			)
@@ -1197,8 +1212,8 @@ func _get_pool_size(state: CombatantState, pool: String) -> int:
 	return CombatMath.get_pool_size(state, pool)
 
 
-func _effective_tier(state: CombatantState, mod: ActionModifier = null) -> int:
-	return CombatMath.effective_tier(state, mod)
+func _effective_tier(state: CombatantState) -> int:
+	return CombatMath.effective_tier(state)
 
 
 func _attack_flat(state: CombatantState, strike_mod: ActionModifier = null, weapon: EquipmentData = null) -> int:
@@ -1368,7 +1383,7 @@ func get_player_attack_preview() -> int:
 	if not _player:
 		return 0
 	var mod := _get_action_modifier(_player, "strike")
-	var tier := _effective_tier(_player, mod)
+	var tier := _effective_tier(_player)
 	var die_size := _stat_size(_player, "dominion")
 	var flat := _attack_flat(_player)
 	return int(tier * (die_size + 1) / 2.0) + flat

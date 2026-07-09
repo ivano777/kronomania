@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="EquipmentData" format=3 uid="uid://arcanefocus001"]
+
+[ext_resource type="Script" uid="uid://tibot06bfokb" path="res://resources/EquipmentData.gd" id="1_eqscr"]
+[ext_resource type="Script" uid="uid://cp3jgc35libgl" path="res://resources/ActionModifier.gd" id="2_amscr"]
+
+[sub_resource type="Resource" id="Cast"]
+script = ExtResource("2_amscr")
+action_key = "cast"
+action_name = "Cast"
+flat_bonus = 1
+
+[resource]
+script = ExtResource("1_eqscr")
+item_name = "Arcane Focus"
+tags = PackedStringArray("MagicFocus")
+action_modifiers = Array[ExtResource("2_amscr")]([SubResource("Cast")])

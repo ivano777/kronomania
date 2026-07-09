@@ -65,7 +65,7 @@ func _refresh_ui() -> void:
 
 
 func _label(w: EquipmentData) -> String:
-	var parts := ["P%d" % w.potency]
+	var parts: Array[String] = []
 	for mod in w.action_modifiers:
 		if mod.action_key == "strike":
 			if mod.flat_bonus  != 0: parts.append("+%d atk" % mod.flat_bonus)

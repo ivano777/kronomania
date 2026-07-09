@@ -6,9 +6,6 @@ extends Resource
 ## Display name shown in logs and UI.
 @export var item_name: String = ""
 
-## Potency — caps how much Tier is expressed: effective_tier = min(tier, potency).
-@export_range(1, 4) var potency: int = 1
-
 ## Forging: flat bonus added to the attack total after Keep.
 @export_range(0, 5) var flat_attack_bonus: int = 0
 

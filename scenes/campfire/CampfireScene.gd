@@ -110,12 +110,16 @@ func _ready() -> void:
 	_off_slot_label = Label.new()
 	vbox.add_child(_off_slot_label)
 
-	var weapon_row := VBoxContainer.new()
-	weapon_row.add_theme_constant_override("separation", 2)
+	# Two-column grid: the armoury outgrew a single column (fit inside 640x360).
+	var weapon_row := GridContainer.new()
+	weapon_row.columns = 2
+	weapon_row.add_theme_constant_override("v_separation", 2)
+	weapon_row.add_theme_constant_override("h_separation", 2)
 	vbox.add_child(weapon_row)
 	for w in PlayerProgression.AVAILABLE_WEAPONS:
 		var btn := Button.new()
 		btn.text = (w as EquipmentData).item_name
+		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		btn.pressed.connect(_on_equip_weapon.bind(w))
 		weapon_row.add_child(btn)
 		_weapon_btns.append(btn)
