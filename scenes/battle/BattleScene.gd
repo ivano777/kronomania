@@ -12,11 +12,24 @@ const ENEMY_VIS_SCENE := preload("res://scenes/battle/Combatant.tscn")
 const _DBG_WEAPON_SEL    := "res://scenes/debug/DebugWeaponSelector.tscn"
 const _DBG_FERVOR_DISP   := "res://scenes/debug/DebugFervorDisplay.tscn"
 const _DBG_COMBAT_CTRL   := "res://scenes/debug/DebugCombatControl.tscn"
+const _DBG_ATTACK_FX     := "res://scenes/debug/DebugAttackFX.tscn"
 var _dbg_fervor_disp = null
+
+## Seconds CombatManager pauses after each attack so the presentation can play out.
+## Must exceed windup + hold + restore (~0.95s) or consecutive attacks overlap.
+const ATTACK_PACING_S := 1.1
+
+## Player pose chosen at action confirm, consumed when CombatManager emits
+## combatant_attacking(true, …) at actual resolution time (slow enemies act first).
+var _pending_player_anim: String = ""
+var _pending_player_fallback: String = "attack_melee"
+var _pending_player_lunge: bool = true
 
 # ── Node references ───────────────────────────────────────────────────────────
 @onready var _player_hud:            CombatantHUD  = $UILayer/PlayerHUD
 @onready var _player_visual:         Combatant     = $WorldLayer/PlayerVisual
+@onready var _presenter:             AttackPresenter = $AttackPresenter
+@onready var _dim_overlay:           TextureRect   = $WorldLayer/DimOverlay
 @onready var _enemies_hud_container: HBoxContainer = $UILayer/EnemiesHUDContainer
 @onready var _round_hud:             RoundHUD      = $UILayer/RoundHUD
 @onready var _defeat_panel:          Panel         = $UILayer/DefeatPanel
@@ -103,12 +116,18 @@ func _ready() -> void:
 	_round_hud.burnout_prevent_chosen.connect(_on_burnout_prevent_chosen)
 	_round_hud.auto_attack_requested.connect(_on_auto_attack_requested)
 
+	# Attack presentation (DD-style): presenter drives dim/emphasis/impact tweens;
+	# pacing gives each attack room to play out before the next one starts.
+	_presenter.setup($WorldLayer, _dim_overlay, Vector2(320, 235))
+	CombatManager.attack_pacing_s = ATTACK_PACING_S
+
 	# Connect CombatManager signals.
 	CombatManager.log_message.connect(_on_log)
 	CombatManager.round_started.connect(_on_round_started)
 	CombatManager.phase_changed.connect(_on_phase_changed)
 	CombatManager.wounds_changed.connect(_on_wounds_changed)
 	CombatManager.combatant_attacking.connect(_on_combatant_attacking)
+	CombatManager.attack_resolved.connect(_on_attack_resolved)
 	CombatManager.guard_changed.connect(_on_guard_changed)
 	CombatManager.combat_ended.connect(_on_combat_ended)
 	CombatManager.player_intents_available.connect(_on_intents_available)
@@ -127,6 +146,8 @@ func _ready() -> void:
 		$UILayer.add_child(_dbg_fervor_disp)
 	if ResourceLoader.exists(_DBG_COMBAT_CTRL):
 		$UILayer.add_child((load(_DBG_COMBAT_CTRL) as PackedScene).instantiate())
+	if ResourceLoader.exists(_DBG_ATTACK_FX):
+		$UILayer.add_child((load(_DBG_ATTACK_FX) as PackedScene).instantiate())
 
 	CombatManager.start_combat(PLAYER_DATA, _enemies_data)
 
@@ -179,8 +200,38 @@ func _on_wounds_changed(is_player: bool, enemy_index: int, current: int, max_wou
 
 func _on_combatant_attacking(is_player: bool, enemy_index: int) -> void:
 	if is_player:
-		return  # player attack anims are triggered at action confirm
-	_enemy_visuals[enemy_index].play_attack_melee()
+		# Player attack resolving NOW (after slow enemies) — start the windup
+		# with the pose remembered at action confirm.
+		var anim := _pending_player_anim if _pending_player_anim != "" else _pending_player_fallback
+		_player_visual.play_attack(anim, _pending_player_fallback)
+		_presenter.begin_windup(_player_visual, _enemy_visuals[enemy_index],
+			_all_visuals(), _pending_player_lunge)
+		return
+	var attacker: Combatant = _enemy_visuals[enemy_index]
+	var e_weapon: EquipmentData = (_enemies_data[enemy_index] as CombatantData).equipped_weapon
+	var e_anim: String = e_weapon.attack_anim if e_weapon != null else ""
+	attacker.play_attack(e_anim if e_anim != "" else "attack_melee")
+	_presenter.begin_windup(attacker, _player_visual, _all_visuals())
+
+
+func _on_attack_resolved(attacker_is_player: bool, enemy_index: int, _target_pool: String,
+		did_breach: bool, is_massive: bool, wounds_dealt: int, defender_defeated: bool) -> void:
+	var target: Combatant = _enemy_visuals[enemy_index] if attacker_is_player else _player_visual
+	_presenter.play_impact(target, did_breach, is_massive, wounds_dealt, defender_defeated)
+
+
+func _all_visuals() -> Array:
+	var all := [_player_visual]
+	all.append_array(_enemy_visuals)
+	return all
+
+
+## Remembers the pose for the player's next attack; consumed by
+## _on_combatant_attacking(true, …) when the attack actually resolves.
+func _set_pending_player_pose(anim: String, fallback: String, lunge: bool) -> void:
+	_pending_player_anim = anim
+	_pending_player_fallback = fallback
+	_pending_player_lunge = lunge
 
 
 func _on_guard_changed(is_player: bool, enemy_index: int, pool: String, guard_value: int) -> void:
@@ -261,8 +312,7 @@ func _on_burnout_prevent_chosen(use_charge: bool) -> void:
 
 
 func _on_auto_attack_requested() -> void:
-	_player_visual.play_attack_melee()
-	await get_tree().create_timer(0.35).timeout
+	_set_pending_player_pose("", "attack_melee", true)
 	CombatManager.player_auto_execute_attack(
 		_target_index,
 		_round_hud.get_net_advantage() + _ambush_base_disadvantage
@@ -270,7 +320,8 @@ func _on_auto_attack_requested() -> void:
 
 
 func _on_strike_confirmed(pool: String, brutal_trade: bool, source_weapon: EquipmentData) -> void:
-	_player_visual.play_attack_melee()
+	var anim: String = source_weapon.attack_anim if source_weapon != null else ""
+	_set_pending_player_pose(anim, "attack_melee", true)
 	CombatManager.player_chose_strike(
 		_round_hud.get_net_advantage() + _ambush_base_disadvantage,
 		pool,
@@ -281,13 +332,32 @@ func _on_strike_confirmed(pool: String, brutal_trade: bool, source_weapon: Equip
 
 
 func _on_cantrip_selected(spell: SpellData, source_weapon: EquipmentData) -> void:
-	_player_visual.play_cast_spell()
+	_set_pending_player_pose(spell.attack_anim, "cast_spell", false)
 	CombatManager.player_chose_cantrip(spell, _target_index, source_weapon)
 
 
 func _on_spell_selected(spell: SpellData, source_weapon: EquipmentData) -> void:
-	_player_visual.play_cast_spell()
+	_set_pending_player_pose(spell.attack_anim, "cast_spell", false)
 	CombatManager.player_chose_spell(spell, _target_index, source_weapon)
+
+
+# ── Debug (DebugAttackFX widget) ──────────────────────────────────────────────
+
+## Replays the attack presentation with a mock payload — no CombatManager involvement.
+## kind: "hit" | "massive" | "blocked" | "kill".
+func debug_replay_attack(kind: String) -> void:
+	var target: Combatant = _enemy_visuals[_target_index]
+	match kind:
+		"massive":
+			_presenter.debug_replay(_player_visual, target, _all_visuals(), true, true, 2, false)
+		"blocked":
+			_presenter.debug_replay(_player_visual, target, _all_visuals(), false, false, 0, false)
+		"kill":
+			await _presenter.debug_replay(_player_visual, target, _all_visuals(), true, false, 1, true)
+			target.fade_name_label(1.0)  # replay only — undo the death label fade
+			target.play_idle()
+		_:
+			_presenter.debug_replay(_player_visual, target, _all_visuals(), true, false, 1, false)
 
 
 func _teardown_signals() -> void:
@@ -296,6 +366,7 @@ func _teardown_signals() -> void:
 	CombatManager.phase_changed.disconnect(_on_phase_changed)
 	CombatManager.wounds_changed.disconnect(_on_wounds_changed)
 	CombatManager.combatant_attacking.disconnect(_on_combatant_attacking)
+	CombatManager.attack_resolved.disconnect(_on_attack_resolved)
 	CombatManager.guard_changed.disconnect(_on_guard_changed)
 	CombatManager.combat_ended.disconnect(_on_combat_ended)
 	CombatManager.player_intents_available.disconnect(_on_intents_available)

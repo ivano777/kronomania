@@ -5,6 +5,12 @@
       "frames": ["fireball_start", "fireball_mid", "fireball_end"],
       "fps": 12,
       "loop": true
+    },
+    {
+      "name": "ImpactBurst",
+      "frames": ["impact_burst_1", "impact_burst_2", "impact_burst_3", "impact_burst_4", "impact_burst_5"],
+      "fps": 12,
+      "loop": false
     }
   ]
 }

@@ -24,6 +24,10 @@ extends Resource
 ## Action-keyed modifiers. When non-empty, supersedes the deprecated flat fields above.
 @export var action_modifiers: Array[ActionModifier] = []
 
+## Combatant animation played when striking with this weapon. "" = default "attack_melee".
+## Presentation only — missing animations degrade to the default pose at runtime.
+@export var attack_anim: String = ""
+
 
 ## Returns how many hand slots this item requires, derived from tags.
 ## "TwoHanded" → 2; "NoHanded" → 0 (future zero-slot items); default → 1.

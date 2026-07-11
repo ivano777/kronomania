@@ -1,0 +1,17 @@
+{
+  "name": "ImpactBurst",
+  "sheet": "ImpactBurst_sheet.png",
+  "frame_width": 32,
+  "frame_height": 32,
+  "frame_count": 5,
+  "frames": [
+    "impact_burst_1",
+    "impact_burst_2",
+    "impact_burst_3",
+    "impact_burst_4",
+    "impact_burst_5"
+  ],
+  "fps": 12,
+  "loop": false,
+  "layout": "horizontal_strip"
+}

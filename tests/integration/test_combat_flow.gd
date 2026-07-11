@@ -78,5 +78,15 @@ func test_enemy_turn_emits_combatant_attacking() -> void:
 	if CombatManager._enemies[0].is_defeated:
 		pass_test("grunt died to the opening hit under this seed — no enemy turn")
 		return
-	assert_signal_emitted_with_parameters(
-		CombatManager, "combatant_attacking", [false, 0])
+	# The signal now fires for BOTH sides (player emission drives the attack
+	# presentation windup) — assert the enemy emission is among them.
+	var saw_enemy := false
+	var saw_player := false
+	for i in get_signal_emit_count(CombatManager, "combatant_attacking"):
+		var p = get_signal_parameters(CombatManager, "combatant_attacking", i)
+		if p[0] == false and p[1] == 0:
+			saw_enemy = true
+		if p[0] == true and p[1] == 0:
+			saw_player = true
+	assert_true(saw_enemy, "enemy turn must emit combatant_attacking(false, 0)")
+	assert_true(saw_player, "player attack must emit combatant_attacking(true, 0)")

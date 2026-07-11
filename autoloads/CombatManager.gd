@@ -44,8 +44,16 @@ signal wounds_changed(is_player: bool, enemy_index: int, current: int, max_wound
 signal guard_changed(is_player: bool, enemy_index: int, pool: String, guard_value: int)
 
 ## Emitted when a combatant's attack is about to resolve — drives attack
-## animations on the battle visuals (enemy_index -1 when is_player is true).
+## animations on the battle visuals. enemy_index: the enemy participant
+## (the attacker when is_player is false, the TARGET when is_player is true).
 signal combatant_attacking(is_player: bool, enemy_index: int)
+
+## Emitted once at the end of every _resolve_attack pass (all attack paths: strike,
+## auto, cantrip, spell, enemy, echo, mind-detonation). Drives impact presentation.
+## enemy_index: the enemy participant (target when attacker_is_player, else attacker).
+## wounds_dealt is 0 when the guard held (did_breach false → "Blocked").
+signal attack_resolved(attacker_is_player: bool, enemy_index: int, target_pool: String,
+		did_breach: bool, is_massive: bool, wounds_dealt: int, defender_defeated: bool)
 
 ## Emitted once combat ends.
 signal combat_ended(winner_name: String)
@@ -96,6 +104,10 @@ var _enemies: Array  # Array[CombatantState]
 var _round:  int = 0
 var _debug_immortal: bool = false
 var _debug_lethal: bool = false
+
+## Seconds to pause after each resolved attack so the scene's presentation can play out.
+## 0.0 (default) = no pause — headless runs and tests are unaffected. BattleScene sets it.
+var attack_pacing_s: float = 0.0
 
 ## True only while awaiting the player's action input.
 var _waiting_for_player: bool = false
@@ -474,7 +486,10 @@ func _resolve_round(net_advantage: int = 0, target_pool: String = "stance", brut
 
 	# ── Phase 2: Player attacks chosen target ──────────────────────────────
 	if not target.is_defeated:
+		combatant_attacking.emit(true, target_index)
 		await _resolve_attack(true, target_index, p_atk, target_pool)
+		if attack_pacing_s > 0.0:
+			await get_tree().create_timer(attack_pacing_s).timeout
 
 	# Phase 2.1 — post player-attack: detonate any primed mind-bomb if Stance was breached.
 	if not target.is_defeated:
@@ -527,7 +542,10 @@ func _resolve_round_cantrip(spell: SpellData, target_index: int = 0) -> void:
 	# ── Phase 2: Player attacks chosen target ──────────────────────────────
 	var _pool_breached_before_c := _current_round_player_breaches.get(spell.target_pool, false) as bool
 	if not target.is_defeated:
+		combatant_attacking.emit(true, target_index)
 		await _resolve_attack(true, target_index, p_atk, spell.target_pool)
+		if attack_pacing_s > 0.0:
+			await get_tree().create_timer(attack_pacing_s).timeout
 	# "breach" = this spell caused the round's FIRST breach on its target_pool.
 	# A spell that breaches an already-breached pool sets this to false.
 	# Group B mechanics that need pure per-spell breach detection should read
@@ -642,7 +660,12 @@ func _resolve_round_spell(spell: SpellData, target_index: int = 0) -> void:
 			"time_lock":
 				await _cast_time_lock(target, target_index, p_atk)
 			_:
+				# Presentation windup only for casts that route through
+				# _resolve_attack (which emits the matching attack_resolved).
+				combatant_attacking.emit(true, target_index)
 				await _resolve_attack(true, target_index, p_atk, spell.target_pool)
+		if attack_pacing_s > 0.0:
+			await get_tree().create_timer(attack_pacing_s).timeout
 	# "breach" = this spell caused the round's FIRST breach on its target_pool.
 	# A spell that breaches an already-breached pool sets this to false.
 	# Group B mechanics that need pure per-spell breach detection should read
@@ -753,6 +776,8 @@ func _run_enemy_attacks(slow_phase: bool, p_total: int, player_target_pool: Stri
 		combatant_attacking.emit(false, i)
 		var e_pool := player_target_pool if i == target_index else "stance"
 		await _resolve_attack(false, i, e_atk, e_pool)
+		if attack_pacing_s > 0.0:
+			await get_tree().create_timer(attack_pacing_s).timeout
 		if _player.is_defeated:
 			return true
 	return false
@@ -844,6 +869,7 @@ func _resolve_attack(attacker_is_player: bool, enemy_index: int, attack_result: 
 	ctx.target_pool = target_pool
 	ctx.attack_total = attack_result.total as int
 	ctx.guard_value = current_guard
+	var wounds_dealt := 0
 	if (attack_result.total as int) >= current_guard or force_breach:
 		ctx.did_breach = true
 		_process_statuses_hook("on_breach", defender, {
@@ -876,6 +902,7 @@ func _resolve_attack(attacker_is_player: bool, enemy_index: int, attack_result: 
 				if result["resolved"]:
 					wounds_pending = result["wounds_modified"] as int
 		var wounds := wounds_pending
+		wounds_dealt = wounds
 		defender.current_wounds += wounds
 		if _debug_lethal and attacker_is_player and not defender_is_player:
 			defender.current_wounds = defender.max_wounds
@@ -925,6 +952,11 @@ func _resolve_attack(attacker_is_player: bool, enemy_index: int, attack_result: 
 			var ph: CombatEffect = EffectRegistry.get_handler(st.status_id)
 			if ph != null:
 				ph.on_player_attack_resolved(st, ctx)
+
+	attack_resolved.emit(
+		attacker_is_player, enemy_index, target_pool,
+		ctx.did_breach, ctx.is_massive, wounds_dealt, defender.is_defeated
+	)
 
 
 func _end_combat() -> void:

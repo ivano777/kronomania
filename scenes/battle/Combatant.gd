@@ -52,12 +52,26 @@ func play_idle() -> void:
 	_play("idle")
 
 
+## Plays a per-attack pose animation; falls back to `fallback` when the pose
+## (or the requested clip itself) is missing from the loaded sprite frames.
+func play_attack(anim_name: String, fallback: String = "attack_melee") -> void:
+	if anim_name != "" and _sprite.sprite_frames != null \
+			and _sprite.sprite_frames.has_animation(anim_name):
+		_play(anim_name)
+	else:
+		_play(fallback)
+
+
 func play_attack_melee() -> void:
-	_play("attack_melee")
+	play_attack("attack_melee")
 
 
 func play_cast_spell() -> void:
-	_play("cast_spell")
+	play_attack("cast_spell", "cast_spell")
+
+
+func fade_name_label(alpha: float = 0.4) -> void:
+	_name_label.modulate.a = alpha
 
 
 func play_hurt() -> void:

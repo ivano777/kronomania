@@ -12,12 +12,7 @@ var _rest_feedback: Label
 var _short_rest_btn: Button
 var _long_rest_btn: Button
 var _continue_btn: Button
-var _weapon_btns: Array[Button] = []
-var _equip_slot: String = "main"  # "main" or "off"
-var _main_slot_btn: Button
-var _off_slot_btn: Button
-var _main_slot_label: Label
-var _off_slot_label: Label
+var _hands_label: Label
 
 # Save popup
 var _save_overlay: ColorRect
@@ -85,49 +80,18 @@ func _ready() -> void:
 
 	vbox.add_child(HSeparator.new())
 
-	# --- Equipment ---
-	var slot_row := HBoxContainer.new()
-	slot_row.add_theme_constant_override("separation", 3)
-	vbox.add_child(slot_row)
-
-	_main_slot_btn = Button.new()
-	_main_slot_btn.pressed.connect(func() -> void:
-		_equip_slot = "main"
-		_refresh()
-	)
-	slot_row.add_child(_main_slot_btn)
-
-	_off_slot_btn = Button.new()
-	_off_slot_btn.pressed.connect(func() -> void:
-		_equip_slot = "off"
-		_refresh()
-	)
-	slot_row.add_child(_off_slot_btn)
-
-	_main_slot_label = Label.new()
-	vbox.add_child(_main_slot_label)
-
-	_off_slot_label = Label.new()
-	vbox.add_child(_off_slot_label)
-
-	# Two-column grid: the armoury outgrew a single column (fit inside 640x360).
-	var weapon_row := GridContainer.new()
-	weapon_row.columns = 2
-	weapon_row.add_theme_constant_override("v_separation", 2)
-	weapon_row.add_theme_constant_override("h_separation", 2)
-	vbox.add_child(weapon_row)
-	for w in PlayerProgression.AVAILABLE_WEAPONS:
-		var btn := Button.new()
-		btn.text = (w as EquipmentData).item_name
-		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		btn.pressed.connect(_on_equip_weapon.bind(w))
-		weapon_row.add_child(btn)
-		_weapon_btns.append(btn)
-		TooltipManager.attach(btn, w as EquipmentData)
+	# --- Equipment summary (equipping moved to the Equipment scene) ---
+	_hands_label = Label.new()
+	vbox.add_child(_hands_label)
 
 	vbox.add_child(HSeparator.new())
 
 	# --- Actions ---
+	var equip_btn := Button.new()
+	equip_btn.text = "Equipment"
+	equip_btn.pressed.connect(_on_equipment)
+	vbox.add_child(equip_btn)
+
 	var const_btn := Button.new()
 	const_btn.text = "Constellation"
 	const_btn.pressed.connect(_on_constellation)
@@ -375,25 +339,9 @@ func _refresh() -> void:
 	var mh: EquipmentData = PlayerProgression.main_hand
 	var oh: EquipmentData = PlayerProgression.off_hand
 	var mh_two_handed: bool = mh != null and mh.get_hands_required() == 2
-
-	if mh_two_handed and _equip_slot == "off":
-		_equip_slot = "main"
-
-	_main_slot_btn.text = "▶ Main Hand" if _equip_slot == "main" else "  Main Hand"
-	_off_slot_btn.text  = "▶ Off Hand"  if _equip_slot == "off"  else "  Off Hand"
-	_off_slot_btn.disabled = mh_two_handed
-
 	var mh_name := mh.item_name if mh else "(empty)"
 	var oh_name := "— (2H)" if mh_two_handed else (oh.item_name if oh else "(empty)")
-	_main_slot_label.text = "Main: %s" % mh_name
-	_off_slot_label.text = "Off:  %s" % oh_name
-
-	for i in _weapon_btns.size():
-		var w: EquipmentData = PlayerProgression.AVAILABLE_WEAPONS[i] as EquipmentData
-		var in_current := (w == mh and _equip_slot == "main") or (w == oh and _equip_slot == "off")
-		var in_other   := (w == oh and _equip_slot == "main") or (w == mh and _equip_slot == "off")
-		_weapon_btns[i].disabled = in_other
-		_weapon_btns[i].text = ("✓ " + w.item_name) if in_current else w.item_name
+	_hands_label.text = "Main: %s\nOff:  %s" % [mh_name, oh_name]
 
 	if DungeonManager.short_rest_used:
 		_short_rest_btn.text = "Short Rest  (used)"
@@ -480,12 +428,8 @@ func _on_exit_confirmed() -> void:
 
 # --- Rest / actions ---
 
-func _on_equip_weapon(w: EquipmentData) -> void:
-	if _equip_slot == "off":
-		PlayerProgression.equip_off_hand(null if PlayerProgression.off_hand == w else w)
-	else:
-		PlayerProgression.equip_main_hand(null if PlayerProgression.main_hand == w else w)
-	_refresh()
+func _on_equipment() -> void:
+	get_tree().change_scene_to_file("res://scenes/equipment/EquipmentScene.tscn")
 
 
 func _on_short_rest() -> void:

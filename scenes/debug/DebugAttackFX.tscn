@@ -1,0 +1,31 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/debug/DebugAttackFX.gd" id="1_atkfx"]
+
+[node name="DebugAttackFX" type="VBoxContainer"]
+anchor_left = 0.0
+anchor_top = 1.0
+anchor_right = 0.0
+anchor_bottom = 1.0
+offset_left = 5.0
+offset_top = -280.0
+offset_bottom = -165.0
+script = ExtResource("1_atkfx")
+
+[node name="ToggleButton" type="Button" parent="."]
+text = "• AttackFX ▶"
+
+[node name="Panel" type="VBoxContainer" parent="."]
+visible = false
+
+[node name="HitBtn" type="Button" parent="Panel"]
+text = "FX: Hit"
+
+[node name="MassiveBtn" type="Button" parent="Panel"]
+text = "FX: Massive"
+
+[node name="BlockedBtn" type="Button" parent="Panel"]
+text = "FX: Blocked"
+
+[node name="KillBtn" type="Button" parent="Panel"]
+text = "FX: Kill beat"

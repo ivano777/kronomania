@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://kfkv1xh1n4qh"]
 
 [ext_resource type="Script" uid="uid://15o84clu565i" path="res://scenes/battle/BattleScene.gd" id="1_bscr"]
+[ext_resource type="Script" path="res://scenes/battle/AttackPresenter.gd" id="5_pres"]
 [ext_resource type="PackedScene" uid="uid://bq5rg150l8e1u" path="res://scenes/battle/CombatantHUD.tscn" id="2_chud"]
 [ext_resource type="PackedScene" uid="uid://wjwhsrnwy3or" path="res://scenes/battle/RoundHUD.tscn" id="3_rhud"]
 [ext_resource type="PackedScene" uid="uid://be04uyksxvods" path="res://scenes/battle/Combatant.tscn" id="4_comb"]
@@ -14,6 +15,12 @@ script = ExtResource("1_bscr")
 offset_right = 640.0
 offset_bottom = 360.0
 color = Color(0.08, 0.08, 0.12, 1)
+
+[node name="DimOverlay" type="TextureRect" parent="WorldLayer"]
+modulate = Color(1, 1, 1, 0)
+offset_right = 640.0
+offset_bottom = 360.0
+mouse_filter = 2
 
 [node name="PlayerAnchor" type="Marker2D" parent="WorldLayer"]
 position = Vector2(360, 285)
@@ -29,6 +36,9 @@ position = Vector2(255, 190)
 
 [node name="PlayerVisual" parent="WorldLayer" instance=ExtResource("4_comb")]
 position = Vector2(360, 285)
+
+[node name="AttackPresenter" type="Node" parent="."]
+script = ExtResource("5_pres")
 
 [node name="UILayer" type="CanvasLayer" parent="."]
 layer = 1

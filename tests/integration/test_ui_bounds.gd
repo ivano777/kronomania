@@ -40,3 +40,7 @@ func test_campfire_fits() -> void:
 
 func test_main_menu_fits() -> void:
 	await _assert_scene_fits("res://scenes/main_menu/MainMenuScene.tscn")
+
+
+func test_equipment_fits() -> void:
+	await _assert_scene_fits("res://scenes/equipment/EquipmentScene.tscn")

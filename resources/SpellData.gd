@@ -29,6 +29,10 @@ extends Resource
 ## School tags matched against SpellBonusEffect.tag (e.g. "fire", "arcane").
 @export var tags: PackedStringArray = []
 
+## Combatant animation played when this spell is cast. "" = default "cast_spell".
+## Presentation only — missing animations degrade to the default pose at runtime.
+@export var attack_anim: String = ""
+
 # ── Discipline cast dispatch (data-driven; replaces spell_name string matches) ──
 
 ## Which discipline cast routine handles the player attack in _resolve_round_spell.
