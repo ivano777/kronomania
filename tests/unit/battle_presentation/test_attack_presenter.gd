@@ -33,6 +33,11 @@ func test_popup_text_massive_amplified() -> void:
 	assert_eq(AttackPresenter.popup_text(true, true, 3), "-3 MASSIVE")
 
 
+func test_popup_text_suppressed_wound_breach() -> void:
+	# Mind Rend / Time Lock: breach lands but the wound is suppressed.
+	assert_eq(AttackPresenter.popup_text(true, false, 0), "Breached!")
+
+
 # ── popup_color ───────────────────────────────────────────────────────────────
 
 func test_popup_color_blocked_is_gray() -> void:

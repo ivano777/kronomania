@@ -3,9 +3,8 @@
   "sheet": "cast_spell_sheet.png",
   "frame_width": 128,
   "frame_height": 69,
-  "frame_count": 6,
+  "frame_count": 8,
   "fps": 12,
   "loop": false,
-  "layout": "horizontal_strip",
-  "source": "Martial Hero by LuizMelo (CC0) \u2014 https://luizmelo.itch.io/martial-hero"
+  "layout": "horizontal_strip"
 }

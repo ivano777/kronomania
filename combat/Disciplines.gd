@@ -112,7 +112,8 @@ static func cast_mind_rend(enemy: CombatantState, enemy_index: int, attack_resul
 	roll_enemy_guard(enemy, enemy_index, "resolve")
 
 	var current_guard: int = enemy.get_guard("resolve")
-	if attack_total >= current_guard:
+	var breached := attack_total >= current_guard
+	if breached:
 		CombatManager._process_statuses_hook("on_breach", enemy, {"pool": "resolve", "attacker": CombatManager._player})
 		CombatManager._current_round_player_breaches["resolve"] = true
 		var hex_level: int = PlayerProgression.get_node_level_by_id("hex_mastery")
@@ -134,6 +135,9 @@ static func cast_mind_rend(enemy: CombatantState, enemy_index: int, attack_resul
 		])
 
 	CombatManager.guard_changed.emit(false, enemy_index, "resolve", enemy.get_guard("resolve"))
+	# Wound-suppressing cast: closes the combatant_attacking windup itself since
+	# it bypasses _resolve_attack. did_breach + wounds_dealt 0 = breach, no wound.
+	CombatManager.attack_resolved.emit(true, enemy_index, "resolve", breached, false, 0, false)
 
 
 # ── Chrono-Tinkering / Time Lock (Group C4) ──────────────────────────────────
@@ -148,7 +152,8 @@ static func cast_time_lock(enemy: CombatantState, enemy_index: int, attack_resul
 	roll_enemy_guard(enemy, enemy_index, "resolve")
 
 	var current_guard: int = enemy.get_guard("resolve")
-	if attack_total >= current_guard:
+	var breached := attack_total >= current_guard
+	if breached:
 		CombatManager._process_statuses_hook("on_breach", enemy, {"pool": "resolve", "attacker": CombatManager._player})
 		CombatManager._current_round_player_breaches["resolve"] = true
 		var tl := CombatStatus.new()
@@ -166,6 +171,9 @@ static func cast_time_lock(enemy: CombatantState, enemy_index: int, attack_resul
 		])
 
 	CombatManager.guard_changed.emit(false, enemy_index, "resolve", enemy.get_guard("resolve"))
+	# Wound-suppressing cast: closes the combatant_attacking windup itself since
+	# it bypasses _resolve_attack. did_breach + wounds_dealt 0 = breach, no wound.
+	CombatManager.attack_resolved.emit(true, enemy_index, "resolve", breached, false, 0, false)
 
 
 # ── Echoing Mind / Mind Lash (Group C3) ──────────────────────────────────────

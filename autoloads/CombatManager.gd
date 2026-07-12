@@ -654,15 +654,15 @@ func _resolve_round_spell(spell: SpellData, target_index: int = 0) -> void:
 	# ── Phase 2: Player attacks chosen target ──────────────────────────────
 	var _pool_breached_before := _current_round_player_breaches.get(spell.target_pool, false) as bool
 	if not target.is_defeated:
+		# Windup for every cast path; discipline handlers that bypass
+		# _resolve_attack emit their own matching attack_resolved.
+		combatant_attacking.emit(true, target_index)
 		match spell.cast_handler:
 			"mind_rend":
 				await _cast_mind_rend(target, target_index, p_atk)
 			"time_lock":
 				await _cast_time_lock(target, target_index, p_atk)
 			_:
-				# Presentation windup only for casts that route through
-				# _resolve_attack (which emits the matching attack_resolved).
-				combatant_attacking.emit(true, target_index)
 				await _resolve_attack(true, target_index, p_atk, spell.target_pool)
 		if attack_pacing_s > 0.0:
 			await get_tree().create_timer(attack_pacing_s).timeout

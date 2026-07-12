@@ -62,6 +62,10 @@ static func popup_text(did_breach: bool, is_massive: bool, wounds: int) -> Strin
 		return "Blocked"
 	if is_massive:
 		return "-%d MASSIVE" % wounds
+	if wounds == 0:
+		# Wound-suppressing discipline cast (Mind Rend / Time Lock): breach lands
+		# but the wound is suppressed. Unreachable from _resolve_attack breaches.
+		return "Breached!"
 	return "-%d" % wounds
 
 
