@@ -13,13 +13,12 @@ const _DBG_PROGRESSION := "res://scenes/debug/DebugProgressionControl.tscn"
 @onready var _line_layer: Control = $Main/TabContainer/Skills/Canvas/LineLayer
 @onready var _card_layer: Control = $Main/TabContainer/Skills/Canvas/CardLayer
 
-var _node_buttons: Dictionary = {}
 var _node_cards: Dictionary = {}
-var _node_level_labels: Dictionary = {}
-var _node_pip_labels: Dictionary = {}
+var _node_pips: Dictionary = {}
 var _node_by_id_map: Dictionary = {}
 var _heart_label: Label
 var _expanded_vertex: String = ""
+var _detail_panel: NodeDetailPanel
 
 var _zoom: float = 1.0
 var _pan_offset: Vector2 = Vector2.ZERO
@@ -30,7 +29,25 @@ const DOM_VERTEX := Vector2(210, 35)
 const ING_VERTEX := Vector2(23, 295)
 const NEG_VERTEX := Vector2(373, 295)
 const CENTROID   := Vector2(202, 208)
-const CARD_SIZE  := Vector2(70, 32)
+const CARD_SIZE  := Vector2(44, 48)
+const ICON_PX    := 32
+const PIP_PX     := 5
+const PIP_EMPTY  := Color(0.25, 0.25, 0.25)
+
+# Per-branch accent colours (dark-fantasy palette, read on the dark backdrop).
+const BRANCH_COLORS := {
+	"dominion":  Color(0.80, 0.25, 0.22),  # crimson
+	"negation":  Color(0.35, 0.55, 0.80),  # steel-blue
+	"ingenuity": Color(0.60, 0.40, 0.85),  # arcane-purple
+	"core":      Color(0.85, 0.70, 0.20),  # gold
+	"flavor":    Color(0.85, 0.80, 0.70),  # parchment
+}
+# Ability/discipline nodes that sit under the Ingenuity vertex but carry no `ing_` prefix.
+const _DISCIPLINE_IDS := {
+	"minor_studies": true, "spellcasting": true, "lucidity": true,
+	"mind_detonation": true, "hex_mastery": true, "echoing_mind": true,
+	"chrono_tinkering": true,
+}
 
 const _ALWAYS_VISIBLE: Dictionary = {
 	"dom_core": true, "ing_core": true, "neg_core": true,
@@ -87,6 +104,9 @@ const _VERTEX_NAMES: Dictionary = {
 func _ready() -> void:
 	_back_btn.pressed.connect(_on_back_pressed)
 	_tab_container.set_tab_title(1, "Background / Traits")
+	_detail_panel = NodeDetailPanel.new()
+	_skills_panel.add_child(_detail_panel)
+	_detail_panel.bought.connect(_on_detail_bought)
 	_populate_canvas()
 	_refresh()
 	if ResourceLoader.exists(_DBG_PROGRESSION):
@@ -112,50 +132,103 @@ func _populate_canvas() -> void:
 
 
 func _make_card(node: NodeData) -> PanelContainer:
+	var branch_color: Color = _branch_color(node)
+
 	var card := PanelContainer.new()
 	card.custom_minimum_size = CARD_SIZE
-	# tooltip_text removed — CustomTooltip handles this via right-click
+	# Branch-tinted frame: flat dark fill + coloured border (the baked 9-slice can't recolour).
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.10, 0.09, 0.15, 0.9)
+	sb.border_color = branch_color
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(2)
+	sb.content_margin_left = 3
+	sb.content_margin_right = 3
+	sb.content_margin_top = 3
+	sb.content_margin_bottom = 3
+	card.add_theme_stylebox_override("panel", sb)
 
 	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 2)
+	vbox.add_theme_constant_override("separation", 1)
+	vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(vbox)
 
-	var header_row := HBoxContainer.new()
-	vbox.add_child(header_row)
+	# Icon (or 2-letter initials fallback when no art exists for this node).
+	var icon_center := CenterContainer.new()
+	icon_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_child(icon_center)
+	var tex: Texture2D = SpriteRegistry.get_icon("nodes", node.node_id)
+	if tex != null:
+		var tr := TextureRect.new()
+		tr.texture = tex
+		tr.custom_minimum_size = Vector2(ICON_PX, ICON_PX)
+		tr.stretch_mode = TextureRect.STRETCH_KEEP_CENTERED
+		tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		icon_center.add_child(tr)
+	else:
+		var init_lbl := Label.new()
+		init_lbl.text = _node_initials(node.display_name)
+		init_lbl.custom_minimum_size = Vector2(ICON_PX, ICON_PX)
+		init_lbl.add_theme_font_size_override("font_size", 16)
+		init_lbl.add_theme_color_override("font_color", branch_color)
+		init_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		init_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		init_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		icon_center.add_child(init_lbl)
 
-	var name_lbl := Label.new()
-	name_lbl.text = node.display_name
-	name_lbl.add_theme_font_size_override("font_size", 16)
-	name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	name_lbl.clip_text = true
-	header_row.add_child(name_lbl)
+	# Level pips — a strip of small squares, filled up to the current level in _refresh().
+	var pip_row := HBoxContainer.new()
+	pip_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	pip_row.add_theme_constant_override("separation", 1)
+	pip_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_child(pip_row)
+	var pips: Array = []
+	for _i in node.max_levels:
+		var pip := ColorRect.new()
+		pip.custom_minimum_size = Vector2(PIP_PX, PIP_PX)
+		pip.color = PIP_EMPTY
+		pip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		pip_row.add_child(pip)
+		pips.append(pip)
 
-	var level_lbl := Label.new()
-	level_lbl.text = "L0/%d" % node.max_levels
-	level_lbl.add_theme_font_size_override("font_size", 16)
-	header_row.add_child(level_lbl)
-
-	var pip_lbl := Label.new()
-	pip_lbl.text = "·".repeat(node.max_levels)
-	pip_lbl.add_theme_font_size_override("font_size", 16)
-	vbox.add_child(pip_lbl)
-
-	var btn := Button.new()
-	btn.pressed.connect(_on_unlock.bind(node))
-	vbox.add_child(btn)
-
-	_node_buttons[node] = btn
 	_node_cards[node] = card
-	_node_level_labels[node] = level_lbl
-	_node_pip_labels[node] = pip_lbl
+	_node_pips[node] = pips
 
-	if node.node_id in _VERTEX_NAMES:
-		card.gui_input.connect(_on_vertex_gui_input.bind(_VERTEX_NAMES[node.node_id]))
-
-	TooltipManager.attach(card, node)
-	TooltipManager.attach_delta(btn, node)
+	# Left-click opens the detail panel; core vertices ALSO toggle their branch.
+	card.gui_input.connect(_on_card_clicked.bind(node))
 
 	return card
+
+
+## Resolve a node to its constellation branch. node_id is authoritative — the
+## `category` field is inconsistent in data (lowercase "ingenuity", default "Training").
+func _branch_of(node: NodeData) -> String:
+	var id := node.node_id
+	if id == "dom_core" or id == "neg_core" or id == "ing_core":
+		return "core"
+	if id.begins_with("dom_"):
+		return "dominion"
+	if id.begins_with("neg_"):
+		return "negation"
+	if id.begins_with("ing_"):
+		return "ingenuity"
+	if id in _DISCIPLINE_IDS:
+		return "ingenuity"
+	if node.category == "Flavor":
+		return "flavor"
+	return "ingenuity"
+
+
+func _branch_color(node: NodeData) -> Color:
+	return BRANCH_COLORS[_branch_of(node)]
+
+
+## Two-letter fallback shown when a node has no icon (initials of the first two words).
+func _node_initials(display_name: String) -> String:
+	var words := display_name.split(" ", false)
+	if words.size() >= 2:
+		return (words[0].substr(0, 1) + words[1].substr(0, 1)).to_upper()
+	return display_name.substr(0, 2).to_upper()
 
 
 func _refresh() -> void:
@@ -174,12 +247,10 @@ func _refresh() -> void:
 			combat_spent, flavor_spent, tier + 1
 		]
 
-	for node in _node_buttons:
+	for node in _node_cards:
 		var nd := node as NodeData
-		var btn: Button = _node_buttons[node]
 		var card: PanelContainer = _node_cards[node]
-		var level_lbl: Label = _node_level_labels[node]
-		var pip_lbl: Label = _node_pip_labels[node]
+		var pips: Array = _node_pips[node]
 		var lvl := PlayerProgression.get_level(nd)
 		var max_lvl := nd.max_levels
 		var at_max := lvl >= max_lvl
@@ -187,27 +258,12 @@ func _refresh() -> void:
 		if not at_max and nd.levels_data.size() > lvl:
 			tier_locked = tier < (nd.levels_data[lvl] as NodeLevelData).required_tier
 
-		level_lbl.text = "L%d/%d" % [lvl, max_lvl]
-		pip_lbl.text = "•".repeat(lvl) + "·".repeat(max_lvl - lvl)
+		var branch_color: Color = _branch_color(nd)
+		for i in pips.size():
+			(pips[i] as ColorRect).color = branch_color if i < lvl else PIP_EMPTY
 
-		if at_max:
-			btn.text = "Max"
-			btn.disabled = true
-			card.modulate = Color.WHITE
-		elif tier_locked:
-			var req_tier: int = (nd.levels_data[lvl] as NodeLevelData).required_tier
-			btn.text = "T%d" % req_tier
-			btn.disabled = true
-			card.modulate = Color(1, 1, 1, 0.4)
-		elif PlayerProgression.can_upgrade(nd):
-			var ld: NodeLevelData = nd.levels_data[lvl]
-			btn.text = "+%d" % ld.cost
-			btn.disabled = false
-			card.modulate = Color.WHITE
-		else:
-			btn.text = "—"
-			btn.disabled = true
-			card.modulate = Color.WHITE
+		# Dim only out-of-reach (tier-locked) nodes; cost/affordability lives in the panel.
+		card.modulate = Color(1, 1, 1, 0.4) if tier_locked else Color.WHITE
 
 	_refresh_canvas()
 
@@ -240,9 +296,10 @@ func _draw_triangle_lines() -> void:
 	_add_line(ING_VERTEX + dc, NEG_VERTEX + dc, color)
 	_add_line(NEG_VERTEX + dc, DOM_VERTEX + dc, color)
 
-	_add_vertex_label("DOMINION",  DOM_VERTEX + Vector2(-5, -12))
-	_add_vertex_label("INGENUITY", ING_VERTEX + Vector2(-10, 30))
-	_add_vertex_label("NEGATION",  NEG_VERTEX + Vector2(-10, 30))
+	# Clear of the 48px-tall core tokens: DOMINION above, INGENUITY/NEGATION below.
+	_add_vertex_label("DOMINION",  DOM_VERTEX + Vector2(-14, -18))
+	_add_vertex_label("INGENUITY", ING_VERTEX + Vector2(-14, 52))
+	_add_vertex_label("NEGATION",  NEG_VERTEX + Vector2(-14, 52))
 
 
 func _draw_connection_lines() -> void:
@@ -275,7 +332,7 @@ func _draw_connection_lines() -> void:
 			var to: Vector2   = _NODE_POSITIONS[nd.node_id] + CARD_SIZE * 0.5
 			var req_lvl: int = int(prereq.get("required_level", 1))
 			var met := PlayerProgression.get_node_level_by_id(pid) >= req_lvl
-			_add_line(from, to, Color(0.85, 0.70, 0.20) if met else Color(0.30, 0.30, 0.30))
+			_add_line(from, to, _branch_color(nd) if met else Color(0.30, 0.30, 0.30))
 
 
 func _add_line(from: Vector2, to: Vector2, color: Color) -> void:
@@ -292,14 +349,21 @@ func _add_vertex_label(text_str: String, pos: Vector2) -> void:
 	lbl.text = text_str
 	lbl.position = pos
 	lbl.add_theme_font_size_override("font_size", 16)
+	lbl.z_index = 5  # above cards (z 1) so branch names are never hidden by tokens
 	_line_layer.add_child(lbl)
 
 
-func _on_vertex_gui_input(event: InputEvent, vertex: String) -> void:
+func _on_card_clicked(event: InputEvent, node: NodeData) -> void:
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
-			_on_vertex_toggle(vertex)
+			_detail_panel.open(node, _branch_of(node), _branch_color(node))
+			if node.node_id in _VERTEX_NAMES:
+				_on_vertex_toggle(_VERTEX_NAMES[node.node_id])
+
+
+func _on_detail_bought(_node: NodeData) -> void:
+	_refresh()
 
 
 func _on_vertex_toggle(vertex: String) -> void:
@@ -349,6 +413,17 @@ func _max_wounds(tier: int) -> int:
 
 
 func _input(event: InputEvent) -> void:
+	# Esc closes the detail panel from anywhere on the screen.
+	if event is InputEventKey and (event as InputEventKey).pressed \
+			and (event as InputEventKey).keycode == KEY_ESCAPE and _detail_panel.is_open():
+		_detail_panel.close()
+		get_viewport().set_input_as_handled()
+		return
+	# Cursor over the open panel → let its GUI own the event (wheel scrolls the
+	# ladder, clicks hit its buttons) instead of canvas zoom/pan/close below.
+	if _detail_panel.is_open() \
+			and _detail_panel.get_global_rect().has_point(get_global_mouse_position()):
+		return
 	if _tab_container.current_tab != 0:
 		return
 	if not _skills_panel.get_global_rect().has_point(get_global_mouse_position()):
@@ -361,6 +436,11 @@ func _input(event: InputEvent) -> void:
 		elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN and mb.pressed:
 			_do_zoom(1.0 / 1.15)
 			get_viewport().set_input_as_handled()
+		elif mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:
+			# Reached _input only if no token/panel consumed it → a click on empty space.
+			if _detail_panel.is_open():
+				_detail_panel.close()
+				get_viewport().set_input_as_handled()
 		elif mb.button_index == MOUSE_BUTTON_MIDDLE:
 			_is_panning = mb.pressed
 			_pan_last_mouse = get_global_mouse_position()
@@ -380,11 +460,6 @@ func _do_zoom(factor: float) -> void:
 	_pan_offset = mouse_in_panel - (mouse_in_panel - _pan_offset) * (_zoom / old_zoom)
 	_canvas.position = _pan_offset
 	_canvas.scale = Vector2(_zoom, _zoom)
-
-
-func _on_unlock(node: NodeData) -> void:
-	PlayerProgression.upgrade(node)
-	_refresh()
 
 
 func _on_back_pressed() -> void:

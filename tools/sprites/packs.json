@@ -5,11 +5,11 @@
       "key": "player",
       "source": "Martial Hero by LuizMelo (CC0) — https://luizmelo.itch.io/martial-hero",
       "dir": "martial_hero/Martial Hero/Sprites",
-      "flip": true,
+      "flip": false,
       "anims": {
         "idle":         {"file": "Idle.png",     "fps": 8,  "loop": true},
         "attack_melee": {"file": "Attack1.png",  "fps": 12, "loop": false},
-        "cast_spell":   {"file": "Attack2.png",  "fps": 12, "loop": false},
+        "cast_spell":   {"file": "Cast.png",     "fps": 12, "loop": false},
         "hurt":         {"file": "Take Hit.png", "fps": 10, "loop": false},
         "die":          {"file": "Death.png",    "fps": 8,  "loop": false}
       }
@@ -18,7 +18,7 @@
       "key": "grunt",
       "source": "Monsters & Creatures Fantasy (Goblin) by LuizMelo (CC0) — https://luizmelo.itch.io/monsters-creatures-fantasy",
       "dir": "monsters_creatures_fantasy/Monsters_Creatures_Fantasy/Goblin",
-      "flip": true,
+      "flip": false,
       "anims": {
         "idle":         {"file": "Idle.png",     "fps": 6,  "loop": true},
         "attack_melee": {"file": "Attack.png",   "fps": 12, "loop": false},

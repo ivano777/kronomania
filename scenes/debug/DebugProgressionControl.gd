@@ -77,5 +77,5 @@ func _sync() -> void:
 	for i in 4:
 		_tier_btns[i].text = "[T%d]" % (i + 1) if tier == i + 1 else "T%d" % (i + 1)
 	var scene: Node = get_tree().current_scene
-	if scene.has_method("_refresh"):
+	if scene != null and scene.has_method("_refresh"):
 		scene._refresh()

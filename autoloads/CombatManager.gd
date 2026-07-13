@@ -35,7 +35,9 @@ signal phase_changed(phase_name: String)
 ## Emitted after wounds are applied.
 ## is_player: true = player was hit; false = enemy was hit.
 ## enemy_index: index into the enemy array (-1 when is_player is true).
-signal wounds_changed(is_player: bool, enemy_index: int, current: int, max_wounds: int)
+## is_initial: true for display-sync emissions (combat start, debug refill) —
+## no real attack happened, so listeners must not play hit/death reactions.
+signal wounds_changed(is_player: bool, enemy_index: int, current: int, max_wounds: int, is_initial: bool)
 
 ## Emitted after a defender's guard pool changes (roll, consumption, or reset).
 ## is_player: true = player's guard; false = enemy's guard.
@@ -161,7 +163,7 @@ func start_combat(player_data: CombatantData, enemies_data: Array) -> void:
 		_register_interrupt(_player, lucidity_handler)
 	_player.space_domination_active = _has_effect_type(_player, "space_domination")
 	_player.current_wounds = mini(PlayerProgression.saved_wounds, _player.max_wounds)
-	wounds_changed.emit(true, -1, _player.current_wounds, _player.max_wounds)
+	wounds_changed.emit(true, -1, _player.current_wounds, _player.max_wounds, true)
 	_player.has_minor_studies = _has_effect_type(_player, "minor_studies")
 	_player.has_spellcasting  = _has_effect_type(_player, "spellcasting")
 	_player.fervor_size = PlayerProgression.saved_fervor_size
@@ -175,7 +177,7 @@ func start_combat(player_data: CombatantData, enemies_data: Array) -> void:
 		var state := CombatantState.new()
 		state.init(ed)
 		_enemies.append(state)
-		wounds_changed.emit(false, i, 0, state.max_wounds)
+		wounds_changed.emit(false, i, 0, state.max_wounds, true)
 
 	# Initialise per-combat item charges for all combatants.
 	for state in ([_player] as Array) + _enemies:
@@ -311,7 +313,7 @@ func debug_set_fervor(new_fervor_size: int, burned_out: bool) -> void:
 func debug_refill_hp() -> void:
 	if _player:
 		_player.current_wounds = 0
-		wounds_changed.emit(true, -1, 0, _player.max_wounds)
+		wounds_changed.emit(true, -1, 0, _player.max_wounds, true)
 
 
 ## Debug only — toggle player immortality (wounds can't trigger defeat).
@@ -926,7 +928,7 @@ func _resolve_attack(attacker_is_player: bool, enemy_index: int, attack_result: 
 				]
 			)
 
-		wounds_changed.emit(defender_is_player, defender_ei, defender.current_wounds, defender.max_wounds)
+		wounds_changed.emit(defender_is_player, defender_ei, defender.current_wounds, defender.max_wounds, false)
 
 		if defender.current_wounds >= defender.max_wounds:
 			defender.is_defeated = true

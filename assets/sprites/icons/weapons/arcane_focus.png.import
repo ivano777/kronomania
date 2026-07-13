@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://cmnc1wth3v5pg"
-path="res://.godot/imported/arcane_focus.png-d88561d77450555eac9452c5c1397caf.ctex"
+path="res://.godot/imported/arcane_focus.png-8db0438583949e695a64495a923227ad.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/sprites/icons/spells/arcane_focus.png"
-dest_files=["res://.godot/imported/arcane_focus.png-d88561d77450555eac9452c5c1397caf.ctex"]
+source_file="res://assets/sprites/icons/weapons/arcane_focus.png"
+dest_files=["res://.godot/imported/arcane_focus.png-8db0438583949e695a64495a923227ad.ctex"]
 
 [params]
 

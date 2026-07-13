@@ -181,7 +181,7 @@ func _on_phase_changed(phase_name: String) -> void:
 	_round_hud.set_phase(phase_name)
 
 
-func _on_wounds_changed(is_player: bool, enemy_index: int, current: int, max_wounds: int) -> void:
+func _on_wounds_changed(is_player: bool, enemy_index: int, current: int, max_wounds: int, is_initial: bool) -> void:
 	if is_player:
 		_player_hud.set_wounds(current, max_wounds)
 	else:
@@ -191,6 +191,8 @@ func _on_wounds_changed(is_player: bool, enemy_index: int, current: int, max_wou
 			_enemy_huds[enemy_index].modulate = Color(0.45, 0.45, 0.45)
 			if enemy_index == _target_index:
 				_auto_select_living_target()
+	if is_initial:
+		return  # display sync only — no real attack happened, don't react
 	var vis: Combatant = _player_visual if is_player else _enemy_visuals[enemy_index]
 	if current >= max_wounds:
 		vis.play_die()

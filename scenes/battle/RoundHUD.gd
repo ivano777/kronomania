@@ -187,6 +187,7 @@ func show_defense_item_choice(options: Array) -> void:
 		var name_lbl := Label.new()
 		name_lbl.text = "%s  (Flat %+d)" % [item_name, mod.flat_bonus]
 		name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		name_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
 		row.add_child(name_lbl)
 		# Pin button — saves default defense item, mirroring ATK weapon pin.
 		var _wk := item_name
@@ -343,6 +344,7 @@ func _show_tool_panel(intent: String) -> void:
 		var name_lbl := Label.new()
 		name_lbl.text = entry["name"] as String
 		name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		name_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
 		row.add_child(name_lbl)
 		var summary: String = entry["summary"] as String
 		if summary != "":
@@ -462,6 +464,7 @@ func _show_action_panel(weapon_item) -> void:
 		var name_lbl := Label.new()
 		name_lbl.text = mod.action_name if mod.action_name != "" else mod.action_key.capitalize()
 		name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		name_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
 		row.add_child(name_lbl)
 		var info_lbl := Label.new()
 		info_lbl.text = _format_action_summary(mod)
