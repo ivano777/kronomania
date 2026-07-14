@@ -4,7 +4,6 @@ const _PLAYER_DATA: CombatantData = preload("res://resources/data/player_default
 const _DBG_PROGRESSION := "res://scenes/debug/DebugProgressionControl.tscn"
 
 @onready var _points_label: Label = $Main/Header/PointsLabel
-@onready var _tier_hp_label: Label = $Main/Header/TierHPLabel
 @onready var _budget_label: Label = $Main/BudgetLabel
 @onready var _back_btn: Button = $Main/Footer/BackButton
 @onready var _tab_container: TabContainer = $Main/TabContainer
@@ -15,8 +14,9 @@ const _DBG_PROGRESSION := "res://scenes/debug/DebugProgressionControl.tscn"
 
 var _node_cards: Dictionary = {}
 var _node_pips: Dictionary = {}
+var _node_styles: Dictionary = {}
 var _node_by_id_map: Dictionary = {}
-var _heart_label: Label
+var _core_medallion: CoreMedallion
 var _expanded_vertex: String = ""
 var _detail_panel: NodeDetailPanel
 
@@ -125,10 +125,15 @@ func _populate_canvas() -> void:
 			card.position = _NODE_POSITIONS[nd.node_id]
 			_card_layer.add_child(card)
 
-	_heart_label = Label.new()
-	_heart_label.position = CENTROID - Vector2(27, 5)
-	_heart_label.add_theme_font_size_override("font_size", 16)
-	_card_layer.add_child(_heart_label)
+	# Core gem medallion at the triangle centroid — Tier / HP / points readout.
+	# CENTROID averages the vertex top-left corners; the graph draws from card
+	# centres, so shift by half a card to sit at the true visual centroid.
+	_core_medallion = CoreMedallion.new()
+	_core_medallion.custom_minimum_size = Vector2(84, 92)
+	_core_medallion.size = Vector2(84, 92)
+	var medallion_center := CENTROID + CARD_SIZE * 0.5
+	_core_medallion.position = medallion_center - _core_medallion.size * 0.5
+	_card_layer.add_child(_core_medallion)
 
 
 func _make_card(node: NodeData) -> PanelContainer:
@@ -141,12 +146,13 @@ func _make_card(node: NodeData) -> PanelContainer:
 	sb.bg_color = Color(0.10, 0.09, 0.15, 0.9)
 	sb.border_color = branch_color
 	sb.set_border_width_all(1)
-	sb.set_corner_radius_all(2)
+	sb.set_corner_radius_all(4)
 	sb.content_margin_left = 3
 	sb.content_margin_right = 3
 	sb.content_margin_top = 3
 	sb.content_margin_bottom = 3
 	card.add_theme_stylebox_override("panel", sb)
+	_node_styles[node] = sb
 
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 1)
@@ -238,7 +244,6 @@ func _refresh() -> void:
 	var flavor_spent := PlayerProgression.tier_flavor_spent
 
 	_points_label.text = "Points: %d" % pts
-	_tier_hp_label.text = "Tier %d · HP %d" % [tier, _max_wounds(tier)]
 
 	if tier >= 4:
 		_budget_label.text = "Max Tier — Combat: %d/5 · Flavor: %d/2" % [combat_spent, flavor_spent]
@@ -261,6 +266,25 @@ func _refresh() -> void:
 		var branch_color: Color = _branch_color(nd)
 		for i in pips.size():
 			(pips[i] as ColorRect).color = branch_color if i < lvl else PIP_EMPTY
+
+		# Frame state: gold glow = affordable now, branch glow = owned, plain = neither.
+		var sb: StyleBoxFlat = _node_styles[node]
+		var buyable := PlayerProgression.can_upgrade(nd)
+		if buyable:
+			var gold: Color = BRANCH_COLORS["core"]
+			sb.border_color = gold
+			sb.set_border_width_all(2)
+			sb.shadow_color = Color(gold.r, gold.g, gold.b, 0.55)
+			sb.shadow_size = 4
+		elif lvl > 0:
+			sb.border_color = branch_color
+			sb.set_border_width_all(2)
+			sb.shadow_color = Color(branch_color.r, branch_color.g, branch_color.b, 0.45)
+			sb.shadow_size = 3
+		else:
+			sb.border_color = branch_color
+			sb.set_border_width_all(1)
+			sb.shadow_size = 0
 
 		# Dim only out-of-reach (tier-locked) nodes; cost/affordability lives in the panel.
 		card.modulate = Color(1, 1, 1, 0.4) if tier_locked else Color.WHITE
@@ -286,20 +310,29 @@ func _refresh_canvas() -> void:
 	_draw_connection_lines()
 
 	var tier := PlayerProgression.get_tier()
-	_heart_label.text = "T%d · HP%d" % [tier, _max_wounds(tier)]
+	_core_medallion.set_state(tier, _max_wounds(tier), PlayerProgression.available_points)
 
 
 func _draw_triangle_lines() -> void:
 	var dc := CARD_SIZE * 0.5
-	var color := Color(0.4, 0.35, 0.6, 0.4)
-	_add_line(DOM_VERTEX + dc, ING_VERTEX + dc, color)
-	_add_line(ING_VERTEX + dc, NEG_VERTEX + dc, color)
-	_add_line(NEG_VERTEX + dc, DOM_VERTEX + dc, color)
+	var d := DOM_VERTEX + dc
+	var i := ING_VERTEX + dc
+	var n := NEG_VERTEX + dc
+	var color := Color(0.5, 0.45, 0.7, 0.55)
+	_add_line(d, i, color, 2.0, true)
+	_add_line(i, n, color, 2.0, true)
+	_add_line(n, d, color, 2.0, true)
+
+	# Sparkles at the edge midpoints decorate the otherwise-plain guide lines.
+	var glint := Color(0.85, 0.70, 0.20, 0.85)
+	_add_star_glint((d + i) * 0.5, glint, 5.0)
+	_add_star_glint((i + n) * 0.5, glint, 5.0)
+	_add_star_glint((n + d) * 0.5, glint, 5.0)
 
 	# Clear of the 48px-tall core tokens: DOMINION above, INGENUITY/NEGATION below.
-	_add_vertex_label("DOMINION",  DOM_VERTEX + Vector2(-14, -18))
-	_add_vertex_label("INGENUITY", ING_VERTEX + Vector2(-14, 52))
-	_add_vertex_label("NEGATION",  NEG_VERTEX + Vector2(-14, 52))
+	_add_vertex_label("♦ DOMINION ♦",  DOM_VERTEX + Vector2(-30, -18))
+	_add_vertex_label("♦ INGENUITY ♦", ING_VERTEX + Vector2(-30, 52))
+	_add_vertex_label("♦ NEGATION ♦",  NEG_VERTEX + Vector2(-30, 52))
 
 
 func _draw_connection_lines() -> void:
@@ -332,16 +365,42 @@ func _draw_connection_lines() -> void:
 			var to: Vector2   = _NODE_POSITIONS[nd.node_id] + CARD_SIZE * 0.5
 			var req_lvl: int = int(prereq.get("required_level", 1))
 			var met := PlayerProgression.get_node_level_by_id(pid) >= req_lvl
-			_add_line(from, to, _branch_color(nd) if met else Color(0.30, 0.30, 0.30))
+			if met:
+				_add_line(from, to, _branch_color(nd), 2.0, true)
+			else:
+				_add_line(from, to, Color(0.30, 0.30, 0.30), 1.0, false)
 
 
-func _add_line(from: Vector2, to: Vector2, color: Color) -> void:
+func _add_line(from: Vector2, to: Vector2, color: Color, width: float = 1.0, glow: bool = false) -> void:
+	if glow:
+		var halo := Line2D.new()
+		halo.add_point(from)
+		halo.add_point(to)
+		halo.default_color = Color(color.r, color.g, color.b, 0.18)
+		halo.width = width + 3.0
+		halo.antialiased = true
+		halo.begin_cap_mode = Line2D.LINE_CAP_ROUND
+		halo.end_cap_mode = Line2D.LINE_CAP_ROUND
+		_line_layer.add_child(halo)
 	var line := Line2D.new()
 	line.add_point(from)
 	line.add_point(to)
 	line.default_color = color
-	line.width = 1.0
+	line.width = width
+	line.antialiased = true
+	line.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	line.end_cap_mode = Line2D.LINE_CAP_ROUND
 	_line_layer.add_child(line)
+
+
+## A small 4-point sparkle (bright cross + faint diagonal X), built from Line2Ds.
+func _add_star_glint(pos: Vector2, color: Color, sz: float) -> void:
+	_add_line(pos - Vector2(sz, 0), pos + Vector2(sz, 0), color, 1.0, false)
+	_add_line(pos - Vector2(0, sz), pos + Vector2(0, sz), color, 1.0, false)
+	var diag := sz * 0.6
+	var faint := Color(color.r, color.g, color.b, 0.4)
+	_add_line(pos - Vector2(diag, diag), pos + Vector2(diag, diag), faint, 1.0, false)
+	_add_line(pos - Vector2(diag, -diag), pos + Vector2(diag, -diag), faint, 1.0, false)
 
 
 func _add_vertex_label(text_str: String, pos: Vector2) -> void:
@@ -349,6 +408,7 @@ func _add_vertex_label(text_str: String, pos: Vector2) -> void:
 	lbl.text = text_str
 	lbl.position = pos
 	lbl.add_theme_font_size_override("font_size", 16)
+	lbl.add_theme_color_override("font_color", Color(0.85, 0.80, 0.70))  # parchment
 	lbl.z_index = 5  # above cards (z 1) so branch names are never hidden by tokens
 	_line_layer.add_child(lbl)
 

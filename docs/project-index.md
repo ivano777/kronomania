@@ -112,7 +112,9 @@ _adding an `@export` field, or adding a `.tres` file._
 | `scenes/battle/CombatantHUD.gd` | `CombatantHUD` | — |
 | `scenes/battle/RoundHUD.gd` | `RoundHUD` | — |
 | `scenes/campfire/CampfireScene.gd` | `—` | `player_default.tres` |
+| `scenes/constellation/ConstellationBackdrop.gd` | `—` | — |
 | `scenes/constellation/ConstellationScene.gd` | `—` | — |
+| `scenes/constellation/CoreMedallion.gd` | `CoreMedallion` | — |
 | `scenes/constellation/NodeDetailPanel.gd` | `NodeDetailPanel` | — |
 | `scenes/equipment/EquipmentScene.gd` | `—` | `player_default.tres` |
 | `scenes/main_menu/MainMenuScene.gd` | `—` | — |
