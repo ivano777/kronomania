@@ -84,6 +84,10 @@ var saved_wounds: int = 0
 var luck: int = 0
 ## Saved combat action defaults and mode settings (consumed by Group 7.5 / 7.6).
 var combat_prefs: CombatPreferences = CombatPreferences.new()
+## Chosen hero sprite variant (cosmetic; folder key under assets/sprites/combatants/).
+## "player" = default; "heroine" = female alternate. Read by Combatant / EquipmentScene
+## for the player only — combatant_name stays "Player" for HUD and win checks.
+var hero_sprite: String = "player"
 
 
 ## Returns the current level of a node (0 = not purchased).
@@ -147,6 +151,7 @@ func reset() -> void:
 	main_hand = null
 	off_hand = null
 	combat_prefs = CombatPreferences.new()
+	hero_sprite = "player"
 	_grant_default_keep_nodes()
 
 
@@ -268,6 +273,7 @@ func serialize() -> Dictionary:
 		"luck":                luck,
 		"main_hand":           main_hand.item_name if main_hand != null else "",
 		"off_hand":            off_hand.item_name if off_hand != null else "",
+		"hero_sprite":         hero_sprite,
 		"combat_prefs": {
 			"atk_mode": combat_prefs.atk_mode,
 			"def_mode": combat_prefs.def_mode,
@@ -284,6 +290,7 @@ func deserialize(data: Dictionary) -> void:
 	saved_fervor_size    = int(data.get("saved_fervor_size", 4))
 	saved_is_burned_out  = bool(data.get("saved_is_burned_out", false))
 	luck                 = int(data.get("luck", 0))
+	hero_sprite          = str(data.get("hero_sprite", "player"))
 	node_levels.clear()
 	var saved: Dictionary = data.get("node_levels", {})
 	for node in ALL_NODES:

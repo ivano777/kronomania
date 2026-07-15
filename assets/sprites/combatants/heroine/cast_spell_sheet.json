@@ -1,0 +1,10 @@
+{
+  "name": "heroine_cast_spell",
+  "sheet": "cast_spell_sheet.png",
+  "frame_width": 39,
+  "frame_height": 69,
+  "frame_count": 6,
+  "fps": 12,
+  "loop": false,
+  "layout": "horizontal_strip"
+}

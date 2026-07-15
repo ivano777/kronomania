@@ -46,18 +46,21 @@ func _ready() -> void:
 	add_child(title)
 
 	# --- Paper doll: player idle sprite between the slot columns ---
-	var frames := SpriteRegistry.get_combatant_frames(_PLAYER_DATA.combatant_name)
+	var hero_key := PlayerProgression.hero_sprite
+	var frames := SpriteRegistry.get_combatant_frames(hero_key)
 	if frames != null:
 		var doll := AnimatedSprite2D.new()
 		doll.sprite_frames = frames
 		doll.position = Vector2(186, 168)
 		doll.scale = Vector2(2, 2)
 		# Pack frames are cropped to the union bbox across ALL anims, so the
-		# idle figure sits off-center inside its frame (attack poses pad the
-		# right side). Counter-offset centers the visible figure on position.
+		# default player idle figure sits off-center inside its frame (attack
+		# poses pad the right side). Counter-offset centers it on position.
 		# Measured on player idle_sheet.png: content center (99.5, 43) vs
 		# frame center (64, 34.5) — re-measure if the pack is re-imported.
-		doll.offset = Vector2(-35.5, -8.5)
+		# Heroine frames are horizontally centered with the same feet line, so
+		# only the shared vertical counter-offset applies.
+		doll.offset = Vector2(-35.5, -8.5) if hero_key == "player" else Vector2(0, -8)
 		doll.play("idle")
 		add_child(doll)
 	else:

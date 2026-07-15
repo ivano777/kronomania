@@ -1,0 +1,10 @@
+{
+  "name": "heroine_idle",
+  "sheet": "idle_sheet.png",
+  "frame_width": 39,
+  "frame_height": 69,
+  "frame_count": 8,
+  "fps": 8,
+  "loop": true,
+  "layout": "horizontal_strip"
+}

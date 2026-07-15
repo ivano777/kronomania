@@ -117,6 +117,7 @@ _adding an `@export` field, or adding a `.tres` file._
 | `scenes/constellation/CoreMedallion.gd` | `CoreMedallion` | — |
 | `scenes/constellation/NodeDetailPanel.gd` | `NodeDetailPanel` | — |
 | `scenes/equipment/EquipmentScene.gd` | `—` | `player_default.tres` |
+| `scenes/hero_select/HeroSelectScene.gd` | `—` | — |
 | `scenes/main_menu/MainMenuScene.gd` | `—` | — |
 | `scenes/ui/CustomTooltip.gd` | `—` | — |
 

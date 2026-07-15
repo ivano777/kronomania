@@ -241,7 +241,9 @@ func _commit_new_game(slot: int) -> void:
 	SaveManager.active_run_name = run_name
 	PlayerProgression.reset()
 	DungeonManager.start_run()
-	get_tree().change_scene_to_file("res://scenes/campfire/CampfireScene.tscn")
+	# Hero variant is chosen on the dedicated screen next; the save is written
+	# on the run's first Campfire (hero_sprite defaults to "player" until then).
+	get_tree().change_scene_to_file("res://scenes/hero_select/HeroSelectScene.tscn")
 
 
 func _on_load_slot(slot: int) -> void:

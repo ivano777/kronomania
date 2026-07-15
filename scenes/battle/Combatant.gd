@@ -19,7 +19,10 @@ func setup(data: CombatantData, is_player: bool) -> void:
 	_name_label.text = data.combatant_name
 	_body.color = COLOR_PLAYER if is_player else COLOR_ENEMY
 	_sprite.flip_h = is_player
-	var frames := SpriteRegistry.get_combatant_frames(data.combatant_name)
+	# Player sprite folder is chosen at New Game (cosmetic hero variant); enemies
+	# use their combatant_name. combatant_name stays "Player" for HUD / win checks.
+	var sprite_key := PlayerProgression.hero_sprite if is_player else data.combatant_name
+	var frames := SpriteRegistry.get_combatant_frames(sprite_key)
 	if frames != null:
 		_sprite.sprite_frames = frames
 		_sprite.play("idle")

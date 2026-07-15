@@ -201,3 +201,38 @@ func test_tier_advances_after_5_combat_plus_2_flavor_slots() -> void:
 	assert_eq(pp.get_tier(), 2, "tier advances to 2 after 5 combat + 2 flavor slots filled")
 	assert_eq(pp.tier_combat_spent, 0, "combat slot counter resets on tier advance")
 	assert_eq(pp.tier_flavor_spent, 0, "flavor slot counter resets on tier advance")
+
+
+# ── hero_sprite (cosmetic hero variant) ─────────────────────────────────────────
+
+func test_reset_hero_sprite_defaults_to_player() -> void:
+	pp.hero_sprite = "heroine"
+	pp.reset()
+	assert_eq(pp.hero_sprite, "player", "reset() restores default hero_sprite")
+
+
+func test_serialize_includes_hero_sprite() -> void:
+	pp.hero_sprite = "heroine"
+	var data: Dictionary = pp.serialize()
+	assert_eq(str(data.get("hero_sprite", "")), "heroine", "serialize() writes hero_sprite")
+
+
+func test_deserialize_reads_hero_sprite() -> void:
+	pp.deserialize({"hero_sprite": "heroine"})
+	assert_eq(pp.hero_sprite, "heroine", "deserialize() reads hero_sprite")
+
+
+func test_deserialize_missing_hero_sprite_defaults_to_player() -> void:
+	pp.hero_sprite = "heroine"
+	pp.deserialize({})
+	assert_eq(pp.hero_sprite, "player",
+		"deserialize() defaults hero_sprite to 'player' for old saves")
+
+
+func test_hero_sprite_survives_save_load_round_trip() -> void:
+	pp.hero_sprite = "heroine"
+	var data: Dictionary = pp.serialize()
+	pp.reset()  # back to "player"
+	pp.deserialize(data)
+	assert_eq(pp.hero_sprite, "heroine",
+		"hero_sprite round-trips through serialize → deserialize")
