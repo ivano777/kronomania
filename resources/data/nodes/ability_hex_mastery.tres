@@ -12,7 +12,7 @@ script = ExtResource("2_ldscr")
 branch_spend = {"ingenuity": 6}
 prerequisites = [{
 "node_id": "spellcasting",
-"required_level": 1
+"required_level": 2
 }]
 level_effect_description = "Inject Mind Rend: an attack vs Resolve that, on a breach, deals no wound but brands the target with a hex for 2 turns. While hexed, every guard you break on that enemy deals +1 wound."
 effect_type = "hex_mastery"
@@ -25,6 +25,9 @@ branch_spend = {"ingenuity": 6}
 prerequisites = [{
 "node_id": "hex_mastery",
 "required_level": 1
+}, {
+"node_id": "spellcasting",
+"required_level": 3
 }]
 level_effect_description = "The brand lingers. Hex duration extended to 4 turns."
 

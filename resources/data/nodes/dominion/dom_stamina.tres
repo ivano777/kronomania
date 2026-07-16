@@ -27,7 +27,7 @@ effect_value = 1
 [sub_resource type="Resource" id="Level_2"]
 script = ExtResource("2_ldscr")
 level_index = 3
-cost = 2
+cost = 1
 branch_spend = {"dominion": 5}
 prerequisites = [{
 "node_id": "dom_stamina",

@@ -12,7 +12,7 @@ script = ExtResource("2_ldscr")
 branch_spend = {"ingenuity": 6}
 prerequisites = [{
 "node_id": "spellcasting",
-"required_level": 1
+"required_level": 2
 }]
 level_effect_description = "Inject Mind Lash: an arcane spell that echoes after you cast it. Each round end, it re-fires with one fewer kept die, until the echo dies out."
 effect_type = "echoing_mind"
@@ -25,6 +25,9 @@ branch_spend = {"ingenuity": 6}
 prerequisites = [{
 "node_id": "echoing_mind",
 "required_level": 1
+}, {
+"node_id": "spellcasting",
+"required_level": 3
 }]
 level_effect_description = "Every echo carries a flat bonus equal to the dice it keeps — the echo bites all the way down."
 effect_type = "echoing_mind"

@@ -14,6 +14,7 @@ level_effect_description = "Natural guard stance. Keep 1 die when rolling Stance
 [sub_resource type="Resource" id="Level_1"]
 script = ExtResource("2_ldscr")
 level_index = 2
+cost = 2
 branch_spend = {"negation": 2}
 prerequisites = [{
 "node_id": "neg_core",
