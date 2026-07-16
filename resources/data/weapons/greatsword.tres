@@ -21,4 +21,6 @@ script = ExtResource("1_eqscr")
 item_name = "Greatsword"
 flat_attack_bonus = 1
 tags = PackedStringArray("Sharp", "TwoHanded")
+rarity = "fine"
+impact_fx = "SlashDiagonal"
 action_modifiers = Array[ExtResource("2_amscr")]([SubResource("Strike"), SubResource("Defend"), SubResource("Cast")])

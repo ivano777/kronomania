@@ -24,7 +24,9 @@ func _ready() -> void:
 	# Draw above the node cards (CardLayer has z_index 1, which otherwise wins
 	# over tree order and paints the tokens on top of this overlay).
 	z_index = 50
-	# Pin a ~190px column to the right edge of the parent (the Skills tab area).
+	# Pin a ~190px column to the right edge of the parent. Parent must NOT be
+	# inside one TabContainer tab — flavor cards open this panel from the
+	# Traits tab, so ConstellationScene parents it to the scene root.
 	set_anchors_preset(Control.PRESET_RIGHT_WIDE)
 	anchor_left = 1.0
 	offset_left = -190.0
@@ -127,8 +129,8 @@ func _populate() -> void:
 			_add_divider("— L%d —" % n)
 
 		var cost_bits: Array[String] = ["Cost %d" % ld.cost]
-		if ld.required_tier > 1:
-			cost_bits.append("Tier %d+" % ld.required_tier)
+		for b in ld.branch_spend:
+			cost_bits.append("%s %d+" % [str(b).capitalize(), int(ld.branch_spend[b])])
 		if ld.uses_per_combat > 0:
 			cost_bits.append("%d/combat" % ld.uses_per_combat)
 		_add_row("L%d" % n, "  ·  ".join(cost_bits), owned)
@@ -159,21 +161,33 @@ func _populate() -> void:
 
 
 func _refresh_buy_button(current_level: int) -> void:
-	var tier: int = PlayerProgression.get_tier()
 	if current_level >= _node.max_levels:
 		_buy_btn.text = "Max"
 		_buy_btn.disabled = true
 		return
 	var ld := _node.levels_data[current_level] as NodeLevelData
-	if tier < ld.required_tier:
-		_buy_btn.text = "Needs Tier %d" % ld.required_tier
-		_buy_btn.disabled = true
-	elif PlayerProgression.can_upgrade(_node):
-		_buy_btn.text = "Buy  +%d" % ld.cost
+	# can_upgrade first: it is the single source of truth (incl. debug Free Buy,
+	# which ignores branch-spend gates and point cost); gate text is just the
+	# failure label.
+	if PlayerProgression.can_upgrade(_node):
+		var free := PlayerProgression.debug_free_buy and DebugManager.enabled
+		_buy_btn.text = "Buy (free)" if free else "Buy  +%d" % ld.cost
 		_buy_btn.disabled = false
+	elif not PlayerProgression.spend_gate_met(ld):
+		_buy_btn.text = _unmet_gate_label(ld)
+		_buy_btn.disabled = true
 	else:
 		_buy_btn.text = "Locked"
 		_buy_btn.disabled = true
+
+
+## First unmet branch-spend requirement as button text, e.g. "Spend 3 in Dominion".
+func _unmet_gate_label(ld: NodeLevelData) -> String:
+	for b in ld.branch_spend:
+		var need := int(ld.branch_spend[b])
+		if PlayerProgression.get_branch_spent(str(b)) < need:
+			return "Spend %d in %s" % [need, str(b).capitalize()]
+	return "Locked"
 
 
 func _on_buy() -> void:

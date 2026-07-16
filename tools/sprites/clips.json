@@ -11,6 +11,30 @@
       "frames": ["impact_burst_1", "impact_burst_2", "impact_burst_3", "impact_burst_4", "impact_burst_5"],
       "fps": 12,
       "loop": false
+    },
+    {
+      "name": "SlashDiagonal",
+      "frames": ["slash_diagonal_1", "slash_diagonal_2", "slash_diagonal_3", "slash_diagonal_4"],
+      "fps": 12,
+      "loop": false
+    },
+    {
+      "name": "CastGlow",
+      "frames": ["cast_glow_1", "cast_glow_2", "cast_glow_3", "cast_glow_4"],
+      "fps": 12,
+      "loop": false
+    },
+    {
+      "name": "ArcaneBolt",
+      "frames": ["arcane_bolt_1", "arcane_bolt_2", "arcane_bolt_3"],
+      "fps": 18,
+      "loop": true
+    },
+    {
+      "name": "BlockSpark",
+      "frames": ["block_spark_1", "block_spark_2", "block_spark_3", "block_spark_4"],
+      "fps": 15,
+      "loop": false
     }
   ]
 }

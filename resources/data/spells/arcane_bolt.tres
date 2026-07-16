@@ -11,3 +11,5 @@ aspect_dice = 0
 target_pool = "stance"
 flat_bonus = 0
 is_cantrip = true
+windup_fx = "CastGlow"
+projectile_fx = "ArcaneBolt"

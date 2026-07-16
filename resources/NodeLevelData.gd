@@ -9,8 +9,14 @@ extends Resource
 ## Slot cost to purchase this level (2 for Core nodes, 1 for others).
 @export_range(1, 5) var cost: int = 1
 
-## Minimum player Tier required before this level may be purchased.
+## DEPRECATED shim — superseded by branch_spend gates; ignored at runtime.
+## Kept so old .tres files load; do not add new uses.
 @export_range(1, 4) var required_tier: int = 1
+
+## Branch-spend gate: {"dominion"|"negation"|"ingenuity": points}. All entries must
+## be satisfied (hybrid gates use two keys). Empty = ungated. Spend is derived from
+## purchased node levels of that branch (PlayerProgression.get_branch_spent()).
+@export var branch_spend: Dictionary = {}
 
 ## Prerequisite nodes required to unlock this level.
 ## Each entry: {"node_id": String, "required_level": int}. All must be satisfied.

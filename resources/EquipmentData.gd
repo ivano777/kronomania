@@ -21,12 +21,30 @@ extends Resource
 ## Weapon tags (e.g. "Sharp", "Blunt", "TwoHanded") for skill prerequisites and slot logic.
 @export var tags: PackedStringArray = PackedStringArray()
 
+## Item rarity — drives the FX aura tint + slight size bonus on this item's
+## slash/projectile clips (AttackPresenter.RARITY_TINTS). Presentation only
+## for now; no gameplay effect.
+@export_enum("common", "fine", "arcane", "relic") var rarity: String = "common"
+
 ## Action-keyed modifiers. When non-empty, supersedes the deprecated flat fields above.
 @export var action_modifiers: Array[ActionModifier] = []
 
 ## Combatant animation played when striking with this weapon. "" = default "attack_melee".
 ## Presentation only — missing animations degrade to the default pose at runtime.
 @export var attack_anim: String = ""
+
+## Shared effect clip (SpriteRegistry.get_effect_frames) played on the ATTACKER
+## during the windup of a strike with this weapon. "" = no windup effect.
+## Presentation only — a missing clip degrades to nothing at runtime.
+@export var windup_fx: String = ""
+
+## Shared effect clip played on the TARGET at impact when a strike with this
+## weapon breaches. "" = the generic "ImpactBurst".
+@export var impact_fx: String = ""
+
+## Shared effect clip flown from attacker to target between windup and impact
+## (thrown/shot weapons). "" = no projectile, impact lands immediately.
+@export var projectile_fx: String = ""
 
 
 ## Returns how many hand slots this item requires, derived from tags.

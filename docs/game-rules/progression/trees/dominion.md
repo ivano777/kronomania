@@ -2,8 +2,10 @@
 
 The Dominion path specialises in raw offensive force, melee mastery, and physical endurance. It is the primary driver for close-quarters combat and max-wounds growth.
 
-**Total budget-consuming level-ups: 24 across 11 nodes** (plus Martial Arts' free L1 baseline, which is auto-granted at run start and costs no slot).
-The tier budget (5 Combat slots × 4 Tiers = 20 total) means players will choose 20 out of 24 possible level-ups. Not every node can be maxed — meaningful sacrifice is intended.
+**Total budget-consuming level-ups: 23 across 11 nodes** (plus the free L1 baselines of Martial Arts and Stamina Guard, auto-granted at run start at no slot cost).
+The tier budget (5 Combat slots × 4 Tiers = 20 total) means players will choose 20 out of 23 possible level-ups. Not every node can be maxed — meaningful sacrifice is intended.
+
+> **Defense rework:** the old Wounds node is deleted. Stamina Guard (the Dominion defense node) carries the branch's only Max Wounds bonus (+1 at L2) and gates Meat for the Grinder. Node-level Tier requirements are replaced by **branch-spend gates** (see [Nodes — Branch-Spend Gates](../nodes.md)).
 
 ---
 
@@ -11,14 +13,13 @@ The tier budget (5 Combat slots × 4 Tiers = 20 total) means players will choose
 
 ```
 Core Dominion (L1 / L2 / L3)
-    ├── Wounds (L1 / L2 / L3)
-    │     [L1 req: Core Dominion L1]
-    │     [L2 req: Wounds L1 + Core Dominion L2]
-    │     [L3 req: Wounds L2 + Core Dominion L3]
-    │     └── Meat for the Grinder (L1 / L2)  [req: Wounds L2]
+    ├── Stamina Guard (L1 free / L2 / L3)
+    │     [L2 req: Core Dominion L1, 2 spent in Dominion]
+    │     [L3 req: Stamina Guard L2 + Core Dominion L2, 5 spent in Dominion]
+    │     └── Meat for the Grinder (L1 / L2)  [req: Stamina Guard L2; 4 / 7 spent in Dominion]
     │
     └── Martial Arts (L1 free / L2 / L3)
-            [L2 req: Core Dominion L1]  [L3 req: Martial Arts L2 + Core Dominion L2, Tier 2]
+            [L2 req: Core Dominion L1]  [L3 req: Martial Arts L2 + Core Dominion L2, 3 spent in Dominion]
             ├── Melee (L1 / L2)  [req: Martial Arts L1]
             │     ├── Dual Wield (L1 / L2)    [req: Melee L1]
             │     ├── Titan's Grip (L1 / L2)  [req: Melee L1]
@@ -49,18 +50,21 @@ Core Dominion (L1 / L2 / L3)
 
 ---
 
-### Wounds
+### Stamina Guard
 | | |
 |---|---|
-| **Category** | Training |
+| **Category** | Training (defense node — Stamina pool) |
 | **Max Level** | 3 |
-| **Prerequisites** | L1: Core Dominion L1 · L2: Wounds L1 + Core Dominion L2 · L3: Wounds L2 + Core Dominion L3 |
+| **Cost** | L1 free · L2: 2 slots · L3: 2 slots |
+| **Prerequisites** | L2: Core Dominion L1 (2 spent in Dominion) · L3: Stamina Guard L2 + Core Dominion L2 (5 spent in Dominion) |
 
 | Level | Effect |
 |---|---|
-| L1 | Max Wounds +1 |
-| L2 | Max Wounds +1 (cumulative: +2 total) |
-| L3 | Max Wounds +1 (cumulative: +3 total) |
+| L1 | **Free baseline** — Keep 1 die on Stamina guard. |
+| L2 | Keep 2 dice on Stamina guard. **Max Wounds +1.** |
+| L3 | Keep 3 dice on Stamina guard. |
+
+> Keep grade equals the node's purchased level (see [Defense and Guard](../../core/defense-and-guard.md)). The L2 wound rider is the only node-based Max Wounds bonus in the game.
 
 ---
 
@@ -69,7 +73,7 @@ Core Dominion (L1 / L2 / L3)
 |---|---|
 | **Category** | Training |
 | **Max Level** | 3 |
-| **Prerequisites** | L1: none (free baseline) · L2: Core Dominion L1 · L3 (Tier 2): Martial Arts L2 + Core Dominion L2 |
+| **Prerequisites** | L1: none (free baseline) · L2: Core Dominion L1 · L3 (3 spent in Dominion): Martial Arts L2 + Core Dominion L2 |
 
 | Level | Effect |
 |---|---|
@@ -173,7 +177,7 @@ Core Dominion (L1 / L2 / L3)
 |---|---|
 | **Category** | Ability |
 | **Max Level** | 2 |
-| **Prerequisites** | Wounds L2 |
+| **Prerequisites** | Stamina Guard L2 (L1: 4 spent in Dominion · L2: 7 spent in Dominion) |
 
 | Level | Name | Effect |
 |---|---|---|

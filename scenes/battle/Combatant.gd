@@ -4,6 +4,9 @@ extends Node2D
 const COLOR_PLAYER := Color(0.20, 0.35, 0.80, 1.0)
 const COLOR_ENEMY  := Color(0.80, 0.20, 0.20, 1.0)
 
+const _FLASH_SHADER := preload("res://assets/shaders/impact_flash.gdshader")
+const FLASH_S := 0.18
+
 var _is_dead := false
 
 @onready var _body:       ColorRect        = $Body
@@ -13,6 +16,10 @@ var _is_dead := false
 
 func _ready() -> void:
 	_sprite.animation_finished.connect(_on_animation_finished)
+	# Per-instance flash material (a shared one would flash every combatant at once).
+	var mat := ShaderMaterial.new()
+	mat.shader = _FLASH_SHADER
+	_sprite.material = mat
 
 
 func setup(data: CombatantData, is_player: bool) -> void:
@@ -79,6 +86,19 @@ func fade_name_label(alpha: float = 0.4) -> void:
 
 func play_hurt() -> void:
 	_play("hurt")
+
+
+## White impact flash — decays back to normal over `duration`. Re-triggering
+## restarts the decay (last tween wins; harmless at this timescale).
+func flash(duration: float = FLASH_S) -> void:
+	var mat := _sprite.material as ShaderMaterial
+	if mat == null:
+		return
+	mat.set_shader_parameter("flash_amount", 1.0)
+	var t := create_tween()
+	t.tween_method(
+		func(v: float) -> void: mat.set_shader_parameter("flash_amount", v),
+		1.0, 0.0, duration)
 
 
 func play_die() -> void:

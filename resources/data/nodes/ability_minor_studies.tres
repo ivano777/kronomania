@@ -17,6 +17,7 @@ spells = Array[ExtResource("4_xrvdi")]([ExtResource("3_spell1"), ExtResource("4_
 [resource]
 script = ExtResource("1_ndscr")
 node_id = "minor_studies"
+branch = "ingenuity"
 display_name = "Minor Studies"
 category = "Ability"
 base_description = "You have learned basic cantrips. Ingenuity-based attack; no Fervor cost. Available even during Burnout."

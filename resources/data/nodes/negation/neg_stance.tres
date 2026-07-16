@@ -10,24 +10,24 @@
 script = ExtResource("2_ldscr")
 cost = 0
 level_effect_description = "Natural guard stance. Keep 1 die when rolling Stance defense."
-effect_type = "stance_keep"
-effect_value = 1
 
 [sub_resource type="Resource" id="Level_1"]
 script = ExtResource("2_ldscr")
 level_index = 2
+branch_spend = {"negation": 2}
 prerequisites = [{
 "node_id": "neg_core",
 "required_level": 1
 }]
-level_effect_description = "Disciplined guard. Keep 2 dice when rolling Stance defense."
-effect_type = "stance_keep"
+level_effect_description = "Disciplined guard. Keep 2 dice when rolling Stance defense. +2 flat to Stance guard."
+effect_type = "stance_flat"
 effect_value = 2
 
 [sub_resource type="Resource" id="Level_2"]
 script = ExtResource("2_ldscr")
 level_index = 3
-required_tier = 2
+cost = 2
+branch_spend = {"negation": 5}
 prerequisites = [{
 "node_id": "neg_stance",
 "required_level": 2
@@ -35,13 +35,14 @@ prerequisites = [{
 "node_id": "neg_core",
 "required_level": 2
 }]
-level_effect_description = "Iron guard. Keep 3 dice when rolling Stance defense."
-effect_type = "stance_keep"
-effect_value = 3
+level_effect_description = "Iron guard. Keep 3 dice when rolling Stance defense. Add one Negation die to every defense pool you roll."
+effect_type = "guard_aspect_all"
+effect_value = 1
 
 [resource]
 script = ExtResource("1_ndscr")
 node_id = "neg_stance"
+branch = "negation"
 display_name = "Stance Guard"
 base_description = "Disciplined footwork and guard technique improve your Stance defense. Improves Keep grade when defending the Stance pool."
 max_levels = 3

@@ -46,3 +46,44 @@ When hostile pressure hits a Guard pool:
 - subtract the hostile total from current Guard
 - if Guard remains above 0, the pool still holds
 - if Guard reaches 0 or lower, the defense is breached
+
+## Defense Keep and Defense Nodes
+
+Each pool's Keep grade equals the purchased level of its branch defense node
+(the training grade is the floor; enemies use training only):
+- **Stance** → Stance Guard (Negation)
+- **Resolve** → Resolve Guard (Ingenuity)
+- **Stamina** → Stamina Guard (Dominion)
+
+Level 1 of each defense node is granted free at run start. Higher levels also
+carry a branch-flavored rider:
+
+| Node | L2 rider | L3 rider |
+|---|---|---|
+| Stamina Guard (Dominion) | +1 Max Wounds | — |
+| Resolve Guard (Ingenuity) | Magic Shield, 1 charge | Magic Shield, 2 charges |
+| Stance Guard (Negation) | +2 flat on Stance guard | +1 Negation die on every defense pool |
+
+Rider scope rule: wound-layer riders are global, charge actives are global by
+trigger, passive number riders stay on the home pool until L3.
+
+## Magic Shield (Resolve Guard L2+)
+
+When any of the player's guards **would break** (incoming total >= current Guard),
+the player may spend a Magic Shield charge BEFORE the breach commits:
+1. roll N Ingenuity-size dice, where N = Resolve Guard purchased level;
+2. add the total to that pool's current Guard;
+3. re-check the breach — the shield can fail.
+
+Rules:
+- Works on **every** pool — protecting the caster's weak pools is its point.
+- One prompt per attack; it never auto-fires (the player judges the odds).
+- Guard-layer only: effects that deal wounds directly without pressuring a
+  Guard pool cannot be shielded.
+- Charges per combat: L2 = 1, L3 = 2.
+
+## Negation Cross-Pool Die (Stance Guard L3)
+
+Stance Guard L3 adds one Negation-size die to **every** defense pool roll.
+The die is added (the pool grows by one die), not substituted. Keep is
+unchanged — the extra die contributes through keep selection.

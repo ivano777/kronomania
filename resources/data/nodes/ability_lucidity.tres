@@ -18,7 +18,7 @@ effect_type = "lucidity_lower_fervor"
 [sub_resource type="Resource" id="Level_2"]
 script = ExtResource("2_ldscr")
 level_index = 2
-required_tier = 3
+branch_spend = {"ingenuity": 6}
 prerequisites = [{
 "node_id": "lucidity",
 "required_level": 1
@@ -29,6 +29,7 @@ effect_type = "lucidity_prevent_burnout"
 [resource]
 script = ExtResource("1_ndscr")
 node_id = "lucidity"
+branch = "ingenuity"
 display_name = "Lucidity"
 category = "Ability"
 base_description = "Master your own Fervor. Cool the burn before it consumes you."

@@ -85,6 +85,7 @@ Holds all common, level-agnostic data. One `.tres` file per node.
 | `base_description` | `String` | Flavour/overview description shared across all levels |
 | `max_levels` | `int` | Maximum level the node can reach (1 for all legacy single-upgrade nodes) |
 | `category` | `String` | Constellation category — `"Core"`, `"Training"`, `"Ability"`, `"Flavor"` |
+| `branch` | `String` | Branch this node's spend counts toward — `"dominion"`, `"negation"`, `"ingenuity"`, or `""` (Flavor nodes count nowhere) |
 | `levels_data` | `Array[NodeLevelData]` | Ordered sub-resource list; index 0 = Level 1, index N−1 = Level `max_levels` |
 
 ### Sub-Resource — `NodeLevelData.gd`
@@ -95,7 +96,8 @@ Holds **exclusively** data that changes per level. Stored inline inside `levels_
 |-------|------|---------|
 | `level_index` | `int` | 1-based level number this entry describes |
 | `cost` | `int` | Slot cost to reach this level (usually 1) |
-| `required_tier` | `int` | Minimum player Tier before this level may be purchased |
+| `required_tier` | `int` | **Deprecated shim** — ignored at runtime, superseded by `branch_spend` |
+| `branch_spend` | `Dictionary` | Branch-spend gate `{"branch": points}`; all entries must be satisfied (hybrid gates use two keys); empty = ungated |
 | `prerequisites` | `Array[Dictionary]` | Each entry: `{ "node_id": String, "required_level": int }`. All must be satisfied simultaneously. |
 | `level_effect_description` | `String` | Human-readable description of the effect granted at this level |
 

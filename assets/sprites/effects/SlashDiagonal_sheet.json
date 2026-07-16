@@ -1,0 +1,16 @@
+{
+  "name": "SlashDiagonal",
+  "sheet": "SlashDiagonal_sheet.png",
+  "frame_width": 32,
+  "frame_height": 32,
+  "frame_count": 4,
+  "frames": [
+    "slash_diagonal_1",
+    "slash_diagonal_2",
+    "slash_diagonal_3",
+    "slash_diagonal_4"
+  ],
+  "fps": 12,
+  "loop": false,
+  "layout": "horizontal_strip"
+}

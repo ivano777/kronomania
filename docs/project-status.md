@@ -287,6 +287,11 @@ Prerequisites: Group C + Phase D-pre complete. ✓ All prerequisites met.
 
 ---
 
+### ✓ Group E — Defense & Gating Rework — COMPLETE (2026-07-16)
+Defense keep = defense-node level (L1 free baseline; `*_keep` effect types retired); levels carry branch riders — `dom_stamina` L2 +1 Max Wounds (`dom_wounds` deleted, HP +3 → +1; MG re-gated on `dom_stamina` L2), `ing_resolve` L2/L3 Magic Shield (guard-shaped `on_guard_break` interrupt, 1/2 charges, N = node level Ingenuity dice, pre-breach prompt), `neg_stance` L2 +2 Stance flat / L3 +1 Negation die on every pool (added aspect die). Node `required_tier` gates replaced by `branch_spend` gates (`NodeData.branch` + derived `get_branch_spent()`; hybrid = two keys; Tier keeps pool-size + slot-budget roles). Plan: [docs/impl/defense-rework.md](impl/defense-rework.md).
+
+---
+
 ### Group 6 — Polish
 - [x] **Save / load** — `SaveManager`, 3-slot JSON, auto-save on campfire entry.
 - [x] **Constellation triangle canvas** — DOM/ING/NEG vertex layout, `Line2D` connections, expand/collapse, compact node cards.

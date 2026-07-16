@@ -38,6 +38,21 @@ A Core node with `max_level = 3` costs 6 Combat slots total — more than one ti
 A node may require one or more other nodes to be unlocked before it can be purchased.
 All listed prerequisites must be satisfied simultaneously — they are AND conditions.
 
+## Branch-Spend Gates
+
+Besides node prerequisites, a level may carry a **branch-spend gate**: the player
+must have spent at least N points on nodes of a given branch before purchasing it.
+Spend is derived from purchased levels (the sum of their costs); the free
+defense-node L1 grants cost 0 and count nothing.
+
+- Gates replace the old per-node Tier requirements. Tier itself is unchanged —
+  it still governs base pool size and the per-tier slot budget.
+- Hybrid gates list two branches (e.g. 3 in Negation AND 3 in Ingenuity); both
+  must be satisfied.
+- Standard mapping from the old Tier gates: Tier 2 → spend 3, Tier 3 → spend 6,
+  Tier 4 → spend 9. Defense lines gate at 2 (L2) and 5 (L3); Meat for the
+  Grinder at 4 (L1) and 7 (L2).
+
 Examples:
 - A spell school tier may require the previous school tier AND a Core stat node.
 - The Spellcasting node requires Minor Studies.

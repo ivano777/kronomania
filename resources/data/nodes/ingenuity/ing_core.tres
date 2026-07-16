@@ -29,7 +29,7 @@ effect_value = 8
 script = ExtResource("2_ldscr")
 level_index = 3
 cost = 2
-required_tier = 2
+branch_spend = {"ingenuity": 3}
 prerequisites = [{
 "node_id": "ing_core",
 "required_level": 2
@@ -41,6 +41,7 @@ effect_value = 10
 [resource]
 script = ExtResource("1_ndscr")
 node_id = "ing_core"
+branch = "ingenuity"
 display_name = "Ingenuity Core"
 category = "Core"
 base_description = "Arcane mastery. Increases your Ingenuity die size."

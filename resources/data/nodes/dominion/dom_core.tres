@@ -29,7 +29,7 @@ effect_value = 8
 script = ExtResource("2_ldscr")
 level_index = 3
 cost = 2
-required_tier = 2
+branch_spend = {"dominion": 3}
 prerequisites = [{
 "node_id": "dom_core",
 "required_level": 2
@@ -41,6 +41,7 @@ effect_value = 10
 [resource]
 script = ExtResource("1_ndscr")
 node_id = "dom_core"
+branch = "dominion"
 display_name = "Dominion Core"
 category = "Core"
 base_description = "Raw physical force. Increases your Dominion die size."

@@ -9,7 +9,7 @@
 
 [sub_resource type="Resource" id="Level_1"]
 script = ExtResource("2_ldscr")
-required_tier = 3
+branch_spend = {"ingenuity": 6}
 prerequisites = [{
 "node_id": "spellcasting",
 "required_level": 1
@@ -21,7 +21,7 @@ spells = Array[ExtResource("4_t3nyx")]([ExtResource("3_mlspell")])
 [sub_resource type="Resource" id="Level_2"]
 script = ExtResource("2_ldscr")
 level_index = 2
-required_tier = 3
+branch_spend = {"ingenuity": 6}
 prerequisites = [{
 "node_id": "echoing_mind",
 "required_level": 1
@@ -32,6 +32,7 @@ effect_type = "echoing_mind"
 [resource]
 script = ExtResource("1_ndscr")
 node_id = "echoing_mind"
+branch = "ingenuity"
 display_name = "Echoing Mind"
 category = "ingenuity"
 base_description = "Your spells do not end when cast. Tag a spell with the echo mark and it resounds at the end of each round, weakening with each pass."

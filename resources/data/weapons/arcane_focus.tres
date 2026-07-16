@@ -13,4 +13,5 @@ flat_bonus = 1
 script = ExtResource("1_eqscr")
 item_name = "Arcane Focus"
 tags = PackedStringArray("MagicFocus")
+rarity = "arcane"
 action_modifiers = Array[ExtResource("2_amscr")]([SubResource("Cast")])

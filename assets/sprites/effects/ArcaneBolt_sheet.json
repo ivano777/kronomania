@@ -1,0 +1,15 @@
+{
+  "name": "ArcaneBolt",
+  "sheet": "ArcaneBolt_sheet.png",
+  "frame_width": 16,
+  "frame_height": 16,
+  "frame_count": 3,
+  "frames": [
+    "arcane_bolt_1",
+    "arcane_bolt_2",
+    "arcane_bolt_3"
+  ],
+  "fps": 18,
+  "loop": true,
+  "layout": "horizontal_strip"
+}

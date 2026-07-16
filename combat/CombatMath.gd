@@ -46,6 +46,31 @@ static func meat_grinder_charges(state: CombatantState) -> int:
 	return best
 
 
+## Returns the max uses_per_combat across all purchased magic_shield NodeLevelData
+## entries (ing_resolve L2 = 1, L3 = 2).
+static func magic_shield_charges(state: CombatantState) -> int:
+	var best := 0
+	for node in state.node_levels.keys():
+		var nd: NodeData = node as NodeData
+		if nd == null:
+			continue
+		var lvl: int = state.node_levels[node]
+		for i in range(mini(lvl, nd.levels_data.size())):
+			var ld: NodeLevelData = nd.levels_data[i]
+			if ld.effect_type == "magic_shield":
+				best = maxi(best, ld.uses_per_combat)
+	return best
+
+
+## Magic Shield dice count = purchased ing_resolve level (the defense line feeds
+## the shield: deeper Resolve training weaves more Ingenuity dice per charge).
+static func magic_shield_dice(state: CombatantState) -> int:
+	for node in state.node_levels.keys():
+		if (node as NodeData).node_id == "ing_resolve":
+			return state.node_levels[node] as int
+	return 0
+
+
 ## Returns the die size for the given defense pool on a combatant.
 ## Stance = Negation, Resolve = Ingenuity, Stamina = Dominion (defensive expression).
 static func get_pool_size(state: CombatantState, pool: String) -> int:
@@ -244,10 +269,40 @@ static func training_keep_grade(state: CombatantState) -> int:
 	return maxi(state.data.keep_grade, node_effect_max(state, "training_keep"))
 
 
+## Defense node per pool — a pool's keep grade equals the purchased level of its
+## branch defense node (L1 auto-granted = keep 1). Implicit keep frees each level's
+## effect_type for riders (defense-rework); the *_keep effect types are retired.
+const DEFENSE_NODE_FOR_POOL: Dictionary = {
+	"stance": "neg_stance",
+	"resolve": "ing_resolve",
+	"stamina": "dom_stamina",
+}
+
+
 ## Returns the effective defensive keep grade for the given pool: max of
-## training_keep_grade and pool-specific *_keep nodes (mirrors physical_keep_grade architecture).
+## training_keep_grade (floor, covers enemies) and the pool's defense node level.
 static func defense_keep_grade(state: CombatantState, pool: String) -> int:
-	return maxi(training_keep_grade(state), node_effect_max(state, pool + "_keep"))
+	var want: String = DEFENSE_NODE_FOR_POOL.get(pool, "")
+	var lvl := 0
+	for node in state.node_levels.keys():
+		if (node as NodeData).node_id == want:
+			lvl = state.node_levels[node] as int
+			break
+	return maxi(training_keep_grade(state), lvl)
+
+
+## Flat guard bonus for a pool (neg_stance L2 rider "stance_flat" — Stance pool only).
+static func guard_flat_bonus(state: CombatantState, pool: String) -> int:
+	if pool != "stance":
+		return 0
+	return node_effect_sum(state, "stance_flat")
+
+
+## Extra defense pool dice of Negation size on EVERY pool (neg_stance L3 rider
+## "guard_aspect_all"). Added dice, not substituted: caller must widen the pool
+## by this count AND pass it as aspect_count with Negation as aspect_stat_size.
+static func guard_bonus_dice(state: CombatantState) -> int:
+	return node_effect_max(state, "guard_aspect_all")
 
 
 # ── Formatting helpers ────────────────────────────────────────────────────────

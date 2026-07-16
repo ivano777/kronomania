@@ -8,8 +8,11 @@ anchor_top = 1.0
 anchor_right = 0.0
 anchor_bottom = 1.0
 offset_left = 5.0
-offset_top = -100.0
+offset_top = -5.0
+offset_right = 5.0
 offset_bottom = -5.0
+grow_horizontal = 1
+grow_vertical = 0
 script = ExtResource("1_wsel")
 
 [node name="ToggleButton" type="Button" parent="."]
@@ -26,7 +29,7 @@ text = "▶ Main"
 [node name="OffSlotBtn" type="Button" parent="Panel/SlotRow"]
 text = "  Off"
 
-[node name="Buttons" type="HBoxContainer" parent="Panel"]
+[node name="Buttons" type="VBoxContainer" parent="Panel"]
 
 [node name="StatusLabel" type="Label" parent="Panel"]
 text = "Active: (from .tres)"

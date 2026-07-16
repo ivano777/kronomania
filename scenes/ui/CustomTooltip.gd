@@ -103,8 +103,8 @@ func populate_delta(node: NodeData) -> void:
 	# Next block — emphasized
 	var next_ld: NodeLevelData = node.levels_data[current_level] as NodeLevelData
 	_add_row("Cost", "%d slot(s)" % next_ld.cost)
-	if next_ld.required_tier > 1:
-		_add_row("Tier required", "Tier %d+" % next_ld.required_tier)
+	for b in next_ld.branch_spend:
+		_add_row("Requires spend", "%d in %s" % [int(next_ld.branch_spend[b]), str(b).capitalize()])
 	if not next_ld.prerequisites.is_empty():
 		var parts: Array[String] = []
 		for prereq in next_ld.prerequisites:

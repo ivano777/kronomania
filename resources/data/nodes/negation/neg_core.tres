@@ -29,7 +29,7 @@ effect_value = 8
 script = ExtResource("2_ldscr")
 level_index = 3
 cost = 2
-required_tier = 2
+branch_spend = {"negation": 3}
 prerequisites = [{
 "node_id": "neg_core",
 "required_level": 2
@@ -41,6 +41,7 @@ effect_value = 10
 [resource]
 script = ExtResource("1_ndscr")
 node_id = "neg_core"
+branch = "negation"
 display_name = "Negation Core"
 category = "Core"
 base_description = "Defensive mastery. Increases your Negation die size."

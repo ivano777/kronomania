@@ -33,6 +33,19 @@ extends Resource
 ## Presentation only — missing animations degrade to the default pose at runtime.
 @export var attack_anim: String = ""
 
+## Shared effect clip (SpriteRegistry.get_effect_frames) played on the CASTER
+## during the cast windup. "" = no windup effect.
+## Presentation only — a missing clip degrades to nothing at runtime.
+@export var windup_fx: String = ""
+
+## Shared effect clip played on the TARGET at impact when this spell breaches.
+## "" = the generic "ImpactBurst".
+@export var impact_fx: String = ""
+
+## Shared effect clip flown from caster to target between windup and impact
+## (bolts, missiles). "" = no projectile, impact lands immediately.
+@export var projectile_fx: String = ""
+
 # ── Discipline cast dispatch (data-driven; replaces spell_name string matches) ──
 
 ## Which discipline cast routine handles the player attack in _resolve_round_spell.

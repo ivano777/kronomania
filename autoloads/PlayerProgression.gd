@@ -6,7 +6,6 @@ extends Node
 const ALL_NODES: Array = [
 	preload("res://resources/data/nodes/dominion/dom_core.tres"),
 	preload("res://resources/data/nodes/dominion/dom_stamina.tres"),
-	preload("res://resources/data/nodes/dominion/dom_wounds.tres"),
 	preload("res://resources/data/nodes/dominion/dom_martial_arts.tres"),
 	preload("res://resources/data/nodes/dominion/dom_melee.tres"),
 	preload("res://resources/data/nodes/dominion/dom_ranged.tres"),
@@ -75,6 +74,12 @@ var tier_flavor_spent: int = 0
 const MAX_TIER: int = 4
 var _tier: int = 1
 
+## Debug-only Free Buy toggle (DebugProgressionControl widget). While F12 debug
+## mode is active, can_upgrade() ignores Tier requirements, slot budgets AND the
+## point cost (upgrade() spends nothing) so every node is purchasable for testing;
+## only prerequisites and max level still gate. Never serialized; inert without debug mode.
+var debug_free_buy: bool = false
+
 ## Fervor state persisted across combats (Group 5). Long Rest resets to 4; Recovery clears burnout only.
 var saved_fervor_size: int = 4
 var saved_is_burned_out: bool = false
@@ -108,14 +113,19 @@ func can_upgrade(node: NodeData) -> bool:
 	if node.levels_data.size() <= current:
 		return false
 	var ld: NodeLevelData = node.levels_data[current]
-	if available_points < ld.cost:
+	# Free Buy (debug): skip point cost, branch-spend gates and slot budgets;
+	# prerequisites and max level still apply.
+	var free_buy := debug_free_buy and DebugManager.enabled
+	if not free_buy and available_points < ld.cost:
 		return false
-	if _tier < ld.required_tier:
+	if not free_buy and not spend_gate_met(ld):
 		return false
 	for prereq in ld.prerequisites:
 		var prereq_node := _node_by_id(prereq["node_id"])
 		if prereq_node == null or get_level(prereq_node) < int(prereq["required_level"]):
 			return false
+	if free_buy:
+		return true
 	if node.category == "Flavor":
 		return tier_flavor_spent < 2
 	return tier_combat_spent + ld.cost <= 5
@@ -127,6 +137,10 @@ func upgrade(node: NodeData) -> void:
 	var current := get_level(node)
 	var ld: NodeLevelData = node.levels_data[current]
 	node_levels[node] = current + 1
+	# Free Buy (debug): pure sandbox grant — no point spend, no slot bookkeeping,
+	# no auto tier advance (would silently promote the tier while testing).
+	if debug_free_buy and DebugManager.enabled:
+		return
 	available_points -= ld.cost
 	if node.category == "Flavor":
 		tier_flavor_spent += 1
@@ -256,6 +270,31 @@ func get_known_cantrips() -> Array:
 ## Returns current Tier (slot-budget model: 5 combat + 2 Flavor per tier; Core costs 2 slots).
 func get_tier() -> int:
 	return _tier
+
+
+## Total points spent in a branch — derived from purchased node levels (sum of level
+## costs where the node's branch matches). No save field needed: recomputed from
+## node_levels, so old saves and debug Free Buy grants are counted consistently.
+func get_branch_spent(branch: String) -> int:
+	if branch == "":
+		return 0
+	var total := 0
+	for node in node_levels.keys():
+		var nd := node as NodeData
+		if nd.branch != branch:
+			continue
+		var lvl: int = node_levels[node]
+		for i in range(mini(lvl, nd.levels_data.size())):
+			total += (nd.levels_data[i] as NodeLevelData).cost
+	return total
+
+
+## True when every branch-spend requirement on this level is met (empty dict = ungated).
+func spend_gate_met(ld: NodeLevelData) -> bool:
+	for branch in ld.branch_spend:
+		if get_branch_spent(str(branch)) < int(ld.branch_spend[branch]):
+			return false
+	return true
 
 
 func serialize() -> Dictionary:

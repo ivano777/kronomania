@@ -8,12 +8,14 @@ signal cantrip_selected(spell: SpellData, source_weapon: EquipmentData)
 signal spell_selected(spell: SpellData, source_weapon: EquipmentData)
 signal wound_degrade_chosen(use_charge: bool)
 signal burnout_prevent_chosen(use_charge: bool)
+signal shield_chosen(use_charge: bool)
 signal auto_attack_requested()
 
-@onready var _round_label:  Label         = $RoundLabel
-@onready var _phase_label:  Label         = $PhaseLabel
-@onready var _action_panel: VBoxContainer = $ActionPanel
-@onready var _log_text:     RichTextLabel = $LogScroll/LogText
+@onready var _round_label:  Label           = $RoundLabel
+@onready var _phase_label:  Label           = $PhaseLabel
+@onready var _action_panel: VBoxContainer   = $ActionPanel
+@onready var _log_scroll:   ScrollContainer = $LogScroll
+@onready var _log_text:     RichTextLabel   = $LogScroll/LogText
 @onready var _debug_adv = $DebugAdvantageControl if has_node("DebugAdvantageControl") else null
 
 # Magic availability cached from player_magic_available signal.
@@ -34,52 +36,49 @@ var _brutal_toggle: CheckButton = null
 var _atk_mode_btn: Button = null
 var _def_mode_btn: Button = null
 
-# Meat for the Grinder prompt overlay (appended to this VBox, below the log).
-var _massive_overlay: PanelContainer
+# Decision modals (Meat for the Grinder / Lucidity L2 Burnout). Floating
+# top_level roots centered over the viewport — the HUD column is too narrow
+# to hold them (long button text overflowed the window edge).
+var _massive_overlay: Control
 var _massive_spend_btn: Button
-
-# Lucidity L2 Burnout prompt overlay (appended to this VBox, below the log).
-var _burnout_overlay: PanelContainer
+var _burnout_overlay: Control
 var _burnout_spend_btn: Button
+var _shield_overlay: Control
+var _shield_spend_btn: Button
+var _shield_desc: Label
+
+# Combat log lines, newest first (index 0 renders at the top).
+var _log_lines: PackedStringArray = PackedStringArray()
 
 
 func _ready() -> void:
-	_massive_overlay = PanelContainer.new()
-	_massive_overlay.visible = false
-	var overlay_vbox := VBoxContainer.new()
-	var overlay_label := Label.new()
-	overlay_label.text = "Massive Wound incoming!"
-	overlay_vbox.add_child(overlay_label)
-	_massive_spend_btn = Button.new()
-	_massive_spend_btn.pressed.connect(func() -> void: _on_massive_choice(true))
-	overlay_vbox.add_child(_massive_spend_btn)
-	var accept_btn := Button.new()
-	accept_btn.text = "Accept Massive Wound"
-	accept_btn.pressed.connect(func() -> void: _on_massive_choice(false))
-	overlay_vbox.add_child(accept_btn)
-	_massive_overlay.add_child(overlay_vbox)
-	add_child(_massive_overlay)
-	# Lucidity L2 Burnout prompt overlay — mirrors massive overlay pattern.
-	_burnout_overlay = PanelContainer.new()
-	_burnout_overlay.visible = false
-	var burnout_vbox := VBoxContainer.new()
-	var burnout_label := Label.new()
-	burnout_label.text = "BURNOUT IMMINENT!"
-	burnout_label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	burnout_vbox.add_child(burnout_label)
-	var burnout_desc := Label.new()
-	burnout_desc.text = "Spend Lucidity charge to avert it?\n(Fervor stays at the edge.)"
-	burnout_desc.autowrap_mode = TextServer.AUTOWRAP_WORD
-	burnout_vbox.add_child(burnout_desc)
-	_burnout_spend_btn = Button.new()
-	_burnout_spend_btn.pressed.connect(func() -> void: _on_burnout_choice(true))
-	burnout_vbox.add_child(_burnout_spend_btn)
-	var burnout_accept_btn := Button.new()
-	burnout_accept_btn.text = "Let it burn"
-	burnout_accept_btn.pressed.connect(func() -> void: _on_burnout_choice(false))
-	burnout_vbox.add_child(burnout_accept_btn)
-	_burnout_overlay.add_child(burnout_vbox)
-	add_child(_burnout_overlay)
+	var massive := _build_decision_modal("Massive Wound incoming!",
+		"Meat for the Grinder: spend a charge to degrade the wound?")
+	_massive_overlay = massive["root"] as Control
+	_massive_spend_btn = _add_modal_button(massive["box"] as VBoxContainer,
+		func() -> void: _on_massive_choice(true))
+	var massive_accept := _add_modal_button(massive["box"] as VBoxContainer,
+		func() -> void: _on_massive_choice(false))
+	massive_accept.text = "Accept Massive Wound"
+
+	var burnout := _build_decision_modal("BURNOUT IMMINENT!",
+		"Spend Lucidity charge to avert it?\n(Fervor stays at the edge.)")
+	_burnout_overlay = burnout["root"] as Control
+	_burnout_spend_btn = _add_modal_button(burnout["box"] as VBoxContainer,
+		func() -> void: _on_burnout_choice(true))
+	var burnout_accept := _add_modal_button(burnout["box"] as VBoxContainer,
+		func() -> void: _on_burnout_choice(false))
+	burnout_accept.text = "Let it burn"
+
+	var shield := _build_decision_modal("Guard breaking!",
+		"Magic Shield: weave Ingenuity dice into the guard?")
+	_shield_overlay = shield["root"] as Control
+	_shield_desc = shield["desc"] as Label
+	_shield_spend_btn = _add_modal_button(shield["box"] as VBoxContainer,
+		func() -> void: _on_shield_choice(true))
+	var shield_decline := _add_modal_button(shield["box"] as VBoxContainer,
+		func() -> void: _on_shield_choice(false))
+	shield_decline.text = "Take the breach"
 	# Mode strip — insert before ActionPanel so it renders between PhaseLabel and the action area.
 	var mode_strip := HBoxContainer.new()
 	_atk_mode_btn = Button.new()
@@ -210,10 +209,21 @@ func show_defense_item_choice(options: Array) -> void:
 
 
 ## Show the Meat for the Grinder decision prompt; clears the action panel first.
+## Magic Shield prompt — shows the incoming/guard numbers and the reinforcement
+## dice preview so the player can judge whether the charge is worth spending.
+func show_shield_prompt(
+		charges_left: int, incoming: int, guard: int, dice_count: int, die_size: int
+) -> void:
+	_shield_desc.text = "Incoming %d vs Guard %d.\nMagic Shield adds %dd%d." % [
+		incoming, guard, dice_count, die_size]
+	_shield_spend_btn.text = "Spend charge (%d left)" % charges_left
+	_shield_overlay.visible = true
+
+
 func show_massive_prompt(charges_left: int) -> void:
 	_brutal_toggle = null
 	_clear_action_panel()
-	_massive_spend_btn.text = "Meat for the Grinder — spend charge (%d left)" % charges_left
+	_massive_spend_btn.text = "Spend charge (%d left)" % charges_left
 	_massive_overlay.visible = true
 
 
@@ -223,19 +233,68 @@ func show_massive_prompt(charges_left: int) -> void:
 func show_burnout_prompt(charges_left: int) -> void:
 	_brutal_toggle = null
 	_clear_action_panel()
-	_burnout_spend_btn.text = "Avert Burnout — spend Lucidity charge (%d left)" % charges_left
+	_burnout_spend_btn.text = "Avert Burnout (%d left)" % charges_left
 	_burnout_overlay.visible = true
 
 
+## Newest line goes on top and pushes older entries down.
 func add_log(text: String) -> void:
-	_log_text.append_text(text + "\n")
+	_log_lines.insert(0, text)
+	_log_text.text = "\n".join(_log_lines)
+	_log_scroll.scroll_vertical = 0
 
 
 func clear_log() -> void:
+	_log_lines.clear()
 	_log_text.clear()
 
 
 # ── Private — panel management ────────────────────────────────────────────────
+
+## Builds a hidden centered decision modal: a full-viewport top_level root
+## (dims the scene, blocks input behind it) with a centered panel holding a
+## title, an autowrapped description, and whatever buttons the caller appends.
+## top_level Controls are skipped by the VBox layout, so the modal neither
+## inflates the HUD column nor clips at the window edges.
+## Returns { "root": Control, "box": VBoxContainer }.
+func _build_decision_modal(title: String, desc: String) -> Dictionary:
+	var root := Control.new()
+	root.top_level = true
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.mouse_filter = Control.MOUSE_FILTER_STOP
+	root.visible = false
+	var dim := ColorRect.new()
+	dim.color = Color(0.0, 0.0, 0.0, 0.45)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(dim)
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.add_child(center)
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(240.0, 0.0)
+	center.add_child(panel)
+	var box := VBoxContainer.new()
+	panel.add_child(box)
+	var title_lbl := Label.new()
+	title_lbl.text = title
+	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(title_lbl)
+	var desc_lbl := Label.new()
+	desc_lbl.text = desc
+	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
+	desc_lbl.custom_minimum_size = Vector2(240.0, 0.0)
+	box.add_child(desc_lbl)
+	add_child(root)
+	return {"root": root, "box": box, "desc": desc_lbl}
+
+
+func _add_modal_button(box: VBoxContainer, on_press: Callable) -> Button:
+	var btn := Button.new()
+	btn.pressed.connect(on_press)
+	box.add_child(btn)
+	return btn
+
 
 func _clear_action_panel() -> void:
 	for child in _action_panel.get_children():
@@ -568,6 +627,11 @@ func _confirm_strike(pool: String) -> void:
 func _on_massive_choice(use_charge: bool) -> void:
 	_massive_overlay.visible = false
 	wound_degrade_chosen.emit(use_charge)
+
+
+func _on_shield_choice(use_charge: bool) -> void:
+	_shield_overlay.visible = false
+	shield_chosen.emit(use_charge)
 
 
 func _on_burnout_choice(use_charge: bool) -> void:

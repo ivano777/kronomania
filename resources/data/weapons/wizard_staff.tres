@@ -19,4 +19,5 @@ pool_bonus = 1
 script = ExtResource("1_eqscr")
 item_name = "Wizard Staff"
 tags = PackedStringArray("TwoHanded", "MagicFocus", "Blunt")
+rarity = "arcane"
 action_modifiers = Array[ExtResource("2_amscr")]([SubResource("Strike"), SubResource("Cast")])

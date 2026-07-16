@@ -97,6 +97,12 @@ func _ready() -> void:
 	const_btn.pressed.connect(_on_constellation)
 	vbox.add_child(const_btn)
 
+	var training_btn := Button.new()
+	training_btn.text = "Training"
+	training_btn.tooltip_text = "Spar with a training dummy. Free sandbox — wounds and Fervor are restored when you leave."
+	training_btn.pressed.connect(_on_training)
+	vbox.add_child(training_btn)
+
 	_short_rest_btn = Button.new()
 	_short_rest_btn.tooltip_text = "-1 wound, step down Fervor, clear Burnout. Once per run."
 	_short_rest_btn.pressed.connect(_on_short_rest)
@@ -454,6 +460,14 @@ func _on_long_rest() -> void:
 
 func _on_constellation() -> void:
 	get_tree().change_scene_to_file("res://scenes/constellation/ConstellationScene.tscn")
+
+
+## Training room — sparring vs the Training Dummy, outside the run flow.
+## Esc (or the fight ending) returns to this campfire; DungeonManager restores
+## wounds/Fervor/Burnout to their pre-training values.
+func _on_training() -> void:
+	DungeonManager.start_training()
+	get_tree().change_scene_to_file("res://scenes/battle/BattleScene.tscn")
 
 
 func _on_continue() -> void:

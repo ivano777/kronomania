@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bpfb6260l7wx0"
-path="res://.godot/imported/dom_wounds.png-42ee52d24900ad15d375437d7d309e5c.ctex"
+uid="uid://dgphrrgfn2ey4"
+path="res://.godot/imported/CastGlow_sheet.png-a7f6efa758049f5d21f370b0f5830347.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/sprites/icons/nodes/dom_wounds.png"
-dest_files=["res://.godot/imported/dom_wounds.png-42ee52d24900ad15d375437d7d309e5c.ctex"]
+source_file="res://assets/sprites/effects/CastGlow_sheet.png"
+dest_files=["res://.godot/imported/CastGlow_sheet.png-a7f6efa758049f5d21f370b0f5830347.ctex"]
 
 [params]
 

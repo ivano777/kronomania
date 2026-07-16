@@ -9,6 +9,7 @@ const POINTS_PER_VICTORY: int = 1
 const _GRUNT   := preload("res://resources/data/enemy_grunt.tres")
 const _SOLDIER := preload("res://resources/data/enemies/enemy_soldier.tres")
 const _KNIGHT  := preload("res://resources/data/enemies/enemy_knight.tres")
+const _DUMMY   := preload("res://resources/data/enemies/training_dummy.tres")
 
 # Starter Dungeon — 8 encounters with mixed chain/parallel structure.
 const ENCOUNTERS: Array = [
@@ -34,6 +35,37 @@ var is_ambush_active: bool = false
 var ambush_disadvantage: int = 0
 var _ambush_enemies: Array = []
 
+## Training room: BattleScene vs the Training Dummy, entered from the
+## Campfire, fully outside the run flow. While true, current_enemies() serves
+## the dummy and BattleScene must NOT call on_victory/on_defeat (no points, no
+## save deletion, no run advance). Player wounds/Fervor/Burnout are snapshotted
+## at entry and restored on exit — training is a free sandbox for the run.
+var training_mode: bool = false
+## Dummy swings back only when enabled from the battle toggle (off = its whole
+## turn is skipped: no roll, no windup, no pacing pause).
+var training_dummy_attacks: bool = false
+var _pre_training_wounds: int = 0
+var _pre_training_fervor: int = 4
+var _pre_training_burnout: bool = false
+
+
+func start_training() -> void:
+	training_mode = true
+	training_dummy_attacks = false
+	_pre_training_wounds = PlayerProgression.saved_wounds
+	_pre_training_fervor = PlayerProgression.saved_fervor_size
+	_pre_training_burnout = PlayerProgression.saved_is_burned_out
+
+
+func end_training() -> void:
+	if not training_mode:
+		return  # idempotent — a stale snapshot must never overwrite live state
+	training_mode = false
+	training_dummy_attacks = false
+	PlayerProgression.saved_wounds = _pre_training_wounds
+	PlayerProgression.saved_fervor_size = _pre_training_fervor
+	PlayerProgression.saved_is_burned_out = _pre_training_burnout
+
 
 func start_run() -> void:
 	_encounter_index = 0
@@ -49,6 +81,8 @@ func start_run() -> void:
 
 
 func current_enemies() -> Array:
+	if training_mode:
+		return [_DUMMY]
 	if is_ambush_active:
 		return _ambush_enemies
 	if run_active and _encounter_index < ENCOUNTERS.size():

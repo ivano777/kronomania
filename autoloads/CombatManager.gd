@@ -93,6 +93,12 @@ signal player_burnout_imminent(charges_left: int)
 ## Internal gate awaited by _try_prevent_burnout; resolved when player decides.
 signal _burnout_decision_gate(use_charge: bool)
 
+## Emitted when a player guard would break and a Magic Shield charge can reinforce it
+## (ing_resolve L2+). dice_count/die_size preview the reinforcement roll.
+signal player_shield_opportunity(charges_left: int, incoming: int, guard: int, dice_count: int, die_size: int)
+## Internal gate awaited by _try_magic_shield; resolved when player decides.
+signal _shield_decision_gate(use_charge: bool)
+
 
 # ── Runtime state ─────────────────────────────────────────────────────────────
 
@@ -115,6 +121,17 @@ var attack_pacing_s: float = 0.0
 var _waiting_for_player: bool = false
 ## Weapon the player explicitly chose this round; null = use default main-hand resolution.
 var _player_strike_weapon: EquipmentData = null
+## Presentation support: weapon the player's current strike visually resolves with
+## (main-hand fallback applied; null = bare hands). Read by BattleScene at
+## combatant_attacking time for per-action FX — needed for Auto attacks, where
+## the scene never learns which weapon the auto-picker chose.
+var player_strike_weapon_resolved: EquipmentData = null
+## Presentation support: FX intensity facts for the attack about to resolve —
+## the attacker's governing stat die size (dominion for strikes, ingenuity for
+## casts; status overrides included) and the governing node level (0 = none,
+## enemies always 0). Set right before every combatant_attacking emission.
+var fx_attack_die_size: int = 6
+var fx_attack_node_level: int = 0
 ## Casting tool the player chose this round; null = Bare Hands (uncapped, full Tier).
 var _player_cast_weapon: EquipmentData = null
 ## Round-scoped: which defense pools the player has breached this round (any attack/spell).
@@ -161,6 +178,17 @@ func start_combat(player_data: CombatantData, enemies_data: Array) -> void:
 		lucidity_handler.priority = 10
 		lucidity_handler.source_node_id = "lucidity"
 		_register_interrupt(_player, lucidity_handler)
+	# Magic Shield (ing_resolve L2+): guard-shaped interrupt; dice fed by the node level.
+	var shield_charges := CombatMath.magic_shield_charges(_player)
+	if shield_charges > 0:
+		var shield_handler := InterruptHandler.new()
+		shield_handler.handler_id = "magic_shield"
+		shield_handler.trigger = "on_guard_break"
+		shield_handler.target = "self"
+		shield_handler.charges = shield_charges
+		shield_handler.priority = 10
+		shield_handler.source_node_id = "ing_resolve"
+		_register_interrupt(_player, shield_handler)
 	_player.space_domination_active = _has_effect_type(_player, "space_domination")
 	_player.current_wounds = mini(PlayerProgression.saved_wounds, _player.max_wounds)
 	wounds_changed.emit(true, -1, _player.current_wounds, _player.max_wounds, true)
@@ -273,6 +301,11 @@ func player_chose_degrade_wound(use_charge: bool) -> void:
 ## Called by RoundHUD (via BattleScene) when the player responds to the Lucidity L2 Burnout prompt.
 func player_chose_prevent_burnout(use_charge: bool) -> void:
 	_burnout_decision_gate.emit(use_charge)
+
+
+## Called by RoundHUD (via BattleScene) when the player responds to the Magic Shield prompt.
+func player_chose_magic_shield(use_charge: bool) -> void:
+	_shield_decision_gate.emit(use_charge)
 
 
 ## Called by RoundHUD when the player clicks OK on the DEF Observe overlay.
@@ -435,6 +468,13 @@ func _auto_best_action() -> Dictionary:
 	return {"target_pool": tp, "score": score}
 
 
+## Publishes the FX intensity facts for the attack about to resolve (see the
+## fx_attack_* vars). Presentation only — call right before combatant_attacking.
+func _set_attack_fx_facts(attacker: CombatantState, stat: String, node_id: String = "") -> void:
+	fx_attack_die_size = _stat_size(attacker, stat)
+	fx_attack_node_level = PlayerProgression.get_node_level_by_id(node_id) if node_id != "" else 0
+
+
 # Coroutine: physical Strike — resolves one full round then loops back.
 func _resolve_round(net_advantage: int = 0, target_pool: String = "stance", brutal_trade: bool = false, target_index: int = 0) -> void:
 	phase_changed.emit("Resolving…")
@@ -447,6 +487,7 @@ func _resolve_round(net_advantage: int = 0, target_pool: String = "stance", brut
 	# ── Roll player attack pool ────────────────────────────────────────────
 	var chosen_weapon := _player_strike_weapon
 	_player_strike_weapon = null
+	player_strike_weapon_resolved = chosen_weapon if chosen_weapon != null else _player.weapon_override
 	var _strike_mod: ActionModifier
 	if chosen_weapon != null:
 		for m in chosen_weapon.action_modifiers:
@@ -488,6 +529,7 @@ func _resolve_round(net_advantage: int = 0, target_pool: String = "stance", brut
 
 	# ── Phase 2: Player attacks chosen target ──────────────────────────────
 	if not target.is_defeated:
+		_set_attack_fx_facts(_player, "dominion", "dom_martial_arts")
 		combatant_attacking.emit(true, target_index)
 		await _resolve_attack(true, target_index, p_atk, target_pool)
 		if attack_pacing_s > 0.0:
@@ -544,6 +586,7 @@ func _resolve_round_cantrip(spell: SpellData, target_index: int = 0) -> void:
 	# ── Phase 2: Player attacks chosen target ──────────────────────────────
 	var _pool_breached_before_c := _current_round_player_breaches.get(spell.target_pool, false) as bool
 	if not target.is_defeated:
+		_set_attack_fx_facts(_player, "ingenuity", "minor_studies")
 		combatant_attacking.emit(true, target_index)
 		await _resolve_attack(true, target_index, p_atk, spell.target_pool)
 		if attack_pacing_s > 0.0:
@@ -658,6 +701,7 @@ func _resolve_round_spell(spell: SpellData, target_index: int = 0) -> void:
 	if not target.is_defeated:
 		# Windup for every cast path; discipline handlers that bypass
 		# _resolve_attack emit their own matching attack_resolved.
+		_set_attack_fx_facts(_player, "ingenuity", "spellcasting")
 		combatant_attacking.emit(true, target_index)
 		match spell.cast_handler:
 			"mind_rend":
@@ -767,6 +811,12 @@ func _run_enemy_attacks(slow_phase: bool, p_total: int, player_target_pool: Stri
 		var e: CombatantState = _enemies[i]
 		if e.is_defeated:
 			continue
+		if DungeonManager.training_mode and not DungeonManager.training_dummy_attacks:
+			# Training room, dummy passive: whole enemy turn skipped — no roll,
+			# no windup animation, no pacing pause.
+			if slow_phase:
+				log_message.emit("[color=gray]%s stands there, menacingly.[/color]" % e.data.combatant_name)
+			continue
 		var e_vt: int = e.data.velocity_threshold - (5 if brutal_trade and i == target_index else 0)
 		# slow phase skips fast enemies; fast phase skips slow enemies.
 		if RollEngine.is_fast(p_total, e_vt) == slow_phase:
@@ -775,6 +825,7 @@ func _run_enemy_attacks(slow_phase: bool, p_total: int, player_target_pool: Stri
 			_effective_tier(e), _stat_size(e, "dominion"), _training_keep_grade(e), _attack_flat(e)
 		)
 		log_message.emit(_fmt_attack(e.data.combatant_name, e_atk, _attacker_weapon_name(e)))
+		_set_attack_fx_facts(e, "dominion")
 		combatant_attacking.emit(false, i)
 		var e_pool := player_target_pool if i == target_index else "stance"
 		await _resolve_attack(false, i, e_atk, e_pool)
@@ -840,10 +891,20 @@ func _resolve_attack(attacker_is_player: bool, enemy_index: int, attack_result: 
 				log_message.emit("  [color=purple][Outcome debuff] flat %+d, keep grade %+d on %s %s guard.[/color]" % [
 					flat_debuff, keep_debuff, defender.data.combatant_name, pool_label
 				])
+		# Negation defense riders: stance_flat (Stance only) + guard_aspect_all
+		# (+N Negation-size dice on every pool — added, so pool widens by N too).
+		var guard_flat := CombatMath.guard_flat_bonus(defender, target_pool)
+		var bonus_dice := CombatMath.guard_bonus_dice(defender)
+		if guard_flat > 0:
+			log_message.emit("  [color=cyan]Stance discipline: +%d Guard.[/color]" % guard_flat)
+		if bonus_dice > 0:
+			log_message.emit("  [color=cyan]Iron guard: +%d Negation die to the pool.[/color]" % bonus_dice)
 		var def_result := RollEngine.resolve(
-				_effective_tier(defender), defensive_size,
-				maxi(1, _defense_keep_grade(defender, target_pool) + keep_debuff), defend_mod.flat_bonus,
-				sd_adv
+				_effective_tier(defender) + bonus_dice, defensive_size,
+				maxi(1, _defense_keep_grade(defender, target_pool) + keep_debuff),
+				defend_mod.flat_bonus + guard_flat,
+				sd_adv, 0,
+				_stat_size(defender, "negation") if bonus_dice > 0 else 0, bonus_dice
 			)
 		var guard_val: int = (def_result.total as int) + flat_debuff
 		defender.set_guard_val(target_pool, guard_val)
@@ -860,6 +921,13 @@ func _resolve_attack(attacker_is_player: bool, enemy_index: int, attack_result: 
 
 	# Breach check: attack_total >= guard (guard reaches 0 or below).
 	var current_guard: int = defender.get_guard(target_pool)
+	# Magic Shield (guard-shaped interrupt, third dispatch path beside on_massive_wound /
+	# on_burnout): fires only when the player's guard WOULD break, before the breach
+	# commits. One prompt per attack; the shield may still fail (tension intended).
+	# Direct-wound effects never pass through here, so they can't be shielded.
+	if defender_is_player and (attack_result.total as int) >= current_guard:
+		current_guard = await _try_magic_shield(
+			defender, defender_ei, target_pool, attack_result.total as int, current_guard)
 	var force_breach := _debug_lethal and attacker_is_player and not defender_is_player
 	# Typed context for this attack pass; carries did_breach (Phase 1) and becomes the surface the
 	# discipline effect handlers read/mutate in Phase 2.
@@ -1063,6 +1131,41 @@ func _resolve_meat_for_the_grinder(
 	return { "wounds_modified": 2, "resolved": true }
 
 
+## Magic Shield (ing_resolve L2+) guard-break interrupt. Awaited inside _resolve_attack
+## when the player's guard would break. Guard-shaped: returns the (possibly reinforced)
+## guard value — contrast _resolve_interrupt (wounds-shaped) and _try_prevent_burnout
+## (bool-shaped). Only the player can hold a shield handler; enemies never reach this.
+func _try_magic_shield(
+		state: CombatantState, enemy_index: int, pool: String, incoming: int, guard: int
+) -> int:
+	var handlers := _find_interrupts(state, "on_guard_break")
+	if handlers.is_empty():
+		return guard
+	var handler := handlers[0]  # priority-sorted; only the shield uses this trigger
+	var dice_count := CombatMath.magic_shield_dice(state)
+	if dice_count <= 0:
+		return guard
+	var die_size := _stat_size(state, "ingenuity")
+	player_shield_opportunity.emit(handler.charges, incoming, guard, dice_count, die_size)
+	var use_charge: bool = await _shield_decision_gate
+	if not use_charge:
+		return guard
+	_consume_interrupt_charge(handler)
+	var added := 0
+	for d in RollEngine.roll_dice(dice_count, die_size):
+		added += d as int
+	var new_guard := guard + added
+	state.set_guard_val(pool, new_guard)
+	guard_changed.emit(state == _player, enemy_index, pool, new_guard)
+	if new_guard > incoming:
+		log_message.emit("  [color=cyan]Magic Shield! +%d Guard (%dd%d) — the wall holds.[/color]" % [
+			added, dice_count, die_size])
+	else:
+		log_message.emit("  [color=cyan]Magic Shield! +%d Guard (%dd%d) — not enough![/color]" % [
+			added, dice_count, die_size])
+	return new_guard
+
+
 ## Lucidity L2 anti-Burnout interrupt. Returns true if Burnout was prevented.
 ## Separate from _resolve_interrupt (which is wounds-shaped, for _resolve_attack);
 ## this fires inside _escalate_fervor and concerns a bool, not wound counts.
@@ -1218,6 +1321,16 @@ func _end_of_round() -> void:
 			var gh: CombatEffect = EffectRegistry.get_handler(st.status_id)
 			if gh != null:
 				gh.on_guard_reset(st, e, i)
+
+	# Training room: the dummy is patched back to full between rounds.
+	# is_initial=true on the emit = display sync only (no hurt/die reaction).
+	if DungeonManager.training_mode:
+		for i in _enemies.size():
+			var e: CombatantState = _enemies[i]
+			if not e.is_defeated and e.current_wounds > 0:
+				e.current_wounds = 0
+				wounds_changed.emit(false, i, 0, e.max_wounds, true)
+				log_message.emit("[color=gray]%s creaks back into shape.[/color]" % e.data.combatant_name)
 
 	await get_tree().create_timer(0.8).timeout
 

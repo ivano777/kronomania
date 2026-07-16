@@ -13,6 +13,10 @@ extends Resource
 ## Category: "Core" | "Training" | "Ability" | "Flavor"
 @export var category: String = "Training"
 
+## Branch this node's spend counts toward: "dominion" | "negation" | "ingenuity" | "".
+## "" (Flavor nodes) counts toward no branch-spend gate.
+@export var branch: String = ""
+
 ## Flavour description shared across all levels.
 @export_multiline var base_description: String = ""
 

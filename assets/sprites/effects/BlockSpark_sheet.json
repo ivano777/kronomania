@@ -1,0 +1,16 @@
+{
+  "name": "BlockSpark",
+  "sheet": "BlockSpark_sheet.png",
+  "frame_width": 32,
+  "frame_height": 32,
+  "frame_count": 4,
+  "frames": [
+    "block_spark_1",
+    "block_spark_2",
+    "block_spark_3",
+    "block_spark_4"
+  ],
+  "fps": 15,
+  "loop": false,
+  "layout": "horizontal_strip"
+}

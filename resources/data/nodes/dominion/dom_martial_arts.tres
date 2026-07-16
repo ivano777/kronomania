@@ -27,7 +27,7 @@ effect_value = 2
 [sub_resource type="Resource" id="Level_2"]
 script = ExtResource("2_ldscr")
 level_index = 3
-required_tier = 2
+branch_spend = {"dominion": 3}
 prerequisites = [{
 "node_id": "dom_martial_arts",
 "required_level": 2
@@ -42,6 +42,7 @@ effect_value = 3
 [resource]
 script = ExtResource("1_ndscr")
 node_id = "dom_martial_arts"
+branch = "dominion"
 display_name = "Martial Arts"
 base_description = "Disciplined combat training. Improves keep grade on physical attacks."
 max_levels = 3

@@ -54,7 +54,7 @@ const _ALWAYS_VISIBLE: Dictionary = {
 	"dom_stamina": true, "neg_stance": true, "ing_resolve": true
 }
 const _DOMINION_SUBTREE: Dictionary = {
-	"dom_wounds": true, "dom_martial_arts": true, "dom_melee": true,
+	"dom_martial_arts": true, "dom_melee": true,
 	"dom_ranged": true, "dom_dual_wield": true, "dom_titans_grip": true,
 	"dom_disarm": true, "dom_brutal": true, "dom_meat_grinder": true,
 	"dom_earthshatter": true, "dom_stamina": true
@@ -75,7 +75,6 @@ const _NODE_POSITIONS: Dictionary = {
 	"neg_stance":       Vector2(463, 295),
 	"ing_resolve":      Vector2(-67, 295),
 	# DOM subtree — expands UPWARD (negative Y) from dom_core
-	"dom_wounds":       Vector2(120,  -25),
 	"dom_martial_arts": Vector2(300,  -25),
 	"dom_meat_grinder": Vector2( 30,  -85),
 	"dom_melee":        Vector2(210,  -85),
@@ -105,12 +104,27 @@ func _ready() -> void:
 	_back_btn.pressed.connect(_on_back_pressed)
 	_tab_container.set_tab_title(1, "Background / Traits")
 	_detail_panel = NodeDetailPanel.new()
-	_skills_panel.add_child(_detail_panel)
+	# Child of the scene ROOT, not the Skills tab: flavor cards live in the
+	# Traits tab, and a panel inside Skills is hidden by the TabContainer there
+	# (= "can't buy backgrounds"). Root is a plain Control, so the panel's
+	# right-column anchors still apply and it overlays both tabs.
+	add_child(_detail_panel)
 	_detail_panel.bought.connect(_on_detail_bought)
 	_populate_canvas()
 	_refresh()
 	if ResourceLoader.exists(_DBG_PROGRESSION):
+		# Left-column overlay mirroring NodeDetailPanel's right one (z=60 in its
+		# .tscn, above CardLayer z=1 and the detail panel z=50). Must be added
+		# LAST at the scene root: input picking ignores z_index and follows tree
+		# order, so tree-last + highest z keeps what's drawn on top and what
+		# gets clicked consistent. Collapsed, only the bottom-left toggle is
+		# solid (root mouse_filter IGNORE) so canvas clicks pass through.
 		add_child((load(_DBG_PROGRESSION) as PackedScene).instantiate())
+	# Initial framing: zoom-to-fit the always-visible triangle so all three
+	# branch entry points are on screen. Container layout hasn't run during
+	# _ready (panel size is still 0), so wait one frame first.
+	await get_tree().process_frame
+	_center_after_toggle()
 
 
 func _populate_canvas() -> void:
@@ -259,9 +273,9 @@ func _refresh() -> void:
 		var lvl := PlayerProgression.get_level(nd)
 		var max_lvl := nd.max_levels
 		var at_max := lvl >= max_lvl
-		var tier_locked := false
+		var gate_locked := false
 		if not at_max and nd.levels_data.size() > lvl:
-			tier_locked = tier < (nd.levels_data[lvl] as NodeLevelData).required_tier
+			gate_locked = not PlayerProgression.spend_gate_met(nd.levels_data[lvl] as NodeLevelData)
 
 		var branch_color: Color = _branch_color(nd)
 		for i in pips.size():
@@ -286,8 +300,9 @@ func _refresh() -> void:
 			sb.set_border_width_all(1)
 			sb.shadow_size = 0
 
-		# Dim only out-of-reach (tier-locked) nodes; cost/affordability lives in the panel.
-		card.modulate = Color(1, 1, 1, 0.4) if tier_locked else Color.WHITE
+		# Dim only out-of-reach (gate-locked) nodes; cost/affordability lives in the
+		# panel. A buyable card is never dimmed (debug Free Buy ignores spend gates).
+		card.modulate = Color(1, 1, 1, 0.4) if (gate_locked and not buyable) else Color.WHITE
 
 	_refresh_canvas()
 
@@ -455,8 +470,10 @@ func _center_on_nodes(node_ids: Array) -> void:
 		max_p = max_p.max(p + CARD_SIZE)
 	if min_p.x == INF:
 		return
-	min_p -= Vector2(15, 15)
-	max_p += Vector2(15, 15)
+	# 30px margin keeps the ♦ BRANCH ♦ vertex labels (offset up to -18/+52 from
+	# their vertex) inside the fitted view.
+	min_p -= Vector2(30, 30)
+	max_p += Vector2(30, 30)
 	var panel_size := _skills_panel.size
 	var content_size := max_p - min_p
 	_zoom = clamp(minf(panel_size.x / content_size.x, panel_size.y / content_size.y), 0.25, 1.5)
@@ -497,10 +514,12 @@ func _input(event: InputEvent) -> void:
 			_do_zoom(1.0 / 1.15)
 			get_viewport().set_input_as_handled()
 		elif mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:
-			# Reached _input only if no token/panel consumed it → a click on empty space.
+			# _input runs BEFORE gui_input, so this fires for every left click on
+			# the canvas — cards included. Close the panel but do NOT consume the
+			# event: a click on a node card must still reach that card's gui_input
+			# so the panel reopens for the new node in the same click.
 			if _detail_panel.is_open():
 				_detail_panel.close()
-				get_viewport().set_input_as_handled()
 		elif mb.button_index == MOUSE_BUTTON_MIDDLE:
 			_is_panning = mb.pressed
 			_pan_last_mouse = get_global_mouse_position()

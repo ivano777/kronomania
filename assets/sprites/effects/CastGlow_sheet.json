@@ -1,0 +1,16 @@
+{
+  "name": "CastGlow",
+  "sheet": "CastGlow_sheet.png",
+  "frame_width": 32,
+  "frame_height": 32,
+  "frame_count": 4,
+  "frames": [
+    "cast_glow_1",
+    "cast_glow_2",
+    "cast_glow_3",
+    "cast_glow_4"
+  ],
+  "fps": 12,
+  "loop": false,
+  "layout": "horizontal_strip"
+}

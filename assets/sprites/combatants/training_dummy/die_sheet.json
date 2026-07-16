@@ -1,0 +1,10 @@
+{
+  "name": "training_dummy_die",
+  "sheet": "die_sheet.png",
+  "frame_width": 48,
+  "frame_height": 48,
+  "frame_count": 8,
+  "fps": 10,
+  "loop": false,
+  "layout": "horizontal_strip"
+}

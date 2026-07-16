@@ -24,6 +24,28 @@ func test_fireball_frames_are_16px_slices() -> void:
 	assert_eq(int(tex.get_height()), 16, "frame slice height from metadata")
 
 
+func test_action_fx_clips_load() -> void:
+	# Shared per-action FX layer (weapon impact_fx / spell windup_fx clips)
+	# + the generic BlockSpark played on blocked hits.
+	for clip: String in ["SlashDiagonal", "CastGlow", "BlockSpark"]:
+		var frames: SpriteFrames = SpriteRegistry.get_effect_frames(clip)
+		assert_not_null(frames, "%s sheet + json should build SpriteFrames" % clip)
+		if frames == null:
+			continue
+		assert_eq(frames.get_frame_count("default"), 4, "%s clip has 4 frames" % clip)
+		assert_false(frames.get_animation_loop("default"), "%s plays once" % clip)
+
+
+func test_projectile_clip_loops_in_flight() -> void:
+	var frames: SpriteFrames = SpriteRegistry.get_effect_frames("ArcaneBolt")
+	assert_not_null(frames, "ArcaneBolt sheet + json should build SpriteFrames")
+	if frames == null:
+		return
+	assert_eq(frames.get_frame_count("default"), 3, "ArcaneBolt clip has 3 frames")
+	assert_true(frames.get_animation_loop("default"),
+		"projectile clips loop while flying (presenter frees them at arrival)")
+
+
 func test_missing_clip_returns_null() -> void:
 	var frames: SpriteFrames = SpriteRegistry.get_effect_frames("DoesNotExist")
 	assert_null(frames, "unknown clip should return null (warning logged)")
@@ -38,6 +60,19 @@ func test_player_full_animation_set() -> void:
 	assert_true(frames.get_animation_loop("idle"), "idle loops")
 	for anim: String in ["attack_melee", "cast_spell", "hurt", "die"]:
 		assert_gt(frames.get_frame_count(anim), 0, "%s has frames" % anim)
+		assert_false(frames.get_animation_loop(anim), "%s does not loop" % anim)
+
+
+func test_training_dummy_animation_set() -> void:
+	# Static post: single-frame idle + hurt/die sheets (no attack anims —
+	# Combatant._play degrades to no pose change).
+	var frames: SpriteFrames = SpriteRegistry.get_combatant_frames("Training Dummy")
+	assert_not_null(frames, "training dummy combatant art should exist")
+	if frames == null:
+		return
+	assert_gt(frames.get_frame_count("idle"), 0, "idle has at least one frame")
+	for anim: String in ["hurt", "die"]:
+		assert_gt(frames.get_frame_count(anim), 1, "%s is multi-frame" % anim)
 		assert_false(frames.get_animation_loop(anim), "%s does not loop" % anim)
 
 

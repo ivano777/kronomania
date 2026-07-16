@@ -3,57 +3,69 @@
 [ext_resource type="Script" path="res://scenes/debug/DebugProgressionControl.gd" id="1_progscr"]
 
 [node name="DebugProgressionControl" type="VBoxContainer"]
-anchor_left = 1.0
-anchor_top = 1.0
-anchor_right = 1.0
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
 anchor_bottom = 1.0
-offset_left = -120.0
-offset_top = -155.0
+offset_left = 5.0
+offset_top = 5.0
+offset_right = 190.0
 offset_bottom = -5.0
+grow_horizontal = 1
+z_index = 60
+mouse_filter = 2
+alignment = 2
 script = ExtResource("1_progscr")
 
-[node name="ToggleButton" type="Button" parent="."]
-text = "* Prog ▶"
-
-[node name="Panel" type="VBoxContainer" parent="."]
+[node name="Panel" type="PanelContainer" parent="."]
 visible = false
+size_flags_vertical = 3
 
-[node name="StatusLabel" type="Label" parent="Panel"]
+[node name="VBox" type="VBoxContainer" parent="Panel"]
+
+[node name="StatusLabel" type="Label" parent="Panel/VBox"]
 text = "Points: 3  Tier: 1"
 
-[node name="PointsRow" type="HBoxContainer" parent="Panel"]
+[node name="PointsRow" type="HBoxContainer" parent="Panel/VBox"]
 
-[node name="PointsMinusBtn" type="Button" parent="Panel/PointsRow"]
+[node name="PointsMinusBtn" type="Button" parent="Panel/VBox/PointsRow"]
 text = "−"
 
-[node name="PointsLabel" type="Label" parent="Panel/PointsRow"]
+[node name="PointsLabel" type="Label" parent="Panel/VBox/PointsRow"]
 text = "Pts: 3"
 
-[node name="PointsPlusBtn" type="Button" parent="Panel/PointsRow"]
+[node name="PointsPlusBtn" type="Button" parent="Panel/VBox/PointsRow"]
 text = "+"
 
-[node name="PointsSetMaxBtn" type="Button" parent="Panel/PointsRow"]
+[node name="PointsSetMaxBtn" type="Button" parent="Panel/VBox/PointsRow"]
 text = "×99"
 
-[node name="TierRow" type="HBoxContainer" parent="Panel"]
+[node name="TierRow" type="HBoxContainer" parent="Panel/VBox"]
 
-[node name="TierLabel" type="Label" parent="Panel/TierRow"]
+[node name="TierLabel" type="Label" parent="Panel/VBox/TierRow"]
 text = "Tier:"
 
-[node name="Tier1Btn" type="Button" parent="Panel/TierRow"]
+[node name="Tier1Btn" type="Button" parent="Panel/VBox/TierRow"]
 text = "[T1]"
 
-[node name="Tier2Btn" type="Button" parent="Panel/TierRow"]
+[node name="Tier2Btn" type="Button" parent="Panel/VBox/TierRow"]
 text = "T2"
 
-[node name="Tier3Btn" type="Button" parent="Panel/TierRow"]
+[node name="Tier3Btn" type="Button" parent="Panel/VBox/TierRow"]
 text = "T3"
 
-[node name="Tier4Btn" type="Button" parent="Panel/TierRow"]
+[node name="Tier4Btn" type="Button" parent="Panel/VBox/TierRow"]
 text = "T4"
 
-[node name="BudgetResetBtn" type="Button" parent="Panel"]
+[node name="FreeBuyToggle" type="CheckButton" parent="Panel/VBox"]
+text = "Free Buy"
+
+[node name="BudgetResetBtn" type="Button" parent="Panel/VBox"]
 text = "Reset Budget"
 
-[node name="ResetAllBtn" type="Button" parent="Panel"]
+[node name="ResetAllBtn" type="Button" parent="Panel/VBox"]
 text = "Full Reset"
+
+[node name="ToggleButton" type="Button" parent="."]
+size_flags_horizontal = 0
+text = "* Prog ▶"

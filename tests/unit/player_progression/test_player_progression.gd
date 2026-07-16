@@ -9,7 +9,8 @@ extends GutTest
 
 const _DOM_CORE       = preload("res://resources/data/nodes/dominion/dom_core.tres")
 const _DOM_MART_ARTS  = preload("res://resources/data/nodes/dominion/dom_martial_arts.tres")
-const _DOM_WOUNDS     = preload("res://resources/data/nodes/dominion/dom_wounds.tres")
+const _DOM_MELEE      = preload("res://resources/data/nodes/dominion/dom_melee.tres")
+const _DOM_MEAT_GRIND = preload("res://resources/data/nodes/dominion/dom_meat_grinder.tres")
 const _MINOR_STUDIES  = preload("res://resources/data/nodes/ability_minor_studies.tres")
 const _WARRIOR_OATH   = preload("res://resources/data/nodes/flavor_warrior_oath.tres")
 const _ARENA_CHAMP    = preload("res://resources/data/nodes/flavors/flavor_arena_champion.tres")
@@ -20,6 +21,12 @@ var pp: Node
 func before_each() -> void:
 	pp = get_node("/root/PlayerProgression")
 	pp.reset()
+
+
+func after_each() -> void:
+	# Free Buy is session-scoped debug state, deliberately untouched by reset().
+	pp.debug_free_buy = false
+	get_node("/root/DebugManager").enabled = false
 
 
 # ── reset() ───────────────────────────────────────────────────────────────────
@@ -188,9 +195,9 @@ func test_tier_advances_after_5_combat_plus_2_flavor_slots() -> void:
 	pp.upgrade(_MINOR_STUDIES)
 	assert_eq(pp.tier_combat_spent, 4, "after minor_studies: 4 combat slots spent")
 
-	# Step 4: dom_wounds L1 — 1 combat slot (requires dom_core L1 ✓)
-	pp.upgrade(_DOM_WOUNDS)
-	assert_eq(pp.tier_combat_spent, 5, "after dom_wounds L1: 5 combat slots spent")
+	# Step 4: dom_melee L1 — 1 combat slot (requires dom_martial_arts L1 ✓ auto-granted)
+	pp.upgrade(_DOM_MELEE)
+	assert_eq(pp.tier_combat_spent, 5, "after dom_melee L1: 5 combat slots spent")
 
 	# Step 5: warrior_oath — 1 flavor slot
 	pp.upgrade(_WARRIOR_OATH)
@@ -201,6 +208,114 @@ func test_tier_advances_after_5_combat_plus_2_flavor_slots() -> void:
 	assert_eq(pp.get_tier(), 2, "tier advances to 2 after 5 combat + 2 flavor slots filled")
 	assert_eq(pp.tier_combat_spent, 0, "combat slot counter resets on tier advance")
 	assert_eq(pp.tier_flavor_spent, 0, "flavor slot counter resets on tier advance")
+
+
+# ── debug Free Buy toggle ─────────────────────────────────────────────────────
+
+func test_free_buy_bypasses_gates_and_budget() -> void:
+	get_node("/root/DebugManager").enabled = true
+	pp.debug_free_buy = true
+	pp.debug_set_points(20)
+	pp.upgrade(_DOM_CORE)  # L1 (cost 2)
+	pp.upgrade(_DOM_CORE)  # L2 (cost 2) — combat budget now 4/5
+	assert_true(pp.can_upgrade(_DOM_CORE),
+		"Free Buy allows dom_core L3 (would overflow the 5-slot budget)")
+
+
+func test_free_buy_inert_without_debug_mode() -> void:
+	get_node("/root/DebugManager").enabled = false
+	pp.debug_free_buy = true
+	pp.debug_set_points(20)
+	pp.upgrade(_DOM_CORE)
+	pp.upgrade(_DOM_CORE)
+	assert_false(pp.can_upgrade(_DOM_CORE),
+		"Free Buy flag does nothing while F12 debug mode is off")
+
+
+func test_slot_budget_holds_without_free_buy() -> void:
+	pp.debug_set_points(20)
+	pp.upgrade(_DOM_CORE)
+	pp.upgrade(_DOM_CORE)
+	# Gate {dominion:3} is met (spend 4), but 4 + 2 slots overflows the 5-slot budget.
+	assert_false(pp.can_upgrade(_DOM_CORE),
+		"dom_core L3 stays blocked by the tier slot budget without Free Buy")
+
+
+func test_free_buy_waives_point_cost_and_spends_nothing() -> void:
+	get_node("/root/DebugManager").enabled = true
+	pp.debug_free_buy = true
+	pp.debug_set_points(0)
+	assert_true(pp.can_upgrade(_DOM_CORE),
+		"Free Buy waives the point cost (0 points, cost 2)")
+	pp.upgrade(_DOM_CORE)
+	assert_eq(pp.get_level(_DOM_CORE), 1, "Free Buy grants the level")
+	assert_eq(pp.available_points, 0, "Free Buy spends no points")
+	assert_eq(pp.tier_combat_spent, 0, "Free Buy fills no combat slots")
+	assert_eq(pp.get_tier(), 1, "Free Buy never auto-advances the tier")
+
+
+func test_free_buy_still_requires_prerequisites() -> void:
+	get_node("/root/DebugManager").enabled = true
+	pp.debug_free_buy = true
+	pp.debug_set_points(20)
+	# dom_meat_grinder L1 requires dom_stamina L2; auto-grant only gives L1.
+	assert_false(pp.can_upgrade(_DOM_MEAT_GRIND),
+		"Free Buy keeps prerequisite chains intact")
+
+
+# ── branch-spend gates (replaced required_tier — defense-rework Phase 1) ─────
+
+func _gated_node(gate: Dictionary) -> NodeData:
+	var ld := NodeLevelData.new()
+	ld.cost = 1
+	ld.branch_spend = gate
+	var n := NodeData.new()
+	n.node_id = "test_gated"
+	n.branch = "dominion"
+	n.max_levels = 1
+	n.levels_data.append(ld)
+	return n
+
+
+func test_branch_gate_blocks_when_spend_too_low() -> void:
+	pp.debug_set_points(10)
+	var n := _gated_node({"dominion": 3})
+	assert_false(pp.can_upgrade(n), "gate {dominion:3} blocks at 0 dominion spend")
+
+
+func test_branch_gate_opens_at_threshold() -> void:
+	pp.debug_set_points(10)
+	pp.upgrade(_DOM_CORE)       # +2 dominion
+	pp.upgrade(_DOM_MART_ARTS)  # +1 dominion (martial arts L2)
+	var n := _gated_node({"dominion": 3})
+	assert_true(pp.can_upgrade(n), "gate {dominion:3} opens at 3 dominion spend")
+
+
+func test_get_branch_spent_counts_only_matching_branch() -> void:
+	pp.debug_set_points(10)
+	assert_eq(pp.get_branch_spent("dominion"), 0,
+		"auto-granted defaults cost 0 — no spend after reset")
+	pp.upgrade(_DOM_CORE)
+	assert_eq(pp.get_branch_spent("dominion"), 2, "dom_core L1 counts 2 toward dominion")
+	assert_eq(pp.get_branch_spent("ingenuity"), 0, "no ingenuity spend yet")
+	pp.upgrade(_MINOR_STUDIES)
+	assert_eq(pp.get_branch_spent("ingenuity"), 1, "minor_studies counts toward ingenuity")
+
+
+func test_hybrid_gate_requires_both_branches() -> void:
+	pp.debug_set_points(10)
+	pp.upgrade(_DOM_CORE)
+	var n := _gated_node({"dominion": 2, "ingenuity": 1})
+	assert_false(pp.can_upgrade(n), "hybrid gate blocked while ingenuity spend is 0")
+	pp.upgrade(_MINOR_STUDIES)
+	assert_true(pp.can_upgrade(n), "hybrid gate opens once both branches reach threshold")
+
+
+func test_free_buy_bypasses_branch_gate() -> void:
+	get_node("/root/DebugManager").enabled = true
+	pp.debug_free_buy = true
+	var n := _gated_node({"negation": 9})
+	assert_true(pp.can_upgrade(n), "Free Buy ignores branch-spend gates")
 
 
 # ── hero_sprite (cosmetic hero variant) ─────────────────────────────────────────

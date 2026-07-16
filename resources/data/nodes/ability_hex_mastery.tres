@@ -9,7 +9,7 @@
 
 [sub_resource type="Resource" id="Level_1"]
 script = ExtResource("2_ldscr")
-required_tier = 3
+branch_spend = {"ingenuity": 6}
 prerequisites = [{
 "node_id": "spellcasting",
 "required_level": 1
@@ -21,7 +21,7 @@ spells = Array[ExtResource("4_bk2j5")]([ExtResource("3_mrspell")])
 [sub_resource type="Resource" id="Level_2"]
 script = ExtResource("2_ldscr")
 level_index = 2
-required_tier = 3
+branch_spend = {"ingenuity": 6}
 prerequisites = [{
 "node_id": "hex_mastery",
 "required_level": 1
@@ -31,6 +31,7 @@ level_effect_description = "The brand lingers. Hex duration extended to 4 turns.
 [resource]
 script = ExtResource("1_ndscr")
 node_id = "hex_mastery"
+branch = "ingenuity"
 display_name = "Hex Mastery"
 category = "ingenuity"
 base_description = "Brand the enemy's mind. Break their Resolve to curse them — then every wound you deal cuts deeper."
