@@ -36,6 +36,10 @@ layout_mode = 2
 custom_minimum_size = Vector2(10, 10)
 color = Color(0.25, 0.25, 0.25, 1)
 
+[node name="StatusRow" type="HBoxContainer" parent="."]
+layout_mode = 2
+visible = false
+
 [node name="StanceRow" type="HBoxContainer" parent="."]
 layout_mode = 2
 

@@ -247,10 +247,21 @@ func _on_log(text: String) -> void:
 
 func _on_round_started(round_num: int) -> void:
 	_round_hud.set_round(round_num)
+	_refresh_status_icons()
 
 
 func _on_phase_changed(phase_name: String) -> void:
 	_round_hud.set_phase(phase_name)
+	_refresh_status_icons()
+
+
+# Statuses have no dedicated change signal (mutations stay inside StatusOps);
+# every mutation happens inside a flow that emits one of the hooked signals, so
+# a poll-refresh here keeps the HUD squares current without touching the spine.
+func _refresh_status_icons() -> void:
+	_player_hud.set_statuses(CombatManager.get_active_statuses(true))
+	for i in _enemy_huds.size():
+		(_enemy_huds[i] as CombatantHUD).set_statuses(CombatManager.get_active_statuses(false, i))
 
 
 func _on_wounds_changed(is_player: bool, enemy_index: int, current: int, max_wounds: int, is_initial: bool) -> void:
@@ -314,6 +325,7 @@ func _on_combatant_attacking(is_player: bool, enemy_index: int) -> void:
 
 func _on_attack_resolved(attacker_is_player: bool, enemy_index: int, _target_pool: String,
 		did_breach: bool, is_massive: bool, wounds_dealt: int, defender_defeated: bool) -> void:
+	_refresh_status_icons()
 	var target: Combatant = _enemy_visuals[enemy_index] if attacker_is_player else _player_visual
 	var impact_fx := _player_impact_fx if attacker_is_player else _enemy_impact_fx
 	var projectile_fx := _player_projectile_fx if attacker_is_player else _enemy_projectile_fx

@@ -6,6 +6,17 @@ const COLOR_WOUND_EMPTY  := Color(0.25, 0.25, 0.25, 1.0)
 const COLOR_WOUND_FILLED := Color(0.85, 0.10, 0.10, 1.0)
 const COLOR_WOUND_HIDDEN := Color(0.0, 0.0, 0.0, 0.0)
 
+# Stub status squares — one per active status, colored by status_id.
+# Replaced by real pixel icons later (assets/sprites/icons/statuses/).
+const STATUS_SQUARE_SIZE := Vector2(9, 9)
+const STATUS_COLORS := {
+	"hex_marked":              Color(0.65, 0.25, 0.90, 1.0),  # purple
+	"time_locked":             Color(0.20, 0.80, 0.90, 1.0),  # cyan
+	"echoing_spell":           Color(0.55, 0.90, 0.30, 1.0),  # green
+	"mind_detonation_primed":  Color(0.95, 0.55, 0.15, 1.0),  # orange
+}
+const STATUS_COLOR_FALLBACK := Color(0.75, 0.75, 0.75, 1.0)
+
 @onready var _name_label:     Label         = $NameLabel
 @onready var _wound_slots:    HBoxContainer = $WoundsRow/WoundSlots
 @onready var _stance_value:   Label         = $StanceRow/StanceValue
@@ -13,10 +24,12 @@ const COLOR_WOUND_HIDDEN := Color(0.0, 0.0, 0.0, 0.0)
 @onready var _stamina_value:  Label         = $StaminaRow/StaminaValue
 @onready var _fervor_row:     HBoxContainer = $FervorRow
 @onready var _fervor_value:   Label         = $FervorRow/FervorValue
+@onready var _status_row:     HBoxContainer = $StatusRow
 
 var _slot_nodes: Array[ColorRect] = []
 var _max_wounds: int = 3
 var _weapon_label: Label
+var _status_signature: String = ""
 
 
 func _ready() -> void:
@@ -59,6 +72,32 @@ func set_weapon_display(weapon: EquipmentData) -> void:
 		return
 	var tags := ", ".join(Array(weapon.tags)) if weapon.tags.size() > 0 else "—"
 	_weapon_label.text = "%s  [%s]" % [weapon.item_name, tags]
+
+
+# Rebuild the status squares row. One colored square per active status; hover
+# shows the status tooltip. Skips the rebuild when nothing changed so a square
+# being hovered isn't freed under the cursor by the frequent refresh calls.
+func set_statuses(statuses: Array) -> void:
+	var signature := ""
+	for s in statuses:
+		var status := s as CombatStatus
+		signature += "%s:%d;" % [status.status_id, status.duration_rounds]
+	if signature == _status_signature:
+		return
+	_status_signature = signature
+
+	for child in _status_row.get_children():
+		child.queue_free()
+
+	_status_row.visible = not statuses.is_empty()
+	for s in statuses:
+		var status := s as CombatStatus
+		var square := ColorRect.new()
+		square.custom_minimum_size = STATUS_SQUARE_SIZE
+		square.color = STATUS_COLORS.get(status.status_id, STATUS_COLOR_FALLBACK) as Color
+		square.mouse_filter = Control.MOUSE_FILTER_PASS
+		_status_row.add_child(square)
+		TooltipManager.attach_hover(square, status)
 
 
 # Update the Fervor row. Only meaningful for the player HUD.

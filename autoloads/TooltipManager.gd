@@ -81,6 +81,22 @@ func attach(control: Control, resource: Resource) -> void:
 	)
 
 
+# Wire hover on a Control to show a full tooltip for a resource; hides on mouse exit.
+# Also hides if the control leaves the tree while its tooltip is up (rebuilt icon rows).
+func attach_hover(control: Control, resource: Resource) -> void:
+	control.mouse_entered.connect(func() -> void:
+		show_for(resource, control.get_screen_position() + Vector2(0.0, control.size.y), control)
+	)
+	control.mouse_exited.connect(func() -> void:
+		if _active_control == control:
+			hide()
+	)
+	control.tree_exiting.connect(func() -> void:
+		if _active_control == control:
+			hide()
+	)
+
+
 # Wire right-click on a Control to show a delta (upgrade preview) tooltip for a NodeData.
 func attach_delta(control: Control, node: NodeData) -> void:
 	control.gui_input.connect(func(event: InputEvent) -> void:

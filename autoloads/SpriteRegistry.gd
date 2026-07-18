@@ -1,6 +1,7 @@
 extends Node
 
 const _ICON_ROOT := "res://assets/sprites/icons/"
+const _HELD_ROOT := "res://assets/sprites/held/"
 const _COMB_ROOT := "res://assets/sprites/combatants/"
 const _FX_ROOT := "res://assets/sprites/effects/"
 const _BG_ROOT := "res://assets/sprites/backgrounds/"
@@ -9,6 +10,45 @@ const _ANIM_NAMES := ["idle", "attack_melee", "cast_spell", "hurt", "die"]
 # Converts a display name to a file-system key.
 static func icon_key(display_name: String) -> String:
 	return display_name.to_lower().replace(" ", "_")
+
+# Returns the in-hand overlay sprite for an equipment key, or null. Silent on
+# miss: held art is rolled out weapon-by-weapon, so absences are expected and
+# the overlay simply stays hidden.
+func get_held(key: String) -> Texture2D:
+	var path := "%s%s.png" % [_HELD_ROOT, key]
+	if ResourceLoader.exists(path):
+		return load(path) as Texture2D
+	return null
+
+
+# ── Held-equipment placement manifests ────────────────────────────────────────
+# Formal per-hero / per-item positioning convention (all coords in raw sheet
+# pixels, i.e. the UNFLIPPED facing; runtime mirroring is applied by Combatant):
+#   assets/sprites/held/<key>.json            → {"grip": [x, y]} — the pixel of
+#     the held art that sits in the hand. Held art is authored pointing in the
+#     sheet's raw facing direction.
+#   assets/sprites/combatants/<hero>/held.json → {"main": [x, y], "off": [x, y],
+#     "idle_bob": [8 ints]} — hand anchors + per-frame idle breathing offset.
+#     "main" = the character's RIGHT hand (front / weapon hand), "off" = LEFT
+#     (back hand). No manifest → that hero shows no held overlays.
+
+func get_held_meta(key: String) -> Dictionary:
+	return _load_json("%s%s.json" % [_HELD_ROOT, key])
+
+
+func get_hero_held_meta(hero_key: String) -> Dictionary:
+	return _load_json("%s%s/held.json" % [_COMB_ROOT, hero_key])
+
+
+func _load_json(path: String) -> Dictionary:
+	if not FileAccess.file_exists(path):
+		return {}
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return {}
+	var parsed: Variant = JSON.parse_string(f.get_as_text())
+	return parsed if parsed is Dictionary else {}
+
 
 # Returns Texture2D or null. Prints a warning on miss so missing art is easy to spot.
 func get_icon(category: String, key: String) -> Texture2D:

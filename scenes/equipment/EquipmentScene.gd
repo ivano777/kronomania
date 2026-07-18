@@ -35,6 +35,7 @@ var _inv_marks: Array = []           # "✓" equipped markers
 var _hands_label: Label
 var _equip_hint: Label
 var _selected_slot: String = "main_hand"
+var _doll: Combatant = null
 
 
 func _ready() -> void:
@@ -45,30 +46,15 @@ func _ready() -> void:
 	title.position = Vector2(10, 4)
 	add_child(title)
 
-	# --- Paper doll: player idle sprite between the slot columns ---
-	var hero_key := PlayerProgression.hero_sprite
-	var frames := SpriteRegistry.get_combatant_frames(hero_key)
-	if frames != null:
-		var doll := AnimatedSprite2D.new()
-		doll.sprite_frames = frames
-		doll.position = Vector2(186, 168)
-		doll.scale = Vector2(2, 2)
-		# Pack frames are cropped to the union bbox across ALL anims, so the
-		# default player idle figure sits off-center inside its frame (attack
-		# poses pad the right side). Counter-offset centers it on position.
-		# Measured on player idle_sheet.png: content center (99.5, 43) vs
-		# frame center (64, 34.5) — re-measure if the pack is re-imported.
-		# Heroine frames are horizontally centered with the same feet line, so
-		# only the shared vertical counter-offset applies.
-		doll.offset = Vector2(-35.5, -8.5) if hero_key == "player" else Vector2(0, -8)
-		doll.play("idle")
-		add_child(doll)
-	else:
-		var body := ColorRect.new()
-		body.color = Color(0.20, 0.35, 0.80)
-		body.position = Vector2(138, 104)
-		body.size = Vector2(96, 128)
-		add_child(body)
+	# --- Paper doll: full Combatant instance so the equipped items render on the
+	# sprite exactly as in battle (held overlays + idle bob), live-updated by
+	# _refresh() via refresh_held(). Battle orientation (faces left).
+	_doll = (preload("res://scenes/battle/Combatant.tscn") as PackedScene).instantiate() as Combatant
+	_doll.position = Vector2(186, 160)
+	_doll.scale = Vector2(2, 2)
+	add_child(_doll)
+	_doll.setup(_PLAYER_DATA, true)
+	_doll.fade_name_label(0.0)
 
 	# --- Doll slots (locked armor placeholders + functional hand slots) ---
 	for def in _slot_defs:
@@ -278,6 +264,9 @@ func _refresh() -> void:
 	var mh := PlayerProgression.main_hand
 	var oh := PlayerProgression.off_hand
 	var mh_two_handed := mh != null and mh.get_hands_required() == 2
+
+	if _doll != null:
+		_doll.refresh_held()
 
 	# A two-handed main occupies both hands: force selection back to main.
 	if mh_two_handed and _selected_slot == "off_hand":

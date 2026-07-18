@@ -1063,6 +1063,19 @@ func _all_enemies_defeated() -> bool:
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+## Read-only snapshot of a participant's active statuses, for HUD display.
+## is_player=true ignores enemy_index. Returns [] when combat is not running.
+func get_active_statuses(is_player: bool, enemy_index: int = -1) -> Array:
+	var state: CombatantState = null
+	if is_player:
+		state = _player
+	elif enemy_index >= 0 and enemy_index < _enemies.size():
+		state = _enemies[enemy_index]
+	if state == null:
+		return []
+	return state.active_statuses.duplicate()
+
+
 # --- Status system helpers (Group A) — logic in combat/StatusOps.gd ---
 # Thin wrappers preserve signatures + the contract-test surface. _tick_statuses emits the
 # log lines StatusOps.tick returns. _process_statuses_hook (awaits the echo) stays below.

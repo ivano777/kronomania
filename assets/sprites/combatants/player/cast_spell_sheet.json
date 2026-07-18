@@ -1,11 +1,10 @@
 {
-  "name": "player_cast_spell",
-  "sheet": "cast_spell_sheet.png",
-  "frame_width": 125,
-  "frame_height": 69,
-  "frame_count": 6,
-  "fps": 12,
-  "loop": false,
-  "layout": "horizontal_strip",
-  "source": "Martial Hero by LuizMelo (CC0) \u2014 https://luizmelo.itch.io/martial-hero"
+ "name": "player_cast_spell",
+ "sheet": "cast_spell_sheet.png",
+ "frame_width": 125,
+ "frame_height": 69,
+ "frame_count": 6,
+ "fps": 12,
+ "loop": false,
+ "layout": "horizontal_strip"
 }

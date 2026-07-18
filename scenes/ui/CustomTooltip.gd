@@ -1,5 +1,26 @@
 extends PanelContainer
 
+# Presentation catalog for known combat statuses. Unknown ids fall back to a
+# prettified status_id + generic stat-override rows.
+const STATUS_INFO := {
+	"hex_marked": {
+		"name": "Hexed",
+		"desc": "Branded by Mind Rend. Every breach against this combatant deals +1 wound while the hex holds.",
+	},
+	"time_locked": {
+		"name": "Time Locked",
+		"desc": "Snared by Time Lock. The next guard breached is frozen — it stays down instead of resetting.",
+	},
+	"echoing_spell": {
+		"name": "Echoing Spell",
+		"desc": "The last spell echoes at the end of each round with decaying kept dice until it fades.",
+	},
+	"mind_detonation_primed": {
+		"name": "Mind Bomb",
+		"desc": "A psychic charge is primed. Breaching this combatant's Stance detonates it against their Resolve.",
+	},
+}
+
 var _title: Label
 var _category: Label
 var _stats: VBoxContainer
@@ -68,6 +89,8 @@ func populate(resource: Resource) -> void:
 		_populate_node_full(resource as NodeData)
 	elif resource is CombatantData:
 		_populate_enemy(resource as CombatantData)
+	elif resource is CombatStatus:
+		_populate_status(resource as CombatStatus)
 
 
 func populate_delta(node: NodeData) -> void:
@@ -205,6 +228,54 @@ func _populate_enemy(cd: CombatantData) -> void:
 	_desc.text = ""
 	_desc_sep.hide()
 	_desc.hide()
+
+
+func _populate_status(status: CombatStatus) -> void:
+	_title.text = status_display_name(status.status_id)
+	_category.text = "Status"
+
+	_add_row("Duration", status_duration_text(status.duration_rounds))
+	for stat_key in status.stat_overrides:
+		var key := str(stat_key)
+		# stat_overrides doubles as effect payload storage; only true stat
+		# overrides (*_size → int) are player-facing.
+		if key.ends_with("_size") and status.stat_overrides[stat_key] is int:
+			var stat_name := key.trim_suffix("_size").capitalize()
+			_add_row(stat_name, "d%d" % (status.stat_overrides[stat_key] as int))
+	if not status.source_node_id.is_empty():
+		_add_row("Source", _node_display_name(status.source_node_id), true)
+
+	var desc := status_description(status.status_id)
+	if desc.is_empty():
+		_desc.text = ""
+		_desc_sep.hide()
+		_desc.hide()
+	else:
+		_desc.text = desc
+		_desc_sep.show()
+		_desc.show()
+
+
+# ── Status formatters (static — unit-tested) ───────────────────────────────────
+
+static func status_display_name(status_id: String) -> String:
+	if STATUS_INFO.has(status_id):
+		return STATUS_INFO[status_id]["name"] as String
+	return status_id.capitalize()
+
+
+static func status_duration_text(duration_rounds: int) -> String:
+	if duration_rounds < 0:
+		return "Permanent"
+	if duration_rounds == 1:
+		return "1 round"
+	return "%d rounds" % duration_rounds
+
+
+static func status_description(status_id: String) -> String:
+	if STATUS_INFO.has(status_id):
+		return STATUS_INFO[status_id]["desc"] as String
+	return ""
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
