@@ -157,6 +157,7 @@ func _bind_held(slot: Sprite2D, hand: String, item: EquipmentData) -> void:
 	slot.texture = tex
 	slot.flip_h = _sprite.flip_h
 	slot.offset = held_slot_offset(grip_px, tex.get_size(), _sprite.flip_h)
+	slot.modulate = AttackPresenter.rarity_tint(item.rarity)
 	_held_info[hand] = {"planted": bool(meta.get("planted", false))}
 
 
