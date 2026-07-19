@@ -429,7 +429,7 @@ func _on_exit_pressed() -> void:
 
 
 func _on_exit_confirmed() -> void:
-	get_tree().change_scene_to_file("res://scenes/main_menu/MainMenuScene.tscn")
+	get_tree().change_scene_to_file(DebugManager.nav_target("res://scenes/main_menu/MainMenuScene.tscn"))
 
 
 # --- Rest / actions ---

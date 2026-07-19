@@ -50,10 +50,11 @@ func _ready() -> void:
 	# sprite exactly as in battle (held overlays + idle bob), live-updated by
 	# _refresh() via refresh_held(). Battle orientation (faces left).
 	_doll = (preload("res://scenes/battle/Combatant.tscn") as PackedScene).instantiate() as Combatant
-	_doll.position = Vector2(186, 160)
 	_doll.scale = Vector2(2, 2)
 	add_child(_doll)
 	_doll.setup(_PLAYER_DATA, true)
+	# Centre the visible figure, not the frame — pack frames have uneven margins.
+	_doll.position = Vector2(186, 160) - _doll.sprite_center_offset() * _doll.scale.x
 	_doll.fade_name_label(0.0)
 
 	# --- Doll slots (locked armor placeholders + functional hand slots) ---
@@ -315,6 +316,6 @@ func _refresh() -> void:
 
 func _on_back_pressed() -> void:
 	if DungeonManager.run_active:
-		get_tree().change_scene_to_file("res://scenes/campfire/CampfireScene.tscn")
+		get_tree().change_scene_to_file(DebugManager.nav_target("res://scenes/campfire/CampfireScene.tscn"))
 	else:
-		get_tree().change_scene_to_file("res://scenes/main_menu/MainMenuScene.tscn")
+		get_tree().change_scene_to_file(DebugManager.nav_target("res://scenes/main_menu/MainMenuScene.tscn"))

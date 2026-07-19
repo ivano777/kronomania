@@ -1,0 +1,14 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scenes/debug/DebugDevMenu.gd" id="1_devmenu"]
+
+[node name="DebugDevMenu" type="VBoxContainer"]
+offset_left = 4.0
+offset_top = 4.0
+offset_right = 120.0
+offset_bottom = 30.0
+script = ExtResource("1_devmenu")
+
+[node name="OpenButton" type="Button" parent="."]
+layout_mode = 2
+text = "× DEV ×"

@@ -9,6 +9,8 @@ const VIEW := Vector2(640, 360)
 const DEBUG_WIDGET_SCENES := [
 	"res://scenes/debug/DebugAttackFX.tscn",
 	"res://scenes/debug/DebugCombatControl.tscn",
+	"res://scenes/debug/DebugDevMenu.tscn",
+	"res://scenes/debug/DevHubScene.tscn",
 	"res://scenes/debug/DebugEquipmentDisplay.tscn",
 	"res://scenes/debug/DebugFervorDisplay.tscn",
 	"res://scenes/debug/DebugProgressionControl.tscn",

@@ -237,6 +237,7 @@ func _on_ng_overwrite_confirmed() -> void:
 func _commit_new_game(slot: int) -> void:
 	var run_name := _ng_name_edit.text.strip_edges()
 	_new_game_popup.queue_free()
+	DebugManager.sandbox_active = false   # real play — leave the dev sandbox
 	SaveManager.active_slot = slot
 	SaveManager.active_run_name = run_name
 	PlayerProgression.reset()
@@ -250,6 +251,7 @@ func _on_load_slot(slot: int) -> void:
 	var meta := SaveManager.get_slot_meta(slot)
 	if not meta.get("exists", false):
 		return
+	DebugManager.sandbox_active = false   # real play — leave the dev sandbox
 	SaveManager.load(slot)
 	if DungeonManager.run_active:
 		get_tree().change_scene_to_file("res://scenes/campfire/CampfireScene.tscn")

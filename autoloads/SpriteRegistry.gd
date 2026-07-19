@@ -25,8 +25,9 @@ func get_held(key: String) -> Texture2D:
 # Formal per-hero / per-item positioning convention (all coords in raw sheet
 # pixels, i.e. the UNFLIPPED facing; runtime mirroring is applied by Combatant):
 #   assets/sprites/held/<key>.json            → {"grip": [x, y]} — the pixel of
-#     the held art that sits in the hand. Held art is authored pointing in the
-#     sheet's raw facing direction.
+#     the held art that sits in the hand. Held art is authored VERTICAL (tip
+#     up, grip on the symmetry axis); anchor-table rot° is absolute tilt from
+#     vertical, so one per-hero table serves every item.
 #   assets/sprites/combatants/<hero>/held.json → {"main": [x, y], "off": [x, y],
 #     "idle_bob": [8 ints]} — hand anchors + per-frame idle breathing offset.
 #     "main" = the character's RIGHT hand (front / weapon hand), "off" = LEFT

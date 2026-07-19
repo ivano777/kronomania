@@ -78,7 +78,7 @@ var _dummy_attack_btn: Button = null  # training room only
 func _ready() -> void:
 	_enemies_data = DungeonManager.current_enemies()
 	if _enemies_data.is_empty():
-		get_tree().change_scene_to_file("res://scenes/main_menu/MainMenuScene.tscn")
+		get_tree().change_scene_to_file(DebugManager.nav_target("res://scenes/main_menu/MainMenuScene.tscn"))
 		return
 	_ambush_base_disadvantage = DungeonManager.ambush_disadvantage
 
@@ -384,7 +384,7 @@ func _on_combat_ended(winner_name: String) -> void:
 		_defeat_panel.show()
 		await get_tree().create_timer(1.5).timeout
 		_teardown_signals()
-		get_tree().change_scene_to_file("res://scenes/main_menu/MainMenuScene.tscn")
+		get_tree().change_scene_to_file(DebugManager.nav_target("res://scenes/main_menu/MainMenuScene.tscn"))
 	else:
 		DungeonManager.on_victory()
 		if DungeonManager.was_last_fight_chained():
@@ -398,13 +398,13 @@ func _on_combat_ended(winner_name: String) -> void:
 			_defeat_panel.show()
 			await get_tree().create_timer(1.5).timeout
 			_teardown_signals()
-			get_tree().change_scene_to_file("res://scenes/campfire/CampfireScene.tscn")
+			get_tree().change_scene_to_file(DebugManager.nav_target("res://scenes/campfire/CampfireScene.tscn"))
 		else:
 			_result_label.text = "Run complete!  Victory!"
 			_defeat_panel.show()
 			await get_tree().create_timer(1.5).timeout
 			_teardown_signals()
-			get_tree().change_scene_to_file("res://scenes/main_menu/MainMenuScene.tscn")
+			get_tree().change_scene_to_file(DebugManager.nav_target("res://scenes/main_menu/MainMenuScene.tscn"))
 
 
 func _on_intents_available(intents: Array[String]) -> void:
@@ -550,7 +550,7 @@ func _refresh_dummy_attack_btn() -> void:
 func _leave_training() -> void:
 	_teardown_signals()
 	DungeonManager.end_training()
-	get_tree().change_scene_to_file("res://scenes/campfire/CampfireScene.tscn")
+	get_tree().change_scene_to_file(DebugManager.nav_target("res://scenes/campfire/CampfireScene.tscn"))
 
 
 func _teardown_signals() -> void:

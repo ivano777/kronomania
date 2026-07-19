@@ -54,6 +54,29 @@ func setup(data: CombatantData, is_player: bool) -> void:
 		_setup_held_overlays(sprite_key)
 
 
+## Offset (local px) of the idle-frame visible-content centre from the frame
+## centre. Menu scenes subtract it (times scale) to centre the character —
+## pack frames can carry wide transparent margins that off-centre the figure.
+func sprite_center_offset() -> Vector2:
+	if _sprite.sprite_frames == null or not _sprite.sprite_frames.has_animation("idle"):
+		return Vector2.ZERO
+	if _sprite.sprite_frames.get_frame_count("idle") == 0:
+		return Vector2.ZERO
+	var tex := _sprite.sprite_frames.get_frame_texture("idle", 0)
+	if tex == null:
+		return Vector2.ZERO
+	var img := tex.get_image()
+	if img == null:
+		return Vector2.ZERO
+	var used := img.get_used_rect()
+	if used.size.x <= 0:
+		return Vector2.ZERO
+	var delta := Vector2(used.get_center()) - tex.get_size() / 2.0
+	if _sprite.flip_h:
+		delta.x = -delta.x
+	return delta
+
+
 # ── Held-equipment overlay ────────────────────────────────────────────────────
 # Slots pivot at the item's grip pixel (offset = -grip), so per-frame anchor
 # rotation swings the item around the fist. Anchors resolved per

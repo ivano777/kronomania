@@ -4,6 +4,24 @@ signal debug_mode_changed(enabled: bool)
 
 var enabled: bool = false
 
+# Set by DebugDevMenu before switching into a dev-tool scene (held editor):
+# the tool returns here on exit instead of quitting. Empty = standalone run.
+var return_scene: String = ""
+
+# True once DevHubScene initialised its persistent dev sandbox (999pt
+# progression, run_active, active_slot 0). Scene jumps keep state while set.
+# Cleared by MainMenu when real play starts (New Game / Load).
+var sandbox_active: bool = false
+
+
+## Sandbox navigation collapse: while the sandbox is active, every back/exit
+## navigation lands on the DevHub instead of its normal target, keeping the
+## dev environment fully closed. Forward navigation (e.g. campfire → battle)
+## must NOT route through this. Release builds never set sandbox_active, so
+## this always returns default_path there.
+func nav_target(default_path: String) -> String:
+	return "res://scenes/debug/DevHubScene.tscn" if sandbox_active else default_path
+
 var _indicator: Label
 
 
