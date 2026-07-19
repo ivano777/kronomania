@@ -1,3 +1,5 @@
 {
-	"grip": [8, 8]
+	"grip": [8, 8],
+	"flip_h": true,
+	"order": { "main": "hero;weapon", "off": "weapon;hero" }
 }

@@ -1,0 +1,19 @@
+/* XPM */
+static char *held_glove[] = {
+"5 7 8 1",
+". c None",
+"K c #16161A",
+"A c #26262E",
+"B c #30303A",
+"C c #3C3C46",
+"D c #4A4A54",
+"E c #5A5A64",
+"F c #6E6E78",
+"AAK..",
+"KCCK.",
+"KAFA.",
+"KKEBK",
+"KBKEK",
+"KKDK.",
+"K.K.."
+};

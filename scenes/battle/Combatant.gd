@@ -17,6 +17,8 @@ var _is_dead := false
 var _sprite_key := ""
 var _held_main: Sprite2D
 var _held_off: Sprite2D
+var _glove_main: Sprite2D
+var _glove_off: Sprite2D
 var _held_info: Dictionary = {}   # hand -> {"planted": bool}
 var _hero_meta: Dictionary = {}
 var _frame_size := Vector2.ZERO
@@ -90,18 +92,89 @@ static func held_slot_position(frame_size: Vector2, hand_px: Vector2i, flipped: 
 	return hand_local
 
 
-## Sprite offset that puts the grip pixel on the node origin (rotation pivot).
-static func held_slot_offset(grip_px: Vector2i, tex_size: Vector2, flipped: bool) -> Vector2:
+## Sprite offset that puts the grip pixel on the node origin (rotation pivot),
+## accounting for the sprite's horizontal / vertical mirror.
+static func held_slot_offset(grip_px: Vector2i, tex_size: Vector2, flip_h: bool,
+		flip_v: bool = false) -> Vector2:
 	var gx := float(grip_px.x)
-	if flipped:
+	if flip_h:
 		gx = tex_size.x - 1.0 - gx
-	return Vector2(-gx, -float(grip_px.y))
+	var gy := float(grip_px.y)
+	if flip_v:
+		gy = tex_size.y - 1.0 - gy
+	return Vector2(-gx, -gy)
 
 
 ## Manifest rotation is authored in RAW sheet orientation; the runtime mirror
 ## reverses the visual arc, so flipped rendering negates it.
 static func held_rotation(deg: float, flipped: bool) -> float:
 	return -deg if flipped else deg
+
+
+const HELD_ORDER_DEFAULT := ["hero", "weapon", "hand"]
+
+
+## Resolves the draw-order tokens for a hand slot from the item meta "order"
+## field (schema doc in SpriteRegistry). String form applies to both hands;
+## object form is per-hand. Missing, unknown-token, or hero/weapon-less
+## entries fall back to the default hero;weapon;hand.
+static func held_order(meta: Dictionary, hand: String) -> Array:
+	var raw: Variant = meta.get("order")
+	if raw is Dictionary:
+		raw = (raw as Dictionary).get(hand)
+	if not (raw is String):
+		return HELD_ORDER_DEFAULT
+	var tokens: Array = []
+	for part in (raw as String).split(";"):
+		tokens.append(part.strip_edges())
+	for t in tokens:
+		if t not in HELD_ORDER_DEFAULT:
+			push_warning("Combatant: unknown held-order token '%s' in '%s'" % [t, raw])
+			return HELD_ORDER_DEFAULT
+	if "hero" not in tokens or "weapon" not in tokens:
+		push_warning("Combatant: held order needs hero and weapon tokens: '%s'" % raw)
+		return HELD_ORDER_DEFAULT
+	return tokens
+
+
+## z_index of a layer token relative to the hero sprite (hero = 0); negative
+## draws behind the body.
+static func held_layer_z(tokens: Array, token: String) -> int:
+	return tokens.find(token) - tokens.find("hero")
+
+
+## Grip value for a slot showing the back-variant texture: the back art's own
+## authored grip wins, else the front item's grip carries over.
+static func held_back_grip(front_meta: Dictionary, back_meta: Dictionary) -> Variant:
+	return back_meta.get("grip", front_meta.get("grip"))
+
+
+## Per-hand glove fine-tune entry [dx, dy, drot] from the hero manifest
+## ("glove_off"). Accepts legacy 2-element [dx, dy] (rot 0). Missing → zeros.
+static func _glove_entry(hero_meta: Dictionary, hand: String) -> Array:
+	var go: Variant = hero_meta.get("glove_off")
+	if go is Dictionary and (go as Dictionary).get(hand) is Array:
+		var a := (go as Dictionary)[hand] as Array
+		return [
+			int(a[0]) if a.size() > 0 else 0,
+			int(a[1]) if a.size() > 1 else 0,
+			int(a[2]) if a.size() > 2 else 0,
+		]
+	return [0, 0, 0]
+
+
+## Per-hero fine offset of the glove from the hand anchor, mirrored with the
+## sprite flip. Missing → zero.
+static func held_glove_offset(hero_meta: Dictionary, hand: String, flipped: bool) -> Vector2:
+	var e := _glove_entry(hero_meta, hand)
+	return Vector2(-int(e[0]) if flipped else int(e[0]), int(e[1]))
+
+
+## Per-hero glove rotation DELTA (deg) added to the weapon's angle; 0 = follow
+## the weapon exactly. Negated on flip, like held_rotation.
+static func held_glove_rot(hero_meta: Dictionary, hand: String, flipped: bool) -> float:
+	var r := float(_glove_entry(hero_meta, hand)[2])
+	return -r if flipped else r
 
 
 ## Resolves the anchor for (anim, hand, frame) from a hero held-manifest.
@@ -147,13 +220,15 @@ func _setup_held_overlays(sprite_key: String) -> void:
 	if _held_main == null:
 		_held_main = _make_held_slot()
 		_held_off = _make_held_slot()
+		_glove_main = _make_held_slot()
+		_glove_off = _make_held_slot()
 	_hero_meta = SpriteRegistry.get_hero_held_meta(sprite_key)
 	var frame_tex: Texture2D = null
 	if _sprite.sprite_frames != null:
 		frame_tex = _sprite.sprite_frames.get_frame_texture("idle", 0)
 	_frame_size = frame_tex.get_size() if frame_tex != null else Vector2.ZERO
-	_bind_held(_held_main, "main", PlayerProgression.main_hand)
-	_bind_held(_held_off, "off", PlayerProgression.off_hand)
+	_bind_held(_held_main, _glove_main, "main", PlayerProgression.main_hand)
+	_bind_held(_held_off, _glove_off, "off", PlayerProgression.off_hand)
 	_update_held_frame()
 
 
@@ -165,8 +240,9 @@ func _make_held_slot() -> Sprite2D:
 	return s
 
 
-func _bind_held(slot: Sprite2D, hand: String, item: EquipmentData) -> void:
+func _bind_held(slot: Sprite2D, glove: Sprite2D, hand: String, item: EquipmentData) -> void:
 	slot.texture = null
+	glove.texture = null
 	_held_info[hand] = {}
 	if item == null or _frame_size == Vector2.ZERO:
 		return
@@ -175,33 +251,70 @@ func _bind_held(slot: Sprite2D, hand: String, item: EquipmentData) -> void:
 	if tex == null:
 		return
 	var meta := SpriteRegistry.get_held_meta(key)
+	var order := held_order(meta, hand)
+	var grip_value: Variant = meta.get("grip")
+	var art_meta := meta   # meta of the texture actually shown (front or back)
+	# Behind-the-body slots show the item's internal side when the art ships one
+	# (asymmetric items, e.g. shields); its own grip wins, else the front's.
+	if held_layer_z(order, "weapon") < 0:
+		var back := SpriteRegistry.get_held(key + "_back")
+		if back != null:
+			tex = back
+			art_meta = SpriteRegistry.get_held_meta(key + "_back")
+			grip_value = held_back_grip(meta, art_meta)
+	var grip_default := Vector2i(tex.get_width() / 2, tex.get_height() / 2)
+	var grip_px := json_v2i(grip_value, grip_default)
+	# Per-art mirror ("flip_h"/"flip_v"), stacked on top of the hero's facing
+	# flip. Read from the shown art's own meta so a <key>_back variant flips
+	# independently of the front. Rotation is unaffected — the item still points
+	# where its anchor rot° says; only the art mirrors.
+	var item_flip_h := bool(art_meta.get("flip_h", false))
+	var item_flip_v := bool(art_meta.get("flip_v", false))
+	var eff_flip_h := _sprite.flip_h != item_flip_h
+	slot.texture = tex
+	slot.flip_h = eff_flip_h
+	slot.flip_v = item_flip_v
+	slot.offset = held_slot_offset(grip_px, tex.get_size(), eff_flip_h, item_flip_v)
+	slot.modulate = AttackPresenter.rarity_tint(item.rarity)
+	slot.z_index = held_layer_z(order, "weapon")
+	_held_info[hand] = {"planted": bool(meta.get("planted", false))}
+	if "hand" in order:
+		_bind_glove(glove, order)
+
+
+# The shared glove rides the same anchor + rotation as the item so the fist
+# stays wrapped around the grip. No rarity tint: it is the hero's hand, not gear.
+func _bind_glove(glove: Sprite2D, order: Array) -> void:
+	var tex := SpriteRegistry.get_held("_glove")
+	if tex == null:
+		return
+	var meta := SpriteRegistry.get_held_meta("_glove")
 	var grip_default := Vector2i(tex.get_width() / 2, tex.get_height() / 2)
 	var grip_px := json_v2i(meta.get("grip"), grip_default)
-	slot.texture = tex
-	slot.flip_h = _sprite.flip_h
-	slot.offset = held_slot_offset(grip_px, tex.get_size(), _sprite.flip_h)
-	slot.modulate = AttackPresenter.rarity_tint(item.rarity)
-	_held_info[hand] = {"planted": bool(meta.get("planted", false))}
+	glove.texture = tex
+	glove.flip_h = _sprite.flip_h
+	glove.offset = held_slot_offset(grip_px, tex.get_size(), _sprite.flip_h)
+	glove.z_index = held_layer_z(order, "hand")
 
 
 # Anchors the held items to the current animation frame's hand positions.
 func _update_held_frame() -> void:
-	for pair in [[_held_main, "main"], [_held_off, "off"]]:
-		var slot := pair[0] as Sprite2D
-		var hand := pair[1] as String
+	for trio in [[_held_main, _glove_main, "main"], [_held_off, _glove_off, "off"]]:
+		var slot := trio[0] as Sprite2D
+		var glove := trio[1] as Sprite2D
+		var hand := trio[2] as String
 		if slot == null:
 			continue
-		if slot.texture == null or _is_dead:
-			slot.visible = false
-			continue
-		var anim := String(_sprite.animation)
-		var planted: bool = (_held_info.get(hand, {}) as Dictionary).get("planted", false)
-		if planted and anim != "idle":
-			slot.visible = false
-			continue
-		var entry: Variant = anchor_entry(_hero_meta, anim, hand, _sprite.frame)
+		var entry: Variant = null
+		if slot.texture != null and not _is_dead:
+			var anim := String(_sprite.animation)
+			var planted: bool = (_held_info.get(hand, {}) as Dictionary).get("planted", false)
+			if not (planted and anim != "idle"):
+				entry = anchor_entry(_hero_meta, anim, hand, _sprite.frame)
 		if entry == null:
 			slot.visible = false
+			if glove != null:
+				glove.visible = false
 			continue
 		var e := entry as Array
 		slot.visible = true
@@ -209,6 +322,12 @@ func _update_held_frame() -> void:
 				_frame_size, Vector2i(int(e[0]), int(e[1])), _sprite.flip_h)
 		slot.rotation_degrees = held_rotation(
 				float(e[2]) if e.size() > 2 else 0.0, _sprite.flip_h)
+		if glove != null:
+			glove.visible = glove.texture != null
+			glove.position = slot.position \
+					+ held_glove_offset(_hero_meta, hand, _sprite.flip_h)
+			glove.rotation_degrees = slot.rotation_degrees \
+					+ held_glove_rot(_hero_meta, hand, _sprite.flip_h)
 
 
 func _on_animation_finished() -> void:

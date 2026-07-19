@@ -26,6 +26,12 @@ func test_slot_offset_puts_grip_on_origin() -> void:
 	assert_eq(Combatant.held_slot_offset(GRIP, TEX, true), Vector2(-27, -5))
 
 
+func test_slot_offset_flip_v_mirrors_y() -> void:
+	# flip_v: grip y becomes 10-1-5 = 4
+	assert_eq(Combatant.held_slot_offset(GRIP, TEX, false, true), Vector2(-5, -4))
+	assert_eq(Combatant.held_slot_offset(GRIP, TEX, true, true), Vector2(-27, -4))
+
+
 func test_rotation_negates_when_flipped() -> void:
 	assert_eq(Combatant.held_rotation(30.0, false), 30.0)
 	assert_eq(Combatant.held_rotation(30.0, true), -30.0)
@@ -146,3 +152,111 @@ func test_heroine_manifest_complete() -> void:
 	assert_true(meta.has("off"), "heroine held.json missing off anchor")
 	var bob: Array = meta.get("idle_bob", [])
 	assert_eq(bob.size(), 8, "heroine idle_bob must cover the 8-frame idle loop")
+
+
+# ── draw-order resolution ─────────────────────────────────────────────────────
+
+func test_order_default_when_absent() -> void:
+	assert_eq(Combatant.held_order({}, "main"), ["hero", "weapon", "hand"])
+
+
+func test_order_string_applies_to_both_hands() -> void:
+	var meta := {"order": "hero;weapon"}
+	assert_eq(Combatant.held_order(meta, "main"), ["hero", "weapon"])
+	assert_eq(Combatant.held_order(meta, "off"), ["hero", "weapon"])
+
+
+func test_order_per_hand_object() -> void:
+	var meta := {"order": {"main": "hero;weapon", "off": "weapon;hero"}}
+	assert_eq(Combatant.held_order(meta, "main"), ["hero", "weapon"])
+	assert_eq(Combatant.held_order(meta, "off"), ["weapon", "hero"])
+
+
+func test_order_object_missing_hand_falls_back() -> void:
+	var meta := {"order": {"off": "weapon;hero"}}
+	assert_eq(Combatant.held_order(meta, "main"), ["hero", "weapon", "hand"])
+
+
+func test_order_unknown_token_falls_back() -> void:
+	assert_eq(Combatant.held_order({"order": "hero;sword"}, "main"),
+			["hero", "weapon", "hand"])
+
+
+func test_order_missing_required_token_falls_back() -> void:
+	assert_eq(Combatant.held_order({"order": "weapon;hand"}, "main"),
+			["hero", "weapon", "hand"])
+
+
+func test_layer_z_default_bands() -> void:
+	var order := Combatant.held_order({}, "main")
+	assert_eq(Combatant.held_layer_z(order, "weapon"), 1)
+	assert_eq(Combatant.held_layer_z(order, "hand"), 2)
+
+
+func test_layer_z_weapon_behind_hero_negative() -> void:
+	assert_eq(Combatant.held_layer_z(["weapon", "hero"], "weapon"), -1)
+
+
+# ── back-variant grip fallback ────────────────────────────────────────────────
+
+func test_back_grip_prefers_back_meta() -> void:
+	assert_eq(Combatant.held_back_grip({"grip": [8, 8]}, {"grip": [3, 5]}), [3, 5])
+
+
+func test_back_grip_falls_back_to_front() -> void:
+	assert_eq(Combatant.held_back_grip({"grip": [8, 8]}, {}), [8, 8])
+
+
+# ── glove fine offset ─────────────────────────────────────────────────────────
+
+func test_glove_offset_zero_when_absent() -> void:
+	assert_eq(Combatant.held_glove_offset({}, "main", false), Vector2.ZERO)
+
+
+func test_glove_offset_reads_hand_and_mirrors_x() -> void:
+	var meta := {"glove_off": {"main": [2, -3], "off": [1, 4]}}
+	assert_eq(Combatant.held_glove_offset(meta, "main", false), Vector2(2, -3))
+	assert_eq(Combatant.held_glove_offset(meta, "main", true), Vector2(-2, -3))
+	assert_eq(Combatant.held_glove_offset(meta, "off", false), Vector2(1, 4))
+
+
+func test_glove_offset_ignores_rot_component() -> void:
+	assert_eq(Combatant.held_glove_offset({"glove_off": {"main": [2, -3, 45]}},
+			"main", false), Vector2(2, -3))
+
+
+func test_glove_rot_zero_when_absent_or_legacy() -> void:
+	assert_eq(Combatant.held_glove_rot({}, "main", false), 0.0)
+	# legacy 2-element entry has no rotation
+	assert_eq(Combatant.held_glove_rot({"glove_off": {"main": [2, 3]}}, "main", false), 0.0)
+
+
+func test_glove_rot_reads_and_negates_on_flip() -> void:
+	var meta := {"glove_off": {"main": [0, 0, 20], "off": [0, 0, -10]}}
+	assert_eq(Combatant.held_glove_rot(meta, "main", false), 20.0)
+	assert_eq(Combatant.held_glove_rot(meta, "main", true), -20.0)
+	assert_eq(Combatant.held_glove_rot(meta, "off", false), -10.0)
+
+
+# ── glove + shield-back install ───────────────────────────────────────────────
+
+func test_glove_art_and_grip_installed() -> void:
+	assert_not_null(SpriteRegistry.get_held("_glove"), "held/_glove.png missing")
+	var grip := Combatant.json_v2i(
+			SpriteRegistry.get_held_meta("_glove").get("grip"), Vector2i(-1, -1))
+	assert_ne(grip, Vector2i(-1, -1), "_glove.json missing grip")
+
+
+func test_shield_back_art_installed() -> void:
+	assert_not_null(SpriteRegistry.get_held("heater_shield_back"),
+			"heater_shield_back.png missing")
+
+
+func test_shield_orders_hide_glove_and_flip_off_hand_behind() -> void:
+	var meta := SpriteRegistry.get_held_meta("heater_shield")
+	var main_order := Combatant.held_order(meta, "main")
+	var off_order := Combatant.held_order(meta, "off")
+	assert_false("hand" in main_order, "shield face must cover the fist (no glove)")
+	assert_false("hand" in off_order, "off-hand shield draws no glove")
+	assert_lt(Combatant.held_layer_z(off_order, "weapon"), 0,
+			"off-hand shield must render behind the body")

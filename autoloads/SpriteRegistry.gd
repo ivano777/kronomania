@@ -28,10 +28,27 @@ func get_held(key: String) -> Texture2D:
 #     the held art that sits in the hand. Held art is authored VERTICAL (tip
 #     up, grip on the symmetry axis); anchor-table rot° is absolute tilt from
 #     vertical, so one per-hero table serves every item.
+#     Optional "flip_h"/"flip_v": mirror the art (bool); stacks on the hero
+#     facing flip, rotation unaffected. Read from the art actually shown, so a
+#     <key>_back variant carries its OWN flip (front's flip does not apply to
+#     the back). Optional "order": draw layers for the hand slot, tokens "hero"/"weapon"/
+#     "hand" joined by ";", first = drawn deepest. Default "hero;weapon;hand"
+#     (item over hero, shared glove over the item). Omit "hand" → no glove
+#     (e.g. shield face covers the fist). String = both hands; object form
+#     {"main": ..., "off": ...} overrides per hand, missing key → default.
+#     A slot whose order puts "weapon" before "hero" renders BEHIND the body
+#     and swaps to <key>_back.png when installed (internal side of asymmetric
+#     items, e.g. shields); same grip applies. Glove art is the shared
+#     held/_glove.png (+_glove.json grip) — underscore keeps it off the
+#     item-key namespace; missing glove art simply draws no glove.
 #   assets/sprites/combatants/<hero>/held.json → {"main": [x, y], "off": [x, y],
 #     "idle_bob": [8 ints]} — hand anchors + per-frame idle breathing offset.
 #     "main" = the character's RIGHT hand (front / weapon hand), "off" = LEFT
-#     (back hand). No manifest → that hero shows no held overlays.
+#     (back hand). No manifest → that hero shows no held overlays. Optional
+#     "glove_off": {"main": [dx, dy, drot], "off": [dx, dy, drot]} nudges the
+#     shared glove off the hand anchor and rotates it relative to the weapon
+#     angle (unflipped px/deg, mirrored at runtime; 2-element legacy entry =
+#     drot 0); absent = 0.
 
 func get_held_meta(key: String) -> Dictionary:
 	return _load_json("%s%s.json" % [_HELD_ROOT, key])
