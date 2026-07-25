@@ -111,6 +111,7 @@ _adding an `@export` field, or adding a `.tres` file._
 | `scenes/battle/Combatant.gd` | `Combatant` | `impact_flash.gdshader` |
 | `scenes/battle/CombatantHUD.gd` | `CombatantHUD` | — |
 | `scenes/battle/RoundHUD.gd` | `RoundHUD` | — |
+| `scenes/battle/SmearGen.gd` | `SmearGen` | — |
 | `scenes/campfire/CampfireScene.gd` | `—` | `player_default.tres` |
 | `scenes/constellation/ConstellationBackdrop.gd` | `—` | — |
 | `scenes/constellation/ConstellationScene.gd` | `—` | — |

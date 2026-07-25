@@ -41,6 +41,13 @@ func get_held(key: String) -> Texture2D:
 #     items, e.g. shields); same grip applies. Glove art is the shared
 #     held/_glove.png (+_glove.json grip) — underscore keeps it off the
 #     item-key namespace; missing glove art simply draws no glove.
+#     Optional "smear": procedural swing-smear params (SmearGen). Missing/true
+#     = defaults, false = never smear, or a dict tuning "threshold_deg" (min
+#     per-frame rotation delta that triggers a smear), "max_sweep_deg" (arc
+#     cap) and "trail_frac_min" (trail length of sparse rows). Applies to both
+#     hands (no per-hand form). Frames whose anchor rotation jumps past the
+#     threshold draw a baked arc (weapon art hidden that frame) colored from
+#     the item's own palette.
 #   assets/sprites/combatants/<hero>/held.json → {"main": [x, y], "off": [x, y],
 #     "idle_bob": [8 ints]} — hand anchors + per-frame idle breathing offset.
 #     "main" = the character's RIGHT hand (front / weapon hand), "off" = LEFT
@@ -65,6 +72,8 @@ func get_held(key: String) -> Texture2D:
 #       "anims" — per-frame anchor tables (same schema as the hero-level
 #         "anims"); a miss inside them (anim/hand/empty) falls through to the
 #         hero-level tables, so an item override cannot hide a hand.
+#       "smear" — smear params (same schema as the item-json field, both hands;
+#         never per-hand); a hero tier here beats the item json outright.
 #     Resolution lives in Combatant.held_override_field and friends.
 
 func get_held_meta(key: String) -> Dictionary:

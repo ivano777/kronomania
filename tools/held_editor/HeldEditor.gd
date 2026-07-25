@@ -66,6 +66,7 @@ var _item_order: Dictionary = {}        # key -> raw "order" value (String | Dic
 var _item_has_grip: Dictionary = {}     # key -> bool (json authored a grip)
 var _item_fliph: Dictionary = {}        # key -> bool (mirror art horizontally)
 var _item_flipv: Dictionary = {}        # key -> bool (mirror art vertically)
+var _item_smear: Dictionary = {}        # key -> raw "smear" json value (params source)
 
 var _hero: String = ""
 var _frames: SpriteFrames = null
@@ -87,6 +88,7 @@ var _playing: bool = false
 var _play_t: float = 0.0
 var _item_alpha: float = 0.9            # preview aid only — never saved
 var _glove_show: bool = true            # preview toggle only — never saved
+var _smear_show: bool = false           # smear preview toggle — never saved
 var _xray: bool = false                 # dim hero so behind-body items show
 var _glove_edit: bool = false           # glove gumball active (never saved)
 var _glove_off: Dictionary = {"main": Vector2i.ZERO, "off": Vector2i.ZERO}
@@ -197,6 +199,7 @@ func _scan_items() -> void:
 				_item_has_grip[key] = g is Array
 				_item_fliph[key] = bool(meta.get("flip_h", false))
 				_item_flipv[key] = bool(meta.get("flip_v", false))
+				_item_smear[key] = meta.get("smear")
 		f = d.get_next()
 	# Back variants without their own authored grip inherit the front item's
 	# grip — same rule as the runtime (Combatant.held_back_grip).
@@ -755,6 +758,13 @@ func _build_ui() -> void:
 		_xray = on
 		_canvas.queue_redraw())
 	right.add_child(xray_box)
+	var smear_box := CheckBox.new()
+	smear_box.text = "smear prev"
+	smear_box.focus_mode = Control.FOCUS_NONE
+	smear_box.toggled.connect(func(on: bool) -> void:
+		_smear_show = on
+		_canvas.queue_redraw())
+	right.add_child(smear_box)
 	var glove_row := HBoxContainer.new()
 	var glove_box := CheckBox.new()
 	glove_box.text = "glv"
@@ -770,7 +780,7 @@ func _build_ui() -> void:
 	var glove_reset := _mk_btn("RESET GLOVE", _reset_glove)
 	right.add_child(glove_reset)
 	_pickers = [main_lbl, _main_item_btn, off_lbl, _off_item_btn,
-			alpha_row, xray_box, glove_row, glove_reset, all_btn]
+			alpha_row, xray_box, smear_box, glove_row, glove_reset, all_btn]
 	var flip_lbl := _mk_label("FLIP art")
 	right.add_child(flip_lbl)
 	var flip_row := HBoxContainer.new()
@@ -1481,12 +1491,20 @@ func _draw_held_pass(behind: bool) -> void:
 			# flip resolved through the per-hero override chain, keyed by the art
 			# actually shown, so a _back variant flips independently of the front
 			# (matches Combatant._bind_held).
-			_draw_overlay(_item_tex[draw_key], _item_grip[draw_key], hand,
-					Vector2.ZERO, _item_alpha, 0.0,
-					Combatant.held_flip(_ovr_meta(), draw_key,
-							{"flip_h": _item_fliph.get(draw_key, false)}, "flip_h", hand),
-					Combatant.held_flip(_ovr_meta(), draw_key,
-							{"flip_v": _item_flipv.get(draw_key, false)}, "flip_v", hand))
+			var ifh := Combatant.held_flip(_ovr_meta(), draw_key,
+					{"flip_h": _item_fliph.get(draw_key, false)}, "flip_h", hand)
+			var ifv := Combatant.held_flip(_ovr_meta(), draw_key,
+					{"flip_v": _item_flipv.get(draw_key, false)}, "flip_v", hand)
+			var smear_tex := _smear_texture(key, draw_key, hand, ifh, ifv)
+			if smear_tex != null:
+				# Swing frame: the smear replaces the weapon (crunch style). A
+				# faint ghost keeps the anchor readable under it while tuning.
+				_draw_overlay(_item_tex[draw_key], _item_grip[draw_key], hand,
+						Vector2.ZERO, _item_alpha * 0.25, 0.0, ifh, ifv)
+				_draw_smear(smear_tex, hand)
+			else:
+				_draw_overlay(_item_tex[draw_key], _item_grip[draw_key], hand,
+						Vector2.ZERO, _item_alpha, 0.0, ifh, ifv)
 		if _glove_show and "hand" in order and _item_tex.has("_glove"):
 			if (Combatant.held_layer_z(order, "hand") < 0) == behind:
 				_draw_overlay(_item_tex["_glove"], _item_grip["_glove"], hand,
@@ -1509,6 +1527,48 @@ func _draw_overlay(tex: Texture2D, grip: Vector2i, hand: String, extra: Vector2,
 	_canvas.draw_set_transform(anchor, rot, Vector2(sx * _zoom, sy * _zoom))
 	_canvas.draw_texture_rect(tex, Rect2(Vector2(-grip.x, -grip.y), tex.get_size()),
 			false, Color(1, 1, 1, alpha))
+	_canvas.draw_set_transform(Vector2.ZERO, 0, Vector2.ONE)
+
+
+## Baked smear texture for a hand's current frame, or null when the preview is
+## off or the frame doesn't swing past the threshold. Mirrors the runtime
+## exactly: live tables + override blocks resolve arc and params, the shown art
+## with its item flips applied feeds the bake; cache keys carry grip and flips,
+## so live edits re-bake automatically.
+func _smear_texture(key: String, draw_key: String, hand: String,
+		ifh: bool, ifv: bool) -> ImageTexture:
+	if not _smear_show or _anim == "" or not _tables.has(_anim):
+		return null
+	var params := Combatant.smear_params(_ovr_meta(), key, {"smear": _item_smear.get(key)})
+	var arc: Variant = Combatant.smear_arc(_ovr_meta(), key, _anim, hand, _frame, params)
+	if arc == null:
+		return null
+	var img: Image = (_item_tex[draw_key] as Texture2D).get_image()
+	if img == null:
+		return null
+	var grip: Vector2i = _item_grip[draw_key]
+	if ifh:
+		img.flip_x()
+		grip.x = img.get_width() - 1 - grip.x
+	if ifv:
+		img.flip_y()
+		grip.y = img.get_height() - 1 - grip.y
+	var a := arc as Dictionary
+	return SmearGen.texture_for(
+			draw_key + ("+fh" if ifh else "") + ("+fv" if ifv else ""),
+			img, grip, float(a["from"]), float(a["to"]), params)
+
+
+## Smear canvases centre on the grip pivot and never rotate — only the facing
+## mirror applies (matches Combatant._update_smear).
+func _draw_smear(tex: ImageTexture, hand: String) -> void:
+	var r := _disp_row(hand)
+	var anchor := _to_screen(Vector2(int(r[0]) + 0.5, int(r[1]) + 0.5))
+	var sx := -1.0 if _flip else 1.0
+	_canvas.draw_set_transform(anchor, 0.0, Vector2(sx * _zoom, _zoom))
+	var half := Vector2(tex.get_size()) / 2.0
+	_canvas.draw_texture_rect(tex, Rect2(-half, Vector2(tex.get_size())), false,
+			Color(1, 1, 1, _item_alpha))
 	_canvas.draw_set_transform(Vector2.ZERO, 0, Vector2.ONE)
 
 
@@ -1698,6 +1758,9 @@ func _save() -> void:
 		_save_item()
 	else:
 		_save_hero()
+	# Baked smears key on grip/tables/params — dump the cache so anything an
+	# edit invalidated is regenerated from the saved state.
+	SmearGen.clear_cache()
 
 
 func _save_item() -> void:
@@ -1720,6 +1783,11 @@ func _save_item() -> void:
 			if (raw as Dictionary).has(h):
 				parts.append("\"%s\": \"%s\"" % [h, (raw as Dictionary)[h]])
 		s += ",\n\t\"order\": { %s }" % ", ".join(parts)
+	# "smear" is authored by hand in the json (editor only previews it) — carry
+	# it through the regenerating save instead of dropping it.
+	var sm: Variant = _item_smear.get(_item_sel)
+	if sm != null:
+		s += ",\n\t\"smear\": %s" % JSON.stringify(sm)
 	s += "\n}\n"
 	var path := "res://assets/sprites/held/%s.json" % _item_sel
 	var f := FileAccess.open(path, FileAccess.WRITE)
@@ -1862,6 +1930,11 @@ func _fmt_ovr_fields(d: Dictionary, ind: String) -> String:
 		var s := _fmt_hand_field(d.get(f), fmts[f] as Callable)
 		if s != "":
 			parts.append("%s\"%s\": %s" % [ind, f, s])
+	# Hand-authored smear params ride the override chain too — preserve them
+	# verbatim through the regenerating save.
+	var sm: Variant = d.get("smear")
+	if sm != null:
+		parts.append("%s\"smear\": %s" % [ind, JSON.stringify(sm)])
 	var anims: Variant = d.get("anims")
 	if anims is Dictionary and not (anims as Dictionary).is_empty():
 		var ablocks: Array[String] = []

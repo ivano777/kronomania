@@ -14,6 +14,15 @@ func _ready() -> void:
 	$Panel/BlockedBtn.pressed.connect(func() -> void: _replay("blocked"))
 	$Panel/KillBtn.pressed.connect(func() -> void: _replay("kill"))
 
+	# Weapon-smear toggle: flips the global DebugManager flag so the next swing
+	# frame draws the raw held art instead of the baked smear (A/B comparison).
+	var smear_btn := $Panel/SmearBtn as Button
+	smear_btn.button_pressed = DebugManager.smears_enabled
+	smear_btn.toggled.connect(func(on: bool) -> void:
+		DebugManager.smears_enabled = on
+		smear_btn.text = "Smears: ON" if on else "Smears: OFF")
+	smear_btn.text = "Smears: ON" if DebugManager.smears_enabled else "Smears: OFF"
+
 	visible = DebugManager.enabled
 	DebugManager.debug_mode_changed.connect(func(en: bool) -> void: visible = en)
 

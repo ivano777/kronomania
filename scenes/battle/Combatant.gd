@@ -10,8 +10,8 @@ const FLASH_S := 0.18
 # Held-equipment overlay (player only). Placement is data-driven: per-hero hand
 # anchors + idle bob live in assets/sprites/combatants/<hero>/held.json, per-item
 # grip pixels in assets/sprites/held/<key>.json (schema doc in SpriteRegistry).
-# Idle-only for now: other anims hide the overlay and the attack FX layer
-# carries the action.
+# Anims without an anchor table hide the overlay; fast swing frames swap the
+# weapon art for a procedural smear (SmearGen) baked from the item's own art.
 
 var _is_dead := false
 var _sprite_key := ""
@@ -19,6 +19,8 @@ var _held_main: Sprite2D
 var _held_off: Sprite2D
 var _glove_main: Sprite2D
 var _glove_off: Sprite2D
+var _smear_main: Sprite2D
+var _smear_off: Sprite2D
 var _held_info: Dictionary = {}   # hand -> {"planted": bool}
 var _hero_meta: Dictionary = {}
 var _frame_size := Vector2.ZERO
@@ -183,11 +185,13 @@ static func held_override_field(hero_meta: Dictionary, key: String, field: Strin
 
 
 ## One tier's contribution for a field: null when the entry doesn't author it
-## (or authors it for other hands only).
+## (or authors it for other hands only). "anims" and "smear" carry dict values
+## of their own, so they skip the per-hand unwrap (smear params apply to both
+## hands).
 static func _entry_field(entry: Variant, field: String, hand: String) -> Variant:
 	if entry is Dictionary and (entry as Dictionary).get(field) != null:
 		var v: Variant = (entry as Dictionary)[field]
-		if field != "anims":
+		if field != "anims" and field != "smear":
 			v = held_hand_value(v, hand)
 		return v
 	return null
@@ -233,6 +237,37 @@ static func anchor_entry_for_item(hero_meta: Dictionary, key: String, anim: Stri
 		if entry != null:
 			return entry
 	return anchor_entry(hero_meta, anim, hand, frame)
+
+
+## Resolved smear params for an item: "smear" through the override chain
+## (hero tiers win), else the item json's own value, normalized by SmearGen
+## (false = disabled, dict = tuned, missing = defaults).
+static func smear_params(hero_meta: Dictionary, item_key: String,
+		item_meta: Dictionary) -> Dictionary:
+	var v: Variant = held_override_field(hero_meta, item_key, "smear")
+	if v == null:
+		v = item_meta.get("smear")
+	return SmearGen.params_from_meta(v)
+
+
+## Smear arc for (anim, hand, frame), or null = draw the weapon normally.
+## Compares the resolved anchor rotation against the PREVIOUS frame's (per-hero
+## rot delta applied to both, so absolute arc angles are final); frame 0 never
+## smears, table clamping makes repeated end frames delta-0. Null entries
+## (hidden item) never smear.
+static func smear_arc(hero_meta: Dictionary, item_key: String, anim: String,
+		hand: String, frame: int, params: Dictionary) -> Variant:
+	if frame <= 0 or not bool(params.get("enabled", true)):
+		return null
+	var cur: Variant = anchor_entry_for_item(hero_meta, item_key, anim, hand, frame)
+	var prev: Variant = anchor_entry_for_item(hero_meta, item_key, anim, hand, frame - 1)
+	if cur == null or prev == null:
+		return null
+	var ovr := held_ovr_rot(hero_meta, item_key, hand)
+	return SmearGen.sweep_for_frames(
+			SmearGen.entry_rot(prev) + ovr, SmearGen.entry_rot(cur) + ovr,
+			float(params.get("threshold_deg", SmearGen.DEFAULT_THRESHOLD_DEG)),
+			float(params.get("max_sweep_deg", SmearGen.DEFAULT_MAX_SWEEP_DEG)))
 
 
 ## Per-hand glove fine-tune entry [dx, dy, drot] from the hero manifest
@@ -308,6 +343,8 @@ func _setup_held_overlays(sprite_key: String) -> void:
 		_held_off = _make_held_slot()
 		_glove_main = _make_held_slot()
 		_glove_off = _make_held_slot()
+		_smear_main = _make_smear_slot()
+		_smear_off = _make_smear_slot()
 	_hero_meta = SpriteRegistry.get_hero_held_meta(sprite_key)
 	var frame_tex: Texture2D = null
 	if _sprite.sprite_frames != null:
@@ -321,6 +358,15 @@ func _setup_held_overlays(sprite_key: String) -> void:
 func _make_held_slot() -> Sprite2D:
 	var s := Sprite2D.new()
 	s.centered = false
+	s.visible = false
+	add_child(s)
+	return s
+
+
+# Smear canvases are centred (bake centre = grip pivot) and never rotate —
+# arc angles are baked absolute; only the facing flip mirrors them.
+func _make_smear_slot() -> Sprite2D:
+	var s := Sprite2D.new()
 	s.visible = false
 	add_child(s)
 	return s
@@ -367,6 +413,24 @@ func _bind_held(slot: Sprite2D, glove: Sprite2D, hand: String, item: EquipmentDa
 	slot.modulate = AttackPresenter.rarity_tint(item.rarity)
 	slot.z_index = held_layer_z(order, "weapon")
 	_held_info[hand] = {"planted": bool(meta.get("planted", false)), "key": key}
+	# Smear bake inputs: the shown art with its OWN flips applied (bakes live in
+	# unflipped-hero terms; the facing flip mirrors the canvas at draw time).
+	# The grip pixel mirrors with the image; the cache key encodes the flips so
+	# flipped variants never share a bake.
+	var smear_img := tex.get_image()
+	if smear_img != null:
+		var smear_grip := grip_px
+		if item_flip_h:
+			smear_img.flip_x()
+			smear_grip.x = smear_img.get_width() - 1 - smear_grip.x
+		if item_flip_v:
+			smear_img.flip_y()
+			smear_grip.y = smear_img.get_height() - 1 - smear_grip.y
+		_held_info[hand]["smear_img"] = smear_img
+		_held_info[hand]["smear_grip"] = smear_grip
+		_held_info[hand]["smear_art"] = art_key \
+				+ ("+fh" if item_flip_h else "") + ("+fv" if item_flip_v else "")
+		_held_info[hand]["smear_params"] = smear_params(_hero_meta, key, meta)
 	if "hand" in order:
 		_bind_glove(glove, order)
 
@@ -388,17 +452,19 @@ func _bind_glove(glove: Sprite2D, order: Array) -> void:
 
 # Anchors the held items to the current animation frame's hand positions.
 func _update_held_frame() -> void:
-	for trio in [[_held_main, _glove_main, "main"], [_held_off, _glove_off, "off"]]:
-		var slot := trio[0] as Sprite2D
-		var glove := trio[1] as Sprite2D
-		var hand := trio[2] as String
+	for quad in [[_held_main, _glove_main, _smear_main, "main"],
+			[_held_off, _glove_off, _smear_off, "off"]]:
+		var slot := quad[0] as Sprite2D
+		var glove := quad[1] as Sprite2D
+		var smear := quad[2] as Sprite2D
+		var hand := quad[3] as String
 		if slot == null:
 			continue
 		var info := _held_info.get(hand, {}) as Dictionary
 		var item_key := String(info.get("key", ""))
+		var anim := String(_sprite.animation)
 		var entry: Variant = null
 		if slot.texture != null and not _is_dead:
-			var anim := String(_sprite.animation)
 			var planted: bool = info.get("planted", false)
 			if not (planted and anim != "idle"):
 				entry = anchor_entry_for_item(_hero_meta, item_key, anim, hand, _sprite.frame)
@@ -406,6 +472,8 @@ func _update_held_frame() -> void:
 			slot.visible = false
 			if glove != null:
 				glove.visible = false
+			if smear != null:
+				smear.visible = false
 			continue
 		var e := entry as Array
 		# Per-hero item deltas ride on top of whichever table resolved the entry
@@ -424,6 +492,37 @@ func _update_held_frame() -> void:
 					+ held_glove_offset(_hero_meta, hand, _sprite.flip_h)
 			glove.rotation_degrees = slot.rotation_degrees \
 					+ held_glove_rot(_hero_meta, hand, _sprite.flip_h)
+		_update_smear(slot, smear, info, item_key, anim, hand)
+
+
+# Fast swing frames replace the weapon art with a baked smear arc: the canvas
+# centre is the grip pivot, so it sits exactly on the hand anchor with no
+# rotation (arc angles are absolute; the facing flip mirrors them, matching
+# held_rotation's negation). The glove keeps riding the anchor — the fist
+# leads the swing. Weapon slot stays hidden for the frame ("crunch" style:
+# the smear fully replaces the weapon, no ghost).
+func _update_smear(slot: Sprite2D, smear: Sprite2D, info: Dictionary,
+		item_key: String, anim: String, hand: String) -> void:
+	if smear == null:
+		return
+	var arc: Variant = null
+	if info.has("smear_img") and DebugManager.smears_enabled:
+		arc = smear_arc(_hero_meta, item_key, anim, hand, _sprite.frame,
+				info.get("smear_params", {}) as Dictionary)
+	if arc == null:
+		smear.visible = false
+		return
+	var a := arc as Dictionary
+	smear.texture = SmearGen.texture_for(String(info["smear_art"]),
+			info["smear_img"] as Image, info["smear_grip"] as Vector2i,
+			float(a["from"]), float(a["to"]),
+			info.get("smear_params", {}) as Dictionary)
+	smear.visible = true
+	slot.visible = false
+	smear.position = slot.position
+	smear.flip_h = _sprite.flip_h
+	smear.z_index = slot.z_index
+	smear.modulate = slot.modulate
 
 
 func _on_animation_finished() -> void:

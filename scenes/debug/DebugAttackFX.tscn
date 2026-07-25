@@ -29,3 +29,7 @@ text = "FX: Blocked"
 
 [node name="KillBtn" type="Button" parent="Panel"]
 text = "FX: Kill beat"
+
+[node name="SmearBtn" type="Button" parent="Panel"]
+toggle_mode = true
+text = "Smears: ON"

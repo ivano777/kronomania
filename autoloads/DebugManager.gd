@@ -8,6 +8,11 @@ var enabled: bool = false
 # the tool returns here on exit instead of quitting. Empty = standalone run.
 var return_scene: String = ""
 
+# Battle-debug toggle for procedural weapon smear frames (SmearGen). ON by
+# default — production behaviour; the debug dock widget can switch it off to
+# compare swings with the raw held art.
+var smears_enabled: bool = true
+
 # True once DevHubScene initialised its persistent dev sandbox (999pt
 # progression, run_active, active_slot 0). Scene jumps keep state while set.
 # Cleared by MainMenu when real play starts (New Game / Load).
