@@ -149,6 +149,92 @@ static func held_back_grip(front_meta: Dictionary, back_meta: Dictionary) -> Var
 	return back_meta.get("grip", front_meta.get("grip"))
 
 
+# ── Per-hero override chain ───────────────────────────────────────────────────
+# Hero manifests may override item behaviour in two tiers on top of the item's
+# own held/<key>.json (tier 1): "item_defaults" (tier 2 — this hero, every
+# item) and "items": {<key>: {...}} (tier 3 — this hero, one item). Each field
+# resolves independently; the highest tier that authors a non-null value WINS
+# outright (replace, never stack), null/missing falls through to the tier below.
+# flip_h/flip_v/pos/rot accept a scalar (both hands) OR a per-hand object
+# {"main": ..., "off": ...} — a missing hand key counts as unauthored and falls
+# through the chain like any null. "anims" tables are per-hand by nature.
+
+
+## Unwraps a possibly per-hand override value: {"main"/"off": ...} picks the
+## hand's entry (null when the hand is absent); a scalar passes through.
+static func held_hand_value(v: Variant, hand: String) -> Variant:
+	if v is Dictionary:
+		return (v as Dictionary).get(hand)
+	return v
+
+
+## Walks tier 3 → tier 2 for one field; null = no override (caller applies the
+## tier-1 base). Explicit JSON null is treated as absent, per the chain rule.
+## Every field except "anims" is unwrapped per-hand; an unwrap miss lets the
+## LOWER tier serve the hand.
+static func held_override_field(hero_meta: Dictionary, key: String, field: String,
+		hand: String = "") -> Variant:
+	var items: Variant = hero_meta.get("items")
+	if items is Dictionary:
+		var v: Variant = _entry_field((items as Dictionary).get(key), field, hand)
+		if v != null:
+			return v
+	return _entry_field(hero_meta.get("item_defaults"), field, hand)
+
+
+## One tier's contribution for a field: null when the entry doesn't author it
+## (or authors it for other hands only).
+static func _entry_field(entry: Variant, field: String, hand: String) -> Variant:
+	if entry is Dictionary and (entry as Dictionary).get(field) != null:
+		var v: Variant = (entry as Dictionary)[field]
+		if field != "anims":
+			v = held_hand_value(v, hand)
+		return v
+	return null
+
+
+## Effective art mirror for the SHOWN texture: override chain (keyed by the
+## shown art's key, so a <key>_back variant is overridden independently of the
+## front) → the art's own held/<key>.json flag → false. Both the overrides and
+## the art's own flag may be per-hand objects.
+static func held_flip(hero_meta: Dictionary, art_key: String, art_meta: Dictionary,
+		field: String, hand: String = "") -> bool:
+	var ovr: Variant = held_override_field(hero_meta, art_key, field, hand)
+	if ovr != null:
+		return bool(ovr)
+	var own: Variant = held_hand_value(art_meta.get(field), hand)
+	return bool(own) if own != null else false
+
+
+## Per-hero anchor position delta for an item ("pos" [dx, dy], unflipped px).
+## Zero when no tier authors one, or on a malformed value.
+static func held_ovr_pos(hero_meta: Dictionary, key: String, hand: String = "") -> Vector2i:
+	return json_v2i(held_override_field(hero_meta, key, "pos", hand), Vector2i.ZERO)
+
+
+## Per-hero anchor rotation delta for an item ("rot", deg in unflipped terms —
+## negated with the rest of the entry when the sprite is mirrored).
+static func held_ovr_rot(hero_meta: Dictionary, key: String, hand: String = "") -> float:
+	var r: Variant = held_override_field(hero_meta, key, "rot", hand)
+	if r is float or r is int:
+		return float(r)
+	return 0.0
+
+
+## Anchor for (anim, hand, frame) honouring the per-item chain: an "anims"
+## table from the override chain wins per lookup; any miss inside it (anim,
+## hand, or empty table) falls through to the hero-level tables — an item
+## override can therefore never HIDE a hand the hero tables show.
+static func anchor_entry_for_item(hero_meta: Dictionary, key: String, anim: String,
+		hand: String, frame: int) -> Variant:
+	var ovr: Variant = held_override_field(hero_meta, key, "anims")
+	if ovr is Dictionary:
+		var entry: Variant = anchor_entry({"anims": ovr}, anim, hand, frame)
+		if entry != null:
+			return entry
+	return anchor_entry(hero_meta, anim, hand, frame)
+
+
 ## Per-hand glove fine-tune entry [dx, dy, drot] from the hero manifest
 ## ("glove_off"). Accepts legacy 2-element [dx, dy] (rot 0). Missing → zeros.
 static func _glove_entry(hero_meta: Dictionary, hand: String) -> Array:
@@ -254,22 +340,25 @@ func _bind_held(slot: Sprite2D, glove: Sprite2D, hand: String, item: EquipmentDa
 	var order := held_order(meta, hand)
 	var grip_value: Variant = meta.get("grip")
 	var art_meta := meta   # meta of the texture actually shown (front or back)
+	var art_key := key     # key of the shown art — flip overrides resolve per shown art
 	# Behind-the-body slots show the item's internal side when the art ships one
 	# (asymmetric items, e.g. shields); its own grip wins, else the front's.
 	if held_layer_z(order, "weapon") < 0:
 		var back := SpriteRegistry.get_held(key + "_back")
 		if back != null:
 			tex = back
-			art_meta = SpriteRegistry.get_held_meta(key + "_back")
+			art_key = key + "_back"
+			art_meta = SpriteRegistry.get_held_meta(art_key)
 			grip_value = held_back_grip(meta, art_meta)
 	var grip_default := Vector2i(tex.get_width() / 2, tex.get_height() / 2)
 	var grip_px := json_v2i(grip_value, grip_default)
 	# Per-art mirror ("flip_h"/"flip_v"), stacked on top of the hero's facing
-	# flip. Read from the shown art's own meta so a <key>_back variant flips
-	# independently of the front. Rotation is unaffected — the item still points
-	# where its anchor rot° says; only the art mirrors.
-	var item_flip_h := bool(art_meta.get("flip_h", false))
-	var item_flip_v := bool(art_meta.get("flip_v", false))
+	# flip. Resolved through the per-hero override chain, keyed by the shown
+	# art's key so a <key>_back variant flips independently of the front.
+	# Rotation is unaffected — the item still points where its anchor rot° says;
+	# only the art mirrors.
+	var item_flip_h := held_flip(_hero_meta, art_key, art_meta, "flip_h", hand)
+	var item_flip_v := held_flip(_hero_meta, art_key, art_meta, "flip_v", hand)
 	var eff_flip_h := _sprite.flip_h != item_flip_h
 	slot.texture = tex
 	slot.flip_h = eff_flip_h
@@ -277,7 +366,7 @@ func _bind_held(slot: Sprite2D, glove: Sprite2D, hand: String, item: EquipmentDa
 	slot.offset = held_slot_offset(grip_px, tex.get_size(), eff_flip_h, item_flip_v)
 	slot.modulate = AttackPresenter.rarity_tint(item.rarity)
 	slot.z_index = held_layer_z(order, "weapon")
-	_held_info[hand] = {"planted": bool(meta.get("planted", false))}
+	_held_info[hand] = {"planted": bool(meta.get("planted", false)), "key": key}
 	if "hand" in order:
 		_bind_glove(glove, order)
 
@@ -305,23 +394,30 @@ func _update_held_frame() -> void:
 		var hand := trio[2] as String
 		if slot == null:
 			continue
+		var info := _held_info.get(hand, {}) as Dictionary
+		var item_key := String(info.get("key", ""))
 		var entry: Variant = null
 		if slot.texture != null and not _is_dead:
 			var anim := String(_sprite.animation)
-			var planted: bool = (_held_info.get(hand, {}) as Dictionary).get("planted", false)
+			var planted: bool = info.get("planted", false)
 			if not (planted and anim != "idle"):
-				entry = anchor_entry(_hero_meta, anim, hand, _sprite.frame)
+				entry = anchor_entry_for_item(_hero_meta, item_key, anim, hand, _sprite.frame)
 		if entry == null:
 			slot.visible = false
 			if glove != null:
 				glove.visible = false
 			continue
 		var e := entry as Array
+		# Per-hero item deltas ride on top of whichever table resolved the entry
+		# (unflipped terms; the mirror below handles facing). Glove follows the
+		# slot, so it inherits both automatically.
+		var dpos := held_ovr_pos(_hero_meta, item_key, hand)
 		slot.visible = true
 		slot.position = held_slot_position(
-				_frame_size, Vector2i(int(e[0]), int(e[1])), _sprite.flip_h)
+				_frame_size, Vector2i(int(e[0]) + dpos.x, int(e[1]) + dpos.y), _sprite.flip_h)
 		slot.rotation_degrees = held_rotation(
-				float(e[2]) if e.size() > 2 else 0.0, _sprite.flip_h)
+				(float(e[2]) if e.size() > 2 else 0.0) + held_ovr_rot(_hero_meta, item_key, hand),
+				_sprite.flip_h)
 		if glove != null:
 			glove.visible = glove.texture != null
 			glove.position = slot.position \

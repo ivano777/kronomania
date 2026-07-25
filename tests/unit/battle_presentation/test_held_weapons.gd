@@ -260,3 +260,134 @@ func test_shield_orders_hide_glove_and_flip_off_hand_behind() -> void:
 	assert_false("hand" in off_order, "off-hand shield draws no glove")
 	assert_lt(Combatant.held_layer_z(off_order, "weapon"), 0,
 			"off-hand shield must render behind the body")
+
+
+# ── per-hero override chain (item_defaults → items) ───────────────────────────
+
+const OVR_META := {
+	"main": [26, 42],
+	"anims": {
+		"idle": {"main": [[26, 42, 10], [27, 43, 10]]},
+	},
+	"item_defaults": {"flip_h": true, "rot": 5, "pos": [0, 1]},
+	"items": {
+		"iron_sword": {"rot": -15, "pos": [2, 0]},
+		"heater_shield_back": {"flip_h": false, "flip_v": true},
+		"arcane_focus": {"anims": {"idle": {"main": [[30, 40, -90], [31, 41, -90]]}}},
+	},
+}
+
+
+func test_override_field_tier3_beats_tier2() -> void:
+	assert_eq(Combatant.held_override_field(OVR_META, "iron_sword", "rot"), -15)
+	assert_eq(Combatant.held_override_field(OVR_META, "iron_sword", "pos"), [2, 0])
+
+
+func test_override_field_tier2_when_item_silent() -> void:
+	# iron_sword authors no flip_h → falls through to item_defaults
+	assert_eq(Combatant.held_override_field(OVR_META, "iron_sword", "flip_h"), true)
+	# unlisted item → item_defaults serves everything it authors
+	assert_eq(Combatant.held_override_field(OVR_META, "crude_club", "rot"), 5)
+
+
+func test_override_field_null_when_no_tier_authors() -> void:
+	assert_null(Combatant.held_override_field({}, "iron_sword", "rot"))
+	assert_null(Combatant.held_override_field(OVR_META, "iron_sword", "grip"))
+
+
+func test_override_field_explicit_null_falls_through() -> void:
+	var meta := {"item_defaults": {"rot": 5}, "items": {"iron_sword": {"rot": null}}}
+	assert_eq(Combatant.held_override_field(meta, "iron_sword", "rot"), 5)
+
+
+func test_held_flip_chain_beats_art_meta() -> void:
+	# tier 3 explicit false wins over the art's own flip_h true
+	assert_false(Combatant.held_flip(OVR_META, "heater_shield_back", {"flip_h": true}, "flip_h"))
+	assert_true(Combatant.held_flip(OVR_META, "heater_shield_back", {}, "flip_v"))
+	# no override chain → art meta rules
+	assert_true(Combatant.held_flip({}, "heater_shield", {"flip_h": true}, "flip_h"))
+	assert_false(Combatant.held_flip({}, "heater_shield", {}, "flip_h"))
+
+
+func test_held_ovr_deltas_replace_not_stack() -> void:
+	# tier 3 rot -15 replaces tier 2 rot 5 — never -10
+	assert_eq(Combatant.held_ovr_rot(OVR_META, "iron_sword"), -15.0)
+	assert_eq(Combatant.held_ovr_pos(OVR_META, "iron_sword"), Vector2i(2, 0))
+	# tier 2 serves items without their own entry
+	assert_eq(Combatant.held_ovr_rot(OVR_META, "crude_club"), 5.0)
+	assert_eq(Combatant.held_ovr_pos(OVR_META, "crude_club"), Vector2i(0, 1))
+	# empty chain → zeros
+	assert_eq(Combatant.held_ovr_rot({}, "iron_sword"), 0.0)
+	assert_eq(Combatant.held_ovr_pos({}, "iron_sword"), Vector2i.ZERO)
+
+
+func test_held_ovr_malformed_values_zero() -> void:
+	var meta := {"items": {"iron_sword": {"rot": "big", "pos": [1]}}}
+	assert_eq(Combatant.held_ovr_rot(meta, "iron_sword"), 0.0)
+	assert_eq(Combatant.held_ovr_pos(meta, "iron_sword"), Vector2i.ZERO)
+
+
+func test_anchor_for_item_override_table_wins() -> void:
+	assert_eq(Combatant.anchor_entry_for_item(OVR_META, "arcane_focus", "idle", "main", 1),
+			[31, 41, -90])
+
+
+func test_anchor_for_item_miss_falls_through_to_hero() -> void:
+	# arcane_focus override lacks "off" and any other anim → hero tables serve
+	assert_eq(Combatant.anchor_entry_for_item(OVR_META, "arcane_focus", "idle", "main", 0),
+			[30, 40, -90])
+	assert_null(Combatant.anchor_entry_for_item(OVR_META, "arcane_focus", "idle", "off", 0))
+	assert_eq(Combatant.anchor_entry_for_item(OVR_META, "iron_sword", "idle", "main", 1),
+			[27, 43, 10])
+
+
+func test_anchor_for_item_no_override_matches_plain_entry() -> void:
+	assert_eq(Combatant.anchor_entry_for_item(OVR_META, "crude_club", "idle", "main", 0),
+			Combatant.anchor_entry(OVR_META, "idle", "main", 0))
+
+
+# ── per-hand override values ──────────────────────────────────────────────────
+
+const HAND_META := {
+	"item_defaults": {"rot": 5},
+	"items": {
+		"iron_sword": {"rot": {"main": -15, "off": 30}, "pos": {"off": [1, 2]}},
+		"heater_shield": {"flip_h": {"off": true}},
+	},
+}
+
+
+func test_hand_value_unwraps_object_and_passes_scalar() -> void:
+	assert_eq(Combatant.held_hand_value({"main": 3, "off": 7}, "off"), 7)
+	assert_null(Combatant.held_hand_value({"off": 7}, "main"))
+	assert_eq(Combatant.held_hand_value(12, "main"), 12)
+
+
+func test_per_hand_rot_resolves_by_hand() -> void:
+	assert_eq(Combatant.held_ovr_rot(HAND_META, "iron_sword", "main"), -15.0)
+	assert_eq(Combatant.held_ovr_rot(HAND_META, "iron_sword", "off"), 30.0)
+
+
+func test_per_hand_missing_hand_falls_to_lower_tier() -> void:
+	# pos authored for off only → main falls through the chain (no tier-2 pos → zero)
+	assert_eq(Combatant.held_ovr_pos(HAND_META, "iron_sword", "off"), Vector2i(1, 2))
+	assert_eq(Combatant.held_ovr_pos(HAND_META, "iron_sword", "main"), Vector2i.ZERO)
+
+
+func test_per_hand_flip_only_named_hand() -> void:
+	assert_true(Combatant.held_flip(HAND_META, "heater_shield", {}, "flip_h", "off"))
+	assert_false(Combatant.held_flip(HAND_META, "heater_shield", {}, "flip_h", "main"))
+
+
+func test_per_hand_art_meta_flip_unwraps() -> void:
+	# the item's own held/<key>.json flag may itself be per-hand
+	var art := {"flip_h": {"off": true}}
+	assert_true(Combatant.held_flip({}, "heater_shield", art, "flip_h", "off"))
+	assert_false(Combatant.held_flip({}, "heater_shield", art, "flip_h", "main"))
+
+
+func test_per_hand_miss_falls_to_tier2_scalar() -> void:
+	var meta := {"item_defaults": {"rot": 5}, "items": {"iron_sword": {"rot": {"off": 9}}}}
+	assert_eq(Combatant.held_ovr_rot(meta, "iron_sword", "off"), 9.0)
+	# main not authored at tier 3 → tier-2 scalar serves it
+	assert_eq(Combatant.held_ovr_rot(meta, "iron_sword", "main"), 5.0)

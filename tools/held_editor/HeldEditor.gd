@@ -25,6 +25,16 @@ extends Control
 #     RESET GLOVE returns it to the weapon's pose. Saved as hero "glove_off"
 #     [dx, dy, drot]. "glv" checkbox hides the glove in the preview; "x-ray
 #     hero" dims the hero so items drawn behind the body (off-hand shield) show.
+#   OVR panel (PLAYER mode, left column) — per-hero override chain (schema in
+#     SpriteRegistry): target "(no ovr)" edits the hero base tables as always;
+#     "hero dflt" writes item_defaults (tier 2, every item); an item key writes
+#     items.<key> (tier 3). With a delta target active, the normal gumball/drag
+#     edits store the DIFFERENCE from the base table as "pos"/"rot" (base rows
+#     untouched); H/V buttons cycle the flip override inh→ON→off (item targets
+#     write it under the shown art's key, so behind-body slots override the
+#     _back variant). CPY snapshots the current anim+hand base rows into
+#     items.<key>.anims — after that, drags edit those per-frame rows directly.
+#     CLR wipes the target's overrides. All saved into the hero held.json.
 #
 # Keys: arrows nudge 1px · Q/E rotate 5° (Shift 1°) · ,/. frame · P play
 #       F flip · +/- zoom · Ctrl+S save · LMB drag · RMB pan
@@ -61,6 +71,9 @@ var _hero: String = ""
 var _frames: SpriteFrames = null
 var _manifest: Dictionary = {}
 var _tables: Dictionary = {}            # anim -> {"main"|"off": [[x,y,rot],..]}
+var _ovr_defaults: Dictionary = {}      # hero "item_defaults" override block (tier 2)
+var _ovr_items: Dictionary = {}         # hero "items" override block (tier 3), key -> dict
+var _ovr_target: String = ""            # "" = no ovr, "*" = hero defaults, else item key
 var _anim: String = "idle"
 var _frame: int = 0
 var _hand: String = "main"
@@ -104,6 +117,13 @@ var _chip_drag: Dictionary = {"hand": "", "from": -1, "x": 0.0}
 var _glove_edit_btn: Button
 var _picker_keys: Array[String] = []    # picker index -> item key (STUB + equippables)
 var _pickers: Array[Control] = []
+var _ovr_btn: OptionButton
+var _ovr_keys: Array[String] = []       # ovr option index -> target token ("", "*", key)
+var _ovr_h_btn: Button
+var _ovr_v_btn: Button
+var _ovr_copy_btn: Button
+var _ovr_clear_btn: Button
+var _ovr_controls: Array[Control] = []  # hero-mode-only OVR panel
 var _item_only: Array[Control] = []
 var _hero_only_btns: Array[Control] = []
 var _readout: Label
@@ -208,6 +228,9 @@ func _load_hero(hero: String) -> void:
 	_hero = hero
 	_frames = SpriteRegistry.get_combatant_frames(hero)
 	_manifest = SpriteRegistry.get_hero_held_meta(hero)
+	_ovr_defaults = (_manifest.get("item_defaults", {}) as Dictionary).duplicate(true)
+	_ovr_items = (_manifest.get("items", {}) as Dictionary).duplicate(true)
+	_ovr_target = ""
 	for hand in ["main", "off"]:
 		var e: Array = Combatant._glove_entry(_manifest, hand)
 		_glove_off[hand] = Vector2i(int(e[0]), int(e[1]))
@@ -239,6 +262,7 @@ func _load_hero(hero: String) -> void:
 	_frame = 0
 	_dirty = false
 	_playing = false
+	_rebuild_ovr_options()
 	_center_view()
 	_update_labels()
 	_canvas.queue_redraw()
@@ -255,6 +279,334 @@ func _row(hand: String) -> Array:
 	if _anim == "" or not _tables.has(_anim):
 		return [0, 0, 0]
 	return (_tables[_anim][hand] as Array)[_frame] as Array
+
+
+# ── Override chain (item_defaults / items) ────────────────────────────────────
+# Live editor state assembled into a hero-manifest shape so display and edit
+# math reuse the exact runtime resolution (Combatant.anchor_entry_for_item &c).
+
+func _ovr_meta() -> Dictionary:
+	return {"anims": _tables, "item_defaults": _ovr_defaults, "items": _ovr_items}
+
+
+## Chain-resolved [x, y, rot] for the item previewed in a hand, WITHOUT the
+## pos/rot deltas — the base the deltas ride on.
+func _base_resolved(hand: String) -> Array:
+	var key := _current_item(hand)
+	if key != "" and _anim != "" and _tables.has(_anim):
+		var e: Variant = Combatant.anchor_entry_for_item(_ovr_meta(), key, _anim, hand, _frame)
+		if e is Array and (e as Array).size() >= 2:
+			var a := e as Array
+			return [int(a[0]), int(a[1]), int(a[2]) if a.size() > 2 else 0]
+	return _row(hand)
+
+
+func _hand_dp(hand: String) -> Vector2i:
+	var key := _current_item(hand)
+	return Combatant.held_ovr_pos(_ovr_meta(), key, hand) if key != "" else Vector2i.ZERO
+
+
+func _hand_dr(hand: String) -> int:
+	var key := _current_item(hand)
+	return int(Combatant.held_ovr_rot(_ovr_meta(), key, hand)) if key != "" else 0
+
+
+## Effective displayed [x, y, rot] for a hand — what the runtime would render.
+## Crosshairs, gumballs, overlays and the glove all follow this.
+func _disp_row(hand: String) -> Array:
+	var base := _base_resolved(hand)
+	if _current_item(hand) == "":
+		return base
+	var dp := _hand_dp(hand)
+	return [int(base[0]) + dp.x, int(base[1]) + dp.y, int(base[2]) + _hand_dr(hand)]
+
+
+## Tier-3 per-frame override row for the OVR target in a hand (current anim /
+## frame, clamped like the runtime), or null when no such table exists.
+func _ovr_row(hand: String) -> Variant:
+	var entry: Variant = _ovr_items.get(_ovr_target)
+	if entry is Dictionary:
+		var anims: Variant = (entry as Dictionary).get("anims")
+		if anims is Dictionary and (anims as Dictionary).get(_anim) is Dictionary:
+			var per := (anims as Dictionary)[_anim] as Dictionary
+			if per.get(hand) is Array and not (per[hand] as Array).is_empty():
+				var arr := per[hand] as Array
+				return arr[clampi(_frame, 0, arr.size() - 1)]
+	return null
+
+
+## Where position/rotation edits for a hand land, given the OVR target:
+## "base" = hero tables (no target, or target not previewed in this hand);
+## "ovr_table" = the target item's per-frame rows; "delta_hero"/"delta_item"
+## = the target's "pos"/"rot" fields (difference from the base row).
+func _edit_kind(hand: String) -> String:
+	if _ovr_target == "" or _current_item(hand) == "":
+		return "base"
+	if _ovr_target == "*":
+		return "delta_hero"
+	if _current_item(hand) != _ovr_target:
+		return "base"
+	if _ovr_row(hand) != null:
+		return "ovr_table"
+	return "delta_item"
+
+
+## While an OVR target is active, base tables are never touched — an edit that
+## would fall through to "base" (target not in this hand) is refused instead,
+## so a stray drag can't silently corrupt the hero tables.
+func _ovr_blocks(kind: String, hand: String) -> bool:
+	if kind == "base" and _ovr_target != "":
+		_status.text = "OVR: no target in %s hand" % hand.to_upper()
+		return true
+	return false
+
+
+## Routes an absolute displayed content-px position into the active edit store.
+func _write_pos(hand: String, x: int, y: int) -> void:
+	if _ovr_blocks(_edit_kind(hand), hand):
+		return
+	match _edit_kind(hand):
+		"base":
+			var r := _row(hand)
+			r[0] = x
+			r[1] = y
+		"ovr_table":
+			var r := _ovr_row(hand) as Array
+			var dp := _hand_dp(hand)
+			r[0] = x - dp.x
+			r[1] = y - dp.y
+		_:
+			var base := _base_resolved(hand)
+			_set_target_pos(Vector2i(x - int(base[0]), y - int(base[1])), hand)
+	_mark_dirty()
+	if _edit_kind(hand).begins_with("delta"):
+		_status.text = "delta=ALL frms (CPY=per-frame)"
+
+
+## Routes an absolute displayed rotation (deg) into the active edit store.
+func _write_rot(hand: String, deg: int) -> void:
+	if _ovr_blocks(_edit_kind(hand), hand):
+		return
+	match _edit_kind(hand):
+		"base":
+			var r := _row(hand)
+			r[2] = wrapi(deg, -180, 181)
+		"ovr_table":
+			var r := _ovr_row(hand) as Array
+			r[2] = wrapi(deg - _hand_dr(hand), -180, 181)
+		_:
+			_set_target_rot(wrapi(deg - int(_base_resolved(hand)[2]), -180, 181), hand)
+	_mark_dirty()
+	if _edit_kind(hand).begins_with("delta"):
+		_status.text = "delta=ALL frms (CPY=per-frame)"
+
+
+## Override dict the OVR target's pos/rot/anims write into (created on demand).
+func _target_dict() -> Dictionary:
+	if _ovr_target == "*":
+		return _ovr_defaults
+	var e: Variant = _ovr_items.get(_ovr_target)
+	if not (e is Dictionary):
+		e = {}
+		_ovr_items[_ovr_target] = e
+	return e as Dictionary
+
+
+## Stores a per-hand override value inside a field that may hold a legacy
+## scalar: the scalar is first spread to both hands so the other hand keeps
+## its current value, then the edited hand is set (or cleared when zero).
+static func _set_hand_field(d: Dictionary, field: String, hand: String,
+		value: Variant, clear: bool) -> void:
+	var cur: Variant = d.get(field)
+	var obj: Dictionary = {}
+	if cur is Dictionary:
+		obj = cur as Dictionary
+	elif cur != null:
+		obj = {"main": cur, "off": cur}
+	if clear:
+		obj.erase(hand)
+	else:
+		obj[hand] = value
+	if obj.is_empty():
+		d.erase(field)
+	else:
+		d[field] = obj
+
+
+func _set_target_pos(p: Vector2i, hand: String) -> void:
+	_set_hand_field(_target_dict(), "pos", hand, [p.x, p.y], p == Vector2i.ZERO)
+	_prune_ovr_items()
+
+
+func _set_target_rot(r: int, hand: String) -> void:
+	_set_hand_field(_target_dict(), "rot", hand, r, r == 0)
+	_prune_ovr_items()
+
+
+func _prune_ovr_items() -> void:
+	for k in _ovr_items.keys():
+		if _ovr_items[k] is Dictionary and (_ovr_items[k] as Dictionary).is_empty():
+			_ovr_items.erase(k)
+
+
+## Hand the OVR target item is previewed in, or "".
+func _target_hand() -> String:
+	if _current_item("main") == _ovr_target:
+		return "main"
+	if _current_item("off") == _ovr_target:
+		return "off"
+	return ""
+
+
+## Art key the target's flip override belongs under: the _back variant when the
+## slot renders behind the body (matches the runtime shown-art rule).
+func _ovr_art_key() -> String:
+	if _ovr_target == "" or _ovr_target == "*":
+		return ""
+	var hand := _target_hand()
+	if hand != "":
+		var raw: Variant = _item_order.get(_ovr_target)
+		var order := Combatant.held_order({"order": raw} if raw != null else {}, hand)
+		if Combatant.held_layer_z(order, "weapon") < 0 and _item_tex.has(_ovr_target + "_back"):
+			return _ovr_target + "_back"
+	return _ovr_target
+
+
+## Dict holding the target's flip override fields, read-only ({} when absent).
+func _ovr_flip_dict_read() -> Dictionary:
+	if _ovr_target == "*":
+		return _ovr_defaults
+	var e: Variant = _ovr_items.get(_ovr_art_key())
+	return e as Dictionary if e is Dictionary else {}
+
+
+## Hand a flip/delta edit applies to: the hand holding an item target, else
+## the selected hand (hero-defaults target).
+func _flip_hand() -> String:
+	if _ovr_target != "" and _ovr_target != "*":
+		var h := _target_hand()
+		if h != "":
+			return h
+	return _hand
+
+
+## Cycles a flip override for the edit hand: inherit → ON → off → inherit.
+func _cycle_flip(axis: String) -> void:
+	if _mode != "hero" or _ovr_target == "":
+		return
+	var d := _ovr_defaults
+	if _ovr_target != "*":
+		var key := _ovr_art_key()
+		var e: Variant = _ovr_items.get(key)
+		if not (e is Dictionary):
+			e = {}
+			_ovr_items[key] = e
+		d = e as Dictionary
+	var field := "flip_" + axis
+	var hand := _flip_hand()
+	var cur: Variant = Combatant.held_hand_value(d.get(field), hand)
+	if cur == null:
+		_set_hand_field(d, field, hand, true, false)
+	elif bool(cur):
+		_set_hand_field(d, field, hand, false, false)
+	else:
+		_set_hand_field(d, field, hand, null, true)
+	_prune_ovr_items()
+	_sync_ovr_ui()
+	_mark_dirty()
+
+
+## Snapshots the current anim's base rows for the target's previewed hand into
+## items.<key>.anims — from then on drags edit those rows per-frame. Copying
+## the BASE rows keeps the visual unchanged (deltas keep riding on top).
+func _ovr_copy_anims() -> void:
+	if _mode != "hero" or _anim == "" or _ovr_target == "" or _ovr_target == "*":
+		return
+	var hand := _target_hand()
+	if hand == "":
+		_status.text = "target not previewed"
+		return
+	var rows: Array = []
+	for r in (_tables[_anim][hand] as Array):
+		var a := r as Array
+		rows.append([int(a[0]), int(a[1]), int(a[2])])
+	var d := _target_dict()
+	var anims: Dictionary = d.get("anims", {}) as Dictionary
+	var per: Dictionary = anims.get(_anim, {}) as Dictionary
+	per[hand] = rows
+	anims[_anim] = per
+	d["anims"] = anims
+	_mark_dirty()
+	_status.text = "OVR tbl %s/%s" % [_anim, hand]
+
+
+## Wipes every override the target owns (an item target also drops its _back
+## variant's flip entry).
+func _ovr_clear() -> void:
+	if _mode != "hero" or _ovr_target == "":
+		return
+	if _ovr_target == "*":
+		_ovr_defaults.clear()
+	else:
+		_ovr_items.erase(_ovr_target)
+		_ovr_items.erase(_ovr_target + "_back")
+	_sync_ovr_ui()
+	_mark_dirty()
+
+
+## Rebuilds the OVR target picker: none / hero defaults / the previewed items.
+func _rebuild_ovr_options() -> void:
+	if _ovr_btn == null:
+		return
+	_ovr_keys.clear()
+	_ovr_btn.clear()
+	_ovr_btn.add_item("(no ovr)")
+	_ovr_keys.append("")
+	_ovr_btn.add_item("hero dflt")
+	_ovr_keys.append("*")
+	for hand in ["main", "off"]:
+		var k := _current_item(hand)
+		if k != "" and k != STUB_KEY and k not in _ovr_keys:
+			_ovr_btn.add_item(k)
+			_ovr_keys.append(k)
+	var idx := _ovr_keys.find(_ovr_target)
+	if idx < 0:
+		idx = 0
+		_ovr_target = ""
+	_ovr_btn.selected = idx
+	_sync_ovr_ui()
+
+
+func _on_ovr_selected(i: int) -> void:
+	_ovr_target = _ovr_keys[i]
+	# Item target: jump the hand selection to the hand actually holding it, so
+	# the gumball the user grabs next edits the target, not the other hand.
+	if _ovr_target != "" and _ovr_target != "*":
+		var h := _target_hand()
+		if h != "":
+			_hand = h
+	_sync_ovr_ui()
+	_update_labels()
+
+
+## Flip-button captions + enabled states from the target's current overrides.
+func _sync_ovr_ui() -> void:
+	if _ovr_btn == null:
+		return
+	var has_target := _ovr_target != ""
+	var d := _ovr_flip_dict_read() if has_target else {}
+	for pair in [[_ovr_h_btn, "flip_h", "H"], [_ovr_v_btn, "flip_v", "V"]]:
+		var b := pair[0] as Button
+		b.disabled = not has_target
+		var v: Variant = Combatant.held_hand_value(d.get(pair[1]), _flip_hand())
+		var tag := "inh"
+		if v != null:
+			tag = "ON" if bool(v) else "off"
+		b.text = "%s·%s" % [pair[2], tag]
+	_ovr_copy_btn.disabled = not has_target or _ovr_target == "*"
+	_ovr_clear_btn.disabled = not has_target
+	if _canvas != null:
+		_canvas.queue_redraw()
 
 
 # ── UI construction ───────────────────────────────────────────────────────────
@@ -278,7 +630,7 @@ func _build_ui() -> void:
 	left.add_child(mode_box)
 
 	_hero_list = ItemList.new()
-	_hero_list.custom_minimum_size = Vector2(104, 72)
+	_hero_list.custom_minimum_size = Vector2(104, 56)
 	_hero_list.item_selected.connect(func(i: int) -> void: _load_hero(_heroes[i]))
 	left.add_child(_hero_list)
 
@@ -293,18 +645,40 @@ func _build_ui() -> void:
 	_anims_lbl = _mk_label("ANIMS")
 	left.add_child(_anims_lbl)
 	_anim_list = ItemList.new()
-	_anim_list.custom_minimum_size = Vector2(104, 92)
+	_anim_list.custom_minimum_size = Vector2(104, 76)
 	_anim_list.item_selected.connect(_on_anim_selected)
 	left.add_child(_anim_list)
 
-	var save_btn := Button.new()
-	save_btn.text = "SAVE"
-	save_btn.pressed.connect(_save)
-	save_btn.focus_mode = Control.FOCUS_NONE
-	left.add_child(save_btn)
+	var save_row := HBoxContainer.new()
+	var save_btn := _mk_btn("SAVE", _save)
+	save_row.add_child(save_btn)
 	var all_btn := _mk_btn("ALL FRMS", _apply_all_frames)
-	left.add_child(all_btn)
+	save_row.add_child(all_btn)
+	left.add_child(save_row)
+	var ovr_row := HBoxContainer.new()
+	ovr_row.add_child(_mk_label("OVR"))
+	_ovr_btn = OptionButton.new()
+	_tune_picker(_ovr_btn)
+	_ovr_btn.custom_minimum_size = Vector2(74, 0)
+	_ovr_btn.item_selected.connect(_on_ovr_selected)
+	ovr_row.add_child(_ovr_btn)
+	left.add_child(ovr_row)
+	var ovr_flip_row := HBoxContainer.new()
+	_ovr_h_btn = _mk_btn("H·inh", func() -> void: _cycle_flip("h"))
+	_ovr_v_btn = _mk_btn("V·inh", func() -> void: _cycle_flip("v"))
+	ovr_flip_row.add_child(_ovr_h_btn)
+	ovr_flip_row.add_child(_ovr_v_btn)
+	left.add_child(ovr_flip_row)
+	var ovr_btn_row := HBoxContainer.new()
+	_ovr_copy_btn = _mk_btn("CPY", _ovr_copy_anims)
+	_ovr_clear_btn = _mk_btn("CLR", _ovr_clear)
+	ovr_btn_row.add_child(_ovr_copy_btn)
+	ovr_btn_row.add_child(_ovr_clear_btn)
+	left.add_child(ovr_btn_row)
+	_ovr_controls = [ovr_row, ovr_flip_row, ovr_btn_row]
 	_status = _mk_label("")
+	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_status.custom_minimum_size = Vector2(104, 0)
 	left.add_child(_status)
 
 	# Canvas
@@ -332,7 +706,6 @@ func _build_ui() -> void:
 	right.add_child(_mk_legend("MAIN hand", COL_MAIN))
 	right.add_child(_mk_legend("OFF hand", COL_OFF))
 	right.add_child(_mk_legend("item GRIP", COL_GRIP))
-	right.add_child(_mk_label(" "))
 	_picker_keys.clear()
 	for k in _items:
 		if k == STUB_KEY or _is_equippable_key(k):
@@ -344,7 +717,9 @@ func _build_ui() -> void:
 	for k in _picker_keys:
 		_main_item_btn.add_item(k)
 	_main_item_btn.selected = 0
-	_main_item_btn.item_selected.connect(func(_i: int) -> void: _canvas.queue_redraw())
+	_main_item_btn.item_selected.connect(func(_i: int) -> void:
+		_rebuild_ovr_options()
+		_canvas.queue_redraw())
 	right.add_child(_main_item_btn)
 	var off_lbl := _mk_label("OFF item")
 	right.add_child(off_lbl)
@@ -354,21 +729,25 @@ func _build_ui() -> void:
 	for k in _picker_keys:
 		_off_item_btn.add_item(k)
 	_off_item_btn.selected = 0
-	_off_item_btn.item_selected.connect(func(_i: int) -> void: _canvas.queue_redraw())
+	_off_item_btn.item_selected.connect(func(_i: int) -> void:
+		_rebuild_ovr_options()
+		_canvas.queue_redraw())
 	right.add_child(_off_item_btn)
-	var alpha_lbl := _mk_label("item alpha")
-	right.add_child(alpha_lbl)
+	var alpha_row := HBoxContainer.new()
+	alpha_row.add_child(_mk_label("alpha"))
 	var alpha_slider := HSlider.new()
 	alpha_slider.min_value = 0.1
 	alpha_slider.max_value = 1.0
 	alpha_slider.step = 0.05
 	alpha_slider.value = _item_alpha
-	alpha_slider.custom_minimum_size = Vector2(96, 16)
+	alpha_slider.custom_minimum_size = Vector2(58, 16)
+	alpha_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	alpha_slider.focus_mode = Control.FOCUS_NONE
 	alpha_slider.value_changed.connect(func(v: float) -> void:
 		_item_alpha = v
 		_canvas.queue_redraw())
-	right.add_child(alpha_slider)
+	alpha_row.add_child(alpha_slider)
+	right.add_child(alpha_row)
 	var xray_box := CheckBox.new()
 	xray_box.text = "x-ray hero"
 	xray_box.focus_mode = Control.FOCUS_NONE
@@ -391,7 +770,7 @@ func _build_ui() -> void:
 	var glove_reset := _mk_btn("RESET GLOVE", _reset_glove)
 	right.add_child(glove_reset)
 	_pickers = [main_lbl, _main_item_btn, off_lbl, _off_item_btn,
-			alpha_lbl, alpha_slider, xray_box, glove_row, glove_reset, all_btn]
+			alpha_row, xray_box, glove_row, glove_reset, all_btn]
 	var flip_lbl := _mk_label("FLIP art")
 	right.add_child(flip_lbl)
 	var flip_row := HBoxContainer.new()
@@ -422,7 +801,6 @@ func _build_ui() -> void:
 	right.add_child(_strip_off)
 	_item_only = [flip_lbl, flip_row, order_hint, main_o_lbl, _glove_chk_main,
 			_strip_main, off_o_lbl, _glove_chk_off, _strip_off]
-	right.add_child(_mk_label(" "))
 	_readout = _mk_label("")
 	right.add_child(_readout)
 
@@ -533,6 +911,8 @@ func _apply_mode() -> void:
 		c.visible = not hero_mode
 	for c in _hero_only_btns:
 		c.visible = hero_mode
+	for c in _ovr_controls:
+		c.visible = hero_mode
 	_mode_hero_btn.modulate = Color(1, 1, 1) if hero_mode else Color(0.55, 0.55, 0.55)
 	_mode_item_btn.modulate = Color(0.55, 0.55, 0.55) if hero_mode else Color(1, 1, 1)
 	if not hero_mode:
@@ -545,6 +925,7 @@ func _apply_mode() -> void:
 	else:
 		_zoom = 5.0
 		_preview_edited_item()
+		_rebuild_ovr_options()
 	_center_view()
 	_update_labels()
 	_canvas.queue_redraw()
@@ -790,33 +1171,47 @@ func _nudge(dx: int, dy: int) -> void:
 			_item_grip[_item_sel] = g + Vector2i(ddx, ddy)
 			_mark_dirty()
 		return
-	var r := _row(_hand)
-	r[0] = int(r[0]) + dx
-	r[1] = int(r[1]) + dy
-	_mark_dirty()
+	var d := _disp_row(_hand)
+	_write_pos(_hand, int(d[0]) + dx, int(d[1]) + dy)
 
 
 func _rotate_by(deg: int) -> void:
 	if _mode != "hero":
 		return
-	var r := _row(_hand)
-	r[2] = wrapi(int(r[2]) + deg, -180, 181)
-	_mark_dirty()
+	_write_rot(_hand, int(_disp_row(_hand)[2]) + deg)
 
 
 ## Copies the selected hand's current [x, y, rot] onto every frame of the
 ## current animation — "save as default" for quickly blocking an anim out.
+## With an OVR per-frame table active it blankets the override rows instead;
+## delta targets are already all-frames, so there is nothing to copy.
 func _apply_all_frames() -> void:
 	if _mode != "hero" or _anim == "":
 		return
-	var cur := _row(_hand)
-	for r in (_tables[_anim][_hand] as Array):
-		var a := r as Array
-		a[0] = int(cur[0])
-		a[1] = int(cur[1])
-		a[2] = int(cur[2])
-	_mark_dirty()
-	_status.text = "%s > all %s" % [_hand.to_upper(), _anim]
+	if _ovr_blocks(_edit_kind(_hand), _hand):
+		return
+	match _edit_kind(_hand):
+		"base":
+			var cur := _row(_hand)
+			for r in (_tables[_anim][_hand] as Array):
+				var a := r as Array
+				a[0] = int(cur[0])
+				a[1] = int(cur[1])
+				a[2] = int(cur[2])
+			_mark_dirty()
+			_status.text = "%s > all %s" % [_hand.to_upper(), _anim]
+		"ovr_table":
+			var cur := _ovr_row(_hand) as Array
+			var anims := (_ovr_items[_ovr_target] as Dictionary)["anims"] as Dictionary
+			for r in ((anims[_anim] as Dictionary)[_hand] as Array):
+				var a := r as Array
+				a[0] = int(cur[0])
+				a[1] = int(cur[1])
+				a[2] = int(cur[2])
+			_mark_dirty()
+			_status.text = "OVR %s > all %s" % [_hand.to_upper(), _anim]
+		_:
+			_status.text = "delta is all-frames"
 
 
 func _mark_dirty() -> void:
@@ -849,13 +1244,29 @@ func _update_labels() -> void:
 		_readout.text = ""
 		return
 	_frame_lbl.text = "frm %d/%d" % [_frame + 1, _frames.get_frame_count(_anim)]
-	var m := _row("main")
-	var o := _row("off")
+	var m := _disp_row("main")
+	var o := _disp_row("off")
 	var gv: Vector2i = _glove_off[_hand]
 	var edit := " EDIT" if _glove_edit else ""
-	_readout.text = "hand: %s\nMAIN %d,%d r%d\nOFF %d,%d r%d\nGLV %+d,%+d r%+d%s" % [
+	_readout.text = "hand: %s\nMAIN %d,%d r%d\nOFF %d,%d r%d\nGLV %+d,%+d r%+d%s%s" % [
 		_hand.to_upper(), m[0], m[1], m[2], o[0], o[1], o[2],
-		gv.x, gv.y, int(_glove_rot[_hand]), edit]
+		gv.x, gv.y, int(_glove_rot[_hand]), edit, _ovr_readout()]
+
+
+## Extra readout line while an OVR target is active: target, its stored
+## deltas, and TBL when a per-frame override table serves the selected hand.
+func _ovr_readout() -> String:
+	if _ovr_target == "":
+		return ""
+	var tgt := "hero" if _ovr_target == "*" else _ovr_target.left(12)
+	var td := _ovr_defaults if _ovr_target == "*" \
+			else (_ovr_items.get(_ovr_target, {}) as Dictionary)
+	var hand := _flip_hand()
+	var p := Combatant.json_v2i(Combatant.held_hand_value(td.get("pos"), hand), Vector2i.ZERO)
+	var rv: Variant = Combatant.held_hand_value(td.get("rot"), hand)
+	var rr := int(rv) if (rv is int or rv is float) else 0
+	var tbl := " TBL" if _ovr_row(_hand) != null else ""
+	return "\nOVR %s %s\ndP%+d,%+d dR%+d%s" % [tgt, hand.to_upper(), p.x, p.y, rr, tbl]
 
 
 static func _abbr_order(s: String) -> String:
@@ -923,7 +1334,7 @@ func _center_and_redraw() -> void:
 
 
 func _anchor_screen(hand: String) -> Vector2:
-	var r := _row(hand)
+	var r := _disp_row(hand)
 	return _to_screen(Vector2(int(r[0]) + 0.5, int(r[1]) + 0.5))
 
 
@@ -951,7 +1362,7 @@ func _grip_screen() -> Vector2:
 
 
 func _knob_screen() -> Vector2:
-	var r := _row(_hand)
+	var r := _disp_row(_hand)
 	var rot := deg_to_rad(Combatant.held_rotation(float(r[2]), _flip))
 	return _anchor_screen(_hand) + Vector2(sin(rot), -cos(rot)) * 34.0
 
@@ -1067,12 +1478,15 @@ func _draw_held_pass(behind: bool) -> void:
 			var draw_key := key
 			if wz < 0 and _item_tex.has(key + "_back"):
 				draw_key = key + "_back"
-			# flip read from the art actually shown, so a _back variant flips
-			# independently of the front (matches Combatant._bind_held).
+			# flip resolved through the per-hero override chain, keyed by the art
+			# actually shown, so a _back variant flips independently of the front
+			# (matches Combatant._bind_held).
 			_draw_overlay(_item_tex[draw_key], _item_grip[draw_key], hand,
 					Vector2.ZERO, _item_alpha, 0.0,
-					bool(_item_fliph.get(draw_key, false)),
-					bool(_item_flipv.get(draw_key, false)))
+					Combatant.held_flip(_ovr_meta(), draw_key,
+							{"flip_h": _item_fliph.get(draw_key, false)}, "flip_h", hand),
+					Combatant.held_flip(_ovr_meta(), draw_key,
+							{"flip_v": _item_flipv.get(draw_key, false)}, "flip_v", hand))
 		if _glove_show and "hand" in order and _item_tex.has("_glove"):
 			if (Combatant.held_layer_z(order, "hand") < 0) == behind:
 				_draw_overlay(_item_tex["_glove"], _item_grip["_glove"], hand,
@@ -1087,7 +1501,7 @@ func _draw_held_pass(behind: bool) -> void:
 ## result as Sprite2D.flip_h/flip_v + held_slot_offset at runtime.
 func _draw_overlay(tex: Texture2D, grip: Vector2i, hand: String, extra: Vector2,
 		alpha: float, rot_extra: float = 0.0, flip_h: bool = false, flip_v: bool = false) -> void:
-	var r := _row(hand)
+	var r := _disp_row(hand)
 	var rot := deg_to_rad(Combatant.held_rotation(float(r[2]) + rot_extra, _flip))
 	var anchor := _to_screen(Vector2(int(r[0]) + 0.5, int(r[1]) + 0.5) + extra)
 	var sx := -1.0 if _flip != flip_h else 1.0
@@ -1099,7 +1513,7 @@ func _draw_overlay(tex: Texture2D, grip: Vector2i, hand: String, extra: Vector2,
 
 
 func _glove_screen(hand: String) -> Vector2:
-	var r := _row(hand)
+	var r := _disp_row(hand)
 	return _to_screen(Vector2(int(r[0]) + 0.5, int(r[1]) + 0.5) + Vector2(_glove_off[hand]))
 
 
@@ -1108,7 +1522,7 @@ func _glove_screen(hand: String) -> Vector2:
 const GLOVE_RING := 44.0
 
 func _glove_knob_screen(hand: String) -> Vector2:
-	var deg := float(_row(hand)[2]) + int(_glove_rot[hand])
+	var deg := float(_disp_row(hand)[2]) + int(_glove_rot[hand])
 	var rot := deg_to_rad(Combatant.held_rotation(deg, _flip))
 	return _glove_screen(hand) + Vector2(sin(rot), -cos(rot)) * GLOVE_RING
 
@@ -1117,7 +1531,7 @@ func _glove_knob_screen(hand: String) -> Vector2:
 ## position: mapped-back point minus the hand anchor.
 func _set_glove_from_mouse(screen_pos: Vector2) -> void:
 	var p := _from_screen(screen_pos)
-	var r := _row(_hand)
+	var r := _disp_row(_hand)
 	_glove_off[_hand] = Vector2i(int(floor(p.x)) - int(r[0]), int(floor(p.y)) - int(r[1]))
 	_mark_dirty()
 
@@ -1163,10 +1577,7 @@ func _canvas_input(ev: InputEvent) -> void:
 		match _drag_mode:
 			"main", "off":
 				var p := _from_screen(mm.position)
-				var r := _row(_drag_mode)
-				r[0] = int(floor(p.x))
-				r[1] = int(floor(p.y))
-				_mark_dirty()
+				_write_pos(_drag_mode, int(floor(p.x)), int(floor(p.y)))
 			"grip":
 				_set_grip_from_mouse(mm.position)
 			"glove":
@@ -1177,7 +1588,7 @@ func _canvas_input(ev: InputEvent) -> void:
 				deg = Combatant.held_rotation(deg, _flip)
 				var snap := 1 if Input.is_key_pressed(KEY_SHIFT) else 5
 				# stored value is the delta from the weapon's current angle
-				var delta := int(round(deg / snap)) * snap - int(_row(_hand)[2])
+				var delta := int(round(deg / snap)) * snap - int(_disp_row(_hand)[2])
 				_glove_rot[_hand] = wrapi(delta, -180, 181)
 				_mark_dirty()
 			"rot":
@@ -1185,9 +1596,7 @@ func _canvas_input(ev: InputEvent) -> void:
 				var deg := rad_to_deg(atan2(d.x, -d.y))
 				deg = Combatant.held_rotation(deg, _flip)
 				var snap := 1 if Input.is_key_pressed(KEY_SHIFT) else 5
-				var r := _row(_hand)
-				r[2] = wrapi(int(round(deg / snap)) * snap, -180, 181)
-				_mark_dirty()
+				_write_rot(_hand, int(round(deg / snap)) * snap)
 			"pan":
 				_pan = _pan_start - (mm.position - _pan_mouse) / _zoom
 				_canvas.queue_redraw()
@@ -1345,6 +1754,8 @@ func _save_hero() -> void:
 		for v in (_manifest["idle_bob"] as Array):
 			bob_strs.append(str(int(v)))
 		s += "\t\"idle_bob\": [%s],\n" % ", ".join(bob_strs)
+	s += _fmt_ovr_defaults()
+	s += _fmt_ovr_items()
 	s += "\t\"anims\": {\n"
 	var anim_blocks: Array[String] = []
 	for anim in ANIMS:
@@ -1375,3 +1786,95 @@ func _fmt_rows(rows: Array) -> String:
 		var a := r as Array
 		parts.append("[%d, %d, %d]" % [int(a[0]), int(a[1]), int(a[2])])
 	return ", ".join(parts)
+
+
+## "item_defaults" manifest block, or "" when the hero authors none.
+func _fmt_ovr_defaults() -> String:
+	var body := _fmt_ovr_fields(_ovr_defaults, "\t\t")
+	if body == "":
+		return ""
+	return "\t\"item_defaults\": {\n%s\n\t},\n" % body
+
+
+## "items" manifest block (sorted keys, empty entries dropped), or "".
+func _fmt_ovr_items() -> String:
+	if _ovr_items.is_empty():
+		return ""
+	var entries: Array[String] = []
+	var keys := _ovr_items.keys()
+	keys.sort()
+	for k in keys:
+		if not (_ovr_items[k] is Dictionary):
+			continue
+		var body := _fmt_ovr_fields(_ovr_items[k] as Dictionary, "\t\t\t")
+		if body != "":
+			entries.append("\t\t\"%s\": {\n%s\n\t\t}" % [k, body])
+	if entries.is_empty():
+		return ""
+	return "\t\"items\": {\n%s\n\t},\n" % ",\n".join(entries)
+
+
+## Scalar formatters — "" = value carries nothing worth saving (inherit).
+static func _fmt_flip_scalar(v: Variant) -> String:
+	if v is bool:
+		return "true" if v else "false"
+	return ""
+
+
+static func _fmt_rot_scalar(v: Variant) -> String:
+	if (v is int or v is float) and int(v) != 0:
+		return str(int(v))
+	return ""
+
+
+static func _fmt_pos_scalar(v: Variant) -> String:
+	if v is Array and (v as Array).size() == 2 \
+			and not (int(v[0]) == 0 and int(v[1]) == 0):
+		return "[%d, %d]" % [int(v[0]), int(v[1])]
+	return ""
+
+
+## Formats a field that may be a scalar (both hands) or a per-hand object;
+## empty hands are dropped, an empty object collapses to "".
+static func _fmt_hand_field(v: Variant, fn: Callable) -> String:
+	if v is Dictionary:
+		var hp: Array[String] = []
+		for hand in ["main", "off"]:
+			var s: String = fn.call((v as Dictionary).get(hand))
+			if s != "":
+				hp.append("\"%s\": %s" % [hand, s])
+		if hp.is_empty():
+			return ""
+		return "{ %s }" % ", ".join(hp)
+	if v == null:
+		return ""
+	return fn.call(v)
+
+
+## Serializes one override dict's known fields (flip_h/flip_v/rot/pos/anims);
+## zero deltas and empty tables are omitted — absent = inherit. flip/rot/pos
+## may each be scalar or per-hand {"main": ..., "off": ...}.
+func _fmt_ovr_fields(d: Dictionary, ind: String) -> String:
+	var parts: Array[String] = []
+	var fmts := {"flip_h": _fmt_flip_scalar, "flip_v": _fmt_flip_scalar,
+			"rot": _fmt_rot_scalar, "pos": _fmt_pos_scalar}
+	for f in ["flip_h", "flip_v", "rot", "pos"]:
+		var s := _fmt_hand_field(d.get(f), fmts[f] as Callable)
+		if s != "":
+			parts.append("%s\"%s\": %s" % [ind, f, s])
+	var anims: Variant = d.get("anims")
+	if anims is Dictionary and not (anims as Dictionary).is_empty():
+		var ablocks: Array[String] = []
+		for anim in ANIMS:
+			if not (anims as Dictionary).get(anim) is Dictionary:
+				continue
+			var per := (anims as Dictionary)[anim] as Dictionary
+			var hparts: Array[String] = []
+			for hand in ["main", "off"]:
+				if per.get(hand) is Array and not (per[hand] as Array).is_empty():
+					hparts.append("%s\t\t\"%s\": [%s]" % [ind, hand, _fmt_rows(per[hand] as Array)])
+			if not hparts.is_empty():
+				ablocks.append("%s\t\"%s\": {\n%s\n%s\t}" % [ind, anim, ",\n".join(hparts), ind])
+		if not ablocks.is_empty():
+			parts.append("%s\"anims\": {\n%s\n%s}" % [ind, ",\n".join(ablocks), ind])
+	return ",\n".join(parts)

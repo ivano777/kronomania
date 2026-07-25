@@ -49,6 +49,23 @@ func get_held(key: String) -> Texture2D:
 #     shared glove off the hand anchor and rotates it relative to the weapon
 #     angle (unflipped px/deg, mirrored at runtime; 2-element legacy entry =
 #     drot 0); absent = 0.
+#     Optional per-hero override chain on top of the item's own json (tier 1):
+#     "item_defaults" (tier 2 — every item this hero holds) and "items":
+#     {"<key>": {...}} (tier 3 — one item). Fields, each resolved independently,
+#     highest tier with a non-null value wins outright (replace, never stack;
+#     null/missing falls through):
+#       "flip_h"/"flip_v" (bool) — art mirror, keyed by the SHOWN art's key
+#         (a <key>_back entry overrides only the back variant);
+#       "pos" [dx, dy] / "rot" (deg) — deltas added to the resolved anchor
+#         entry (unflipped terms, mirrored/negated at runtime), keyed by the
+#         item key;
+#       each of the four may be a scalar (both hands) or a per-hand object
+#         {"main": ..., "off": ...} — a missing hand counts as unauthored and
+#         falls through the chain (also honoured on the item's own flip flags);
+#       "anims" — per-frame anchor tables (same schema as the hero-level
+#         "anims"); a miss inside them (anim/hand/empty) falls through to the
+#         hero-level tables, so an item override cannot hide a hand.
+#     Resolution lives in Combatant.held_override_field and friends.
 
 func get_held_meta(key: String) -> Dictionary:
 	return _load_json("%s%s.json" % [_HELD_ROOT, key])
