@@ -39,7 +39,7 @@ extends Control
 # Keys: arrows nudge 1px · Q/E rotate 5° (Shift 1°) · ,/. frame · P play
 #       F flip · +/- zoom · Ctrl+S save · LMB drag · RMB pan
 
-const ANIMS: Array[String] = ["idle", "attack_melee", "cast_spell", "hurt"]
+const ANIMS: Array[String] = ["idle", "attack_melee", "attack_swipe", "cast_spell", "hurt"]
 const COL_MAIN := Color("ff8830")
 const COL_OFF := Color("30c8ff")
 const COL_GRIP := Color("ffe040")

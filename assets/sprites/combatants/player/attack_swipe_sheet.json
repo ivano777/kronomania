@@ -1,0 +1,10 @@
+{
+ "name": "player_attack_swipe",
+ "sheet": "attack_swipe_sheet.png",
+ "frame_width": 125,
+ "frame_height": 69,
+ "frame_count": 8,
+ "fps": 12,
+ "loop": false,
+ "layout": "horizontal_strip"
+}

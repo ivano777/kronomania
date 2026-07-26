@@ -98,7 +98,7 @@ _adding an `@export` field, or adding a `.tres` file._
 | `resources/data/weapons/crude_club.tres` | `EquipmentData` | item_name="Crude Club", tags=PackedStringArray("Blunt"), action_modifiers=Array[ExtResource("2_amscr")]([SubResource("Strike"), SubResource("Defend"), SubResource("Cast")]) | — |
 | `resources/data/weapons/greatsword.tres` | `EquipmentData` | item_name="Greatsword", flat_attack_bonus=1, tags=PackedStringArray("Sharp", "TwoHanded"), rarity="fine", impact_fx="SlashDiagonal", action_modifiers=Array[ExtResource("2_amscr")]([SubResource("Strike"), SubResource("Defend"), SubResource("Cast")]) | — |
 | `resources/data/weapons/heater_shield.tres` | `EquipmentData` | item_name="Heater Shield", tags=PackedStringArray("Shield"), action_modifiers=Array[ExtResource("2_amscr")]([SubResource("Strike"), SubResource("Defend"), SubResource("Cast")]) | — |
-| `resources/data/weapons/iron_sword.tres` | `EquipmentData` | item_name="Iron Sword", flat_attack_bonus=1, tags=PackedStringArray("Sharp"), rarity="fine", impact_fx="SlashDiagonal", action_modifiers=Array[ExtResource("2_amscr")]([SubResource("Strike"), SubResource("Defend"), SubResource("Cast")]) | — |
+| `resources/data/weapons/iron_sword.tres` | `EquipmentData` | item_name="Iron Sword", flat_attack_bonus=1, tags=PackedStringArray("Sharp"), rarity="fine", attack_anim="attack_swipe", impact_fx="SlashDiagonal" | — |
 | `resources/data/weapons/wizard_staff.tres` | `EquipmentData` | item_name="Wizard Staff", tags=PackedStringArray("TwoHanded", "MagicFocus", "Blunt"), rarity="arcane", action_modifiers=Array[ExtResource("2_amscr")]([SubResource("Strike"), SubResource("Cast")]) | — |
 | `theme/dark_fantasy.tres` | `—` | default_font=monogram-extended.ttf, default_font_size=16, Button/colors/font_color=Color(0.85, 0.8, 0.7, 1), Button/colors/font_disabled_color=Color(0.5, 0.47, 0.42, 1), Button/colors/font_hover_color=Color(1, 0.95, 0.85, 1), Button/colors/font_pressed_color=Color(0.85, 0.7, 0.2, 1) | — |
 
@@ -107,6 +107,8 @@ _adding an `@export` field, or adding a `.tres` file._
 | File | Class | Preloads |
 |------|-------|---------|
 | `scenes/battle/AttackPresenter.gd` | `AttackPresenter` | — |
+| `scenes/battle/AuraFX.gd` | `AuraFX` | — |
+| `scenes/battle/AuraGen.gd` | `AuraGen` | — |
 | `scenes/battle/BattleScene.gd` | `—` | `player_default.tres`, `CombatantHUD.tscn`, `Combatant.tscn` |
 | `scenes/battle/Combatant.gd` | `Combatant` | `impact_flash.gdshader` |
 | `scenes/battle/CombatantHUD.gd` | `CombatantHUD` | — |
@@ -135,3 +137,4 @@ _adding an `@export` field, or adding a `.tres` file._
 | `scenes/debug/DebugProgressionControl.gd` | — | — |
 | `scenes/debug/DebugWeaponSelector.gd` | — | — |
 | `scenes/debug/DevHubScene.gd` | — | — |
+| `scenes/debug/experiments/AuraStudioScene.gd` | — | — |

@@ -75,6 +75,12 @@ func _ready() -> void:
 	_status.modulate = Color(1.0, 0.8, 0.5)
 	right.add_child(_status)
 
+	# EXPERIMENTS — prototype toys, no sandbox needed. Lives in the right
+	# column: the left action column is already at the 360px height budget.
+	right.add_child(_mk_sep())
+	right.add_child(_mk_label("EXPERIMENTS"))
+	right.add_child(_mk_btn("Aura Lab", _open_aura_lab))
+
 	if DebugManager.sandbox_active:
 		_sync_picker_to_hero()
 	_refresh_info()
@@ -178,6 +184,10 @@ func _open_training() -> void:
 func _open_held_editor() -> void:
 	DebugManager.return_scene = _SELF_SCENE
 	get_tree().change_scene_to_file("res://tools/held_editor/HeldEditor.tscn")
+
+
+func _open_aura_lab() -> void:
+	get_tree().change_scene_to_file("res://scenes/debug/experiments/AuraStudioScene.tscn")
 
 
 func _reset_sandbox() -> void:

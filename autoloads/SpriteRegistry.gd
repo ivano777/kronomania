@@ -5,7 +5,7 @@ const _HELD_ROOT := "res://assets/sprites/held/"
 const _COMB_ROOT := "res://assets/sprites/combatants/"
 const _FX_ROOT := "res://assets/sprites/effects/"
 const _BG_ROOT := "res://assets/sprites/backgrounds/"
-const _ANIM_NAMES := ["idle", "attack_melee", "cast_spell", "hurt", "die"]
+const _ANIM_NAMES := ["idle", "attack_melee", "attack_swipe", "cast_spell", "hurt", "die"]
 
 # Converts a display name to a file-system key.
 static func icon_key(display_name: String) -> String:

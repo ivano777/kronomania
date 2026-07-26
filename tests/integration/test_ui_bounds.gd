@@ -15,6 +15,7 @@ const DEBUG_WIDGET_SCENES := [
 	"res://scenes/debug/DebugFervorDisplay.tscn",
 	"res://scenes/debug/DebugProgressionControl.tscn",
 	"res://scenes/debug/DebugWeaponSelector.tscn",
+	"res://scenes/debug/experiments/AuraStudioScene.tscn",
 ]
 
 
